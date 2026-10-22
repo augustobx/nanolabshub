@@ -57,6 +57,8 @@ export default function SaaSWorkspacePage() {
   if(!product)return <div className="min-w-0 flex-1"><Header/><div className="hub-content"><NotConnected title="Producto no registrado" explanation="El identificador solicitado no forma parte de las seis SaaS del portafolio."/><Link className="hub-text-link mt-4 inline-flex" href="/saas">Volver a SaaS</Link></div></div>;
   const app=ops?.apps.find(a=>a.slug===slug);
   const tenants=gov?.tenants.filter(t=>t.saas===slug)||[];
+  const source=gov?.sources?.find(item=>item.saas===slug);
+  const connected=source?.status==="available";
   const copies=(backups||[]).filter(b=>b.appSlug===slug);
   const last=copies.find(b=>b.status==="verified");
   const containers=app?.containers||[];
@@ -80,14 +82,15 @@ export default function SaaSWorkspacePage() {
           <Link className="hub-primary-action" href="/software"><ServerCog className="h-4 w-4"/> Acciones técnicas <ArrowUpRight className="h-4 w-4"/></Link>
         </div>
       </section>
+      {!connected && gov && <p role="status" className="rounded-xl border border-amber-300/20 p-3 text-xs text-amber-200">Lectura de tenants de {product.name} no conectada o no disponible. No significa cero clientes.</p>}
       {errors.length>0&&<p role="status" className="rounded-xl border border-amber-300/20 bg-amber-300/[0.05] px-4 py-3 text-xs text-amber-100">Datos parciales. No respondieron {errors.join(", ")}; no se sustituyen por cifras estimadas.</p>}
       <nav aria-label={"Secciones de "+product.name} className="flex gap-1 overflow-x-auto rounded-xl border border-white/[0.1] bg-[#1a2a3d] p-1.5">
         {TABS.map(t=><button key={t.id} type="button" onClick={()=>setTab(t.id)} aria-current={tab===t.id?"page":undefined} className={"min-h-10 shrink-0 rounded-lg px-4 text-[13px] font-semibold transition-colors "+(tab===t.id?"bg-[#3b5374] text-white shadow-sm":"text-slate-400 hover:bg-white/[0.06] hover:text-white")}>{t.label}</button>)}
       </nav>
       {tab==="overview"&&<div className="space-y-5">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <DataCell label="Tenants reportados" value={gov?tenants.length:"—"}/>
-          <DataCell label="Tenants activos" value={gov?tenants.filter(t=>t.status==="ACTIVE").length:"—"}/>
+          <DataCell label="Tenants reportados" value={connected?tenants.length:"—"}/>
+          <DataCell label="Tenants activos" value={connected?tenants.filter(t=>t.status==="ACTIVE").length:"—"}/>
           <DataCell label="Contenedores en ejecución" value={app?containers.filter(c=>c.state==="running").length+" de "+containers.length:"—"}/>
           <DataCell label="Último backup íntegro" value={backups?last?formatDate(last.createdAt):"Sin registro":"—"}/>
         </div>
@@ -101,7 +104,7 @@ export default function SaaSWorkspacePage() {
       </div>}
       {tab==="tenants"&&<section className="hub-card min-w-0 overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 p-5"><div><h2 className="hub-section-heading">Tenants de {product.name}</h2><p className="mt-1 text-xs text-slate-400">Información proporcionada por el conector existente; no asegura sincronización perfecta.</p></div><Link className="hub-primary-action" href={"/governance?saas="+slug}>Gestionar tenants <ArrowUpRight className="h-4 w-4"/></Link></div>
-        <div className="overflow-x-auto"><table className="min-w-[620px] w-full text-left text-[13px]"><thead><tr><th className="px-5">Empresa</th><th>Estado</th><th>Plan reportado</th><th>Registros</th><th>Dominio</th></tr></thead><tbody>{tenants.map(t=><tr className="border-t border-white/[0.06]" key={t.id}><td className="px-5 font-semibold text-white">{t.name}</td><td><span className="hub-state hub-state-neutral">{t.status}</span></td><td>{t.plan}</td><td>{t.metrics.totalRecords}</td><td className="max-w-48 truncate">{t.domain}</td></tr>)}{gov&&tenants.length===0&&<tr><td colSpan={5} className="p-6 text-center text-slate-400">El conector no reportó tenants para este producto.</td></tr>}{!gov&&<tr><td colSpan={5} className="p-6 text-center text-slate-400">Sin respuesta de la integración de clientes.</td></tr>}</tbody></table></div>
+        <div className="overflow-x-auto"><table className="min-w-[620px] w-full text-left text-[13px]"><thead><tr><th className="px-5">Empresa</th><th>Estado</th><th>Plan reportado</th><th>Registros</th><th>Dominio</th></tr></thead><tbody>{tenants.map(t=><tr className="border-t border-white/[0.06]" key={t.id}><td className="px-5 font-semibold text-white">{t.name}</td><td><span className="hub-state hub-state-neutral">{t.status}</span></td><td>{t.plan}</td><td>{t.metrics.totalRecords}</td><td className="max-w-48 truncate">{t.domain}</td></tr>)}{connected&&tenants.length===0&&<tr><td colSpan={5} className="p-6 text-center text-slate-400">El conector no reportó tenants para este producto.</td></tr>}{!connected&&<tr><td colSpan={5} className="p-6 text-center text-slate-400">Sin respuesta de la integración de clientes.</td></tr>}</tbody></table></div>
       </section>}
       {tab==="operation"&&<section className="hub-card space-y-5 p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="hub-section-heading">Operación técnica</h2><Link href="/software" className="hub-text-link">Abrir operaciones <ArrowUpRight className="h-4 w-4"/></Link></div>
