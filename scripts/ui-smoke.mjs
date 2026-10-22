@@ -92,6 +92,8 @@ try {
     await page.waitForURL((url) => url.pathname === "/", { timeout: 15000 });
     await page.getByRole("heading", { name: "Centro de control", level: 2 }).waitFor();
     await page.getByRole("heading", { name: "Aplicaciones y versiones" }).waitFor();
+    await page.getByText("Git por revisar").first().waitFor();
+    await page.getByText("Mismo commit · 1 cambios locales").first().waitFor();
     await page.screenshot({ path: `ui-screenshots/${device.name}-overview.png`, fullPage: true });
     if (device.name === "desktop") {
       await page.getByText("Commits diferentes").first().waitFor();
