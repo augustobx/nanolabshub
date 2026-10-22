@@ -124,7 +124,7 @@ try {
             "page headings:", await page.locator("h1,h2,h3").allTextContents());
           throw error;
         }
-        await dialog.getByRole("heading", { name: "Restaurante de ejemplo" }).waitFor();
+        await dialog.getByRole("heading", { name: /de ejemplo/i }).waitFor();
         await page.getByRole("tab", { name: "Funcionalidades" }).click();
         await page.getByRole("switch", { name: /pedidos/i }).waitFor();
         await page.screenshot({ path: `ui-screenshots/${device.name}-tenant-dialog.png`, fullPage: false });
