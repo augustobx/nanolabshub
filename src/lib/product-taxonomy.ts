@@ -25,6 +25,8 @@ export const SAAS_PRODUCTS: ReadonlyArray<{
     capabilities: { tenantRead: "connected", statusWrite: "pending", moduleWrite: "pending", impersonation: "pending", settings: "pending", activity: "pending" } },
   { slug: "onlygym", name: "OnlyGym", focus: "Gimnasios y membresías", domain: "onlygym.nanoapps.ar", category: "saas",
     capabilities: { tenantRead: "connected", statusWrite: "pending", moduleWrite: "pending", impersonation: "pending", settings: "pending", activity: "pending" } },
+  { slug: "onlymob", name: "OnlyMob", focus: "Gestión inmobiliaria y alquileres", domain: "onlymob.nanoapps.ar", category: "saas",
+    capabilities: { tenantRead: "connected", statusWrite: "pending", moduleWrite: "pending", impersonation: "pending", settings: "pending", activity: "pending" } },
   { slug: "onlyturn", name: "OnlyTurn", focus: "Turnos inteligentes", domain: "onlyturn.nanoapps.ar", category: "saas",
     capabilities: { tenantRead: "connected", statusWrite: "pending", moduleWrite: "pending", impersonation: "pending", settings: "pending", activity: "pending" } },
   { slug: "onlyerp", name: "OnlyERP", focus: "Gestión industrial y distribución", domain: "onlyerp.nanoapps.ar", category: "saas",
