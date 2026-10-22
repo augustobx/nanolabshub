@@ -125,11 +125,13 @@ try {
     await page.locator('input[type="password"]').fill("ci_smoke_password");
     await page.locator('button[type="submit"]').click();
     await page.waitForURL((url) => url.pathname === "/", { timeout: 15000 });
-    await page.getByRole("heading", { name: "Centro de control", level: 2 }).waitFor();
-    await page.getByRole("heading", { name: "Aplicaciones y versiones" }).waitFor();
+    await page.getByRole("heading", { name: "Toda tu operación, en orden." }).waitFor();
+    await page.getByRole("heading", { name: "Productos SaaS" }).waitFor();
+    await page.getByRole("link", { name: /Superadmin/i }).first().waitFor();
+    await page.screenshot({ path: `ui-screenshots/${device.name}-overview.png`, fullPage: true });
+    await page.goto(origin + "/operations", { waitUntil: "domcontentloaded" });
     await page.getByText("Git por revisar").first().waitFor();
     await page.locator("span:visible").filter({ hasText: "Mismo commit · 1 cambio local" }).first().waitFor();
-    await page.screenshot({ path: `ui-screenshots/${device.name}-overview.png`, fullPage: true });
     if (device.name === "desktop") {
       await page.getByText("Commits diferentes").first().waitFor();
       await page.getByRole("button", { name: "Logs de OnlyFood" }).first().click();
@@ -137,14 +139,18 @@ try {
       await page.getByText(/fixture: real logs/).waitFor();
       await page.keyboard.press("Escape");
     }
+    await page.screenshot({ path: `ui-screenshots/${device.name}-operations.png`, fullPage: true });
     if (device.name === "mobile") {
       const width = await page.evaluate(() => document.documentElement.scrollWidth);
       if (width > device.viewport.width + 4) throw new Error(`Mobile homepage overflows: ${width}px`);
     }
 
     for (const [path, label] of [
-      ["/governance", "Clientes y SaaS"],
-      ["/software", "Productos y versiones"],
+      ["/governance", "Clientes y tenants"],
+      ["/superadmin", "Superadmin"],
+      ["/saas", "Productos SaaS"],
+      ["/saas/onlyfood", "Espacio de SaaS"],
+      ["/software", "Aplicaciones y versiones"],
       ["/hardware", "Infraestructura"],
       ["/backups", "Copias de seguridad"],
       ["/networking", "Dominios y red"],
@@ -160,6 +166,22 @@ try {
         if (width > device.viewport.width + 4) {
           throw new Error(`Mobile horizontal overflow at ${path}: ${width}px (viewport ${device.viewport.width}px)`);
         }
+      }
+      if (path === "/saas") {
+        await page.getByRole("link", { name: "Abrir OnlyFood" }).waitFor();
+        await page.getByRole("link", { name: "Abrir OnlyPadel" }).waitFor();
+        if (await page.getByRole("link", { name: "Abrir NanoMonitor" }).count()) throw new Error("SaaS catalog includes internal apps");
+      }
+      if (path === "/saas/onlyfood") {
+        await page.getByRole("button", { name: "Tenants", exact: true }).click();
+        await page.getByRole("heading", { name: "Tenants de OnlyFood" }).waitFor();
+        await page.getByRole("button", { name: "Configuración" }).click();
+        await page.getByText("Pendiente de integración").first().waitFor();
+        await page.screenshot({ path: `ui-screenshots/${device.name}-saas-workspace.png`, fullPage: true });
+      }
+      if (path === "/superadmin") {
+        await page.getByRole("heading", { name: "Mapa de integración por producto" }).waitFor();
+        await page.getByText("0 / 6").waitFor();
       }
       if (path === "/backups") {
         await page.getByRole("heading", { name: "Generar backup manual" }).waitFor();
@@ -194,6 +216,7 @@ try {
         await archived.waitFor({ state: "hidden" });
 
         if (device.name === "desktop") {
+        await page.getByRole("button", { name: "SaaS" , exact: true }).click();
         const onlyFood = page.locator("#software-item-onlyfood");
         await onlyFood.getByRole("button", { name: "Archivar aplicación" }).click();
         const dialog = page.getByRole("dialog", { name: "Archivar aplicación" });
@@ -234,7 +257,7 @@ try {
     if (device.name === "mobile") {
       await page.goto(origin, { waitUntil: "domcontentloaded" });
       await page.getByRole("button", { name: "Abrir navegación" }).click();
-      await page.getByRole("navigation", { name: "Espacio de trabajo" }).getByRole("link", { name: /Clientes y SaaS/ }).waitFor();
+      await page.getByRole("navigation", { name: "Negocio" }).getByRole("link", { name: /Productos SaaS/ }).waitFor();
       await page.waitForTimeout(250);
       await page.screenshot({ path: "ui-screenshots/mobile-navigation.png", fullPage: false });
     }
