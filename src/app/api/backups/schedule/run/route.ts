@@ -1,4 +1,4 @@
-import { backupEngine } from "@/lib/backup-service";
+import { backupEngine, assertBackupSecurity } from "@/lib/backup-service";
 import { KNOWN_APPS } from "@/lib/apps-registry";
 import { timingSafeEqual } from "node:crypto";
 export const dynamic="force-dynamic";
@@ -11,6 +11,7 @@ export async function POST(req: Request) {
     return Response.json({success:false,error:"No autorizado"},{status:403});
   }
   try {
+    assertBackupSecurity();
     return Response.json({success:true,data:await backupEngine.tick(KNOWN_APPS)});
   } catch(error) {
     console.error("[scheduler]",error);
