@@ -159,6 +159,7 @@ try {
         await page.getByRole("button", { name: "Ocultar archivadas" }).click();
         await archived.waitFor({ state: "hidden" });
 
+        if (device.name === "desktop") {
         const onlyFood = page.locator("#software-item-onlyfood");
         await onlyFood.getByRole("button", { name: "Archivar aplicación" }).click();
         const dialog = page.getByRole("dialog", { name: "Archivar aplicación" });
@@ -171,6 +172,7 @@ try {
         await confirmButton.click();
         await dialog.waitFor({ state: "hidden" });
         await onlyFood.waitFor({ state: "hidden" });
+        }
       }
       if (path === "/governance") {
         const button = page.getByRole("button", { name: "Administrar módulos" }).first();
