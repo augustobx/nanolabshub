@@ -184,10 +184,10 @@ export default function NetworkingPage() {
           <div className="flex items-center justify-between border-b border-white/5 pb-3">
             <div>
               <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
-                <span>Tabla de Proxy Hosts Registrados</span>
+                <span>Inventario de dominios y proxy</span>
               </h2>
               <p className="text-xs text-gray-500 font-mono">
-                Gestionado centralmente por Nginx Proxy Manager en el servidor
+                Configuración documentada de rutas de Nginx Proxy Manager
               </p>
             </div>
             <a
@@ -200,7 +200,28 @@ export default function NetworkingPage() {
             </a>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="space-y-3 md:hidden">
+            {PROXY_ROUTES.map((route) => (
+              <div key={route.domain} className="rounded-xl border border-white/[0.08] bg-white/[0.025] p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <a href={`https://${route.domain}`} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex max-w-full items-center gap-1.5 break-all text-xs font-semibold text-slate-100 hover:text-brand-cyan">
+                      {route.domain} <ExternalLink className="h-3 w-3 shrink-0" />
+                    </a>
+                    <p className="mt-1 break-all text-[11px] text-slate-400">{route.forwardTarget}</p>
+                  </div>
+                  <span className="shrink-0 rounded-md bg-white/[0.05] px-2 py-1 text-[10px] text-slate-300">Declarado</span>
+                </div>
+                <div className="mt-3 border-t border-white/[0.08] pt-3 text-[11px]">
+                  <div className="text-slate-500">Certificado configurado</div>
+                  <div className="mt-1 break-all text-slate-300">{route.ssl}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-left text-xs font-mono">
               <thead className="bg-surface-100/60 text-gray-400 uppercase text-[10px] tracking-wider border-b border-white/5">
                 <tr>
@@ -227,7 +248,7 @@ export default function NetworkingPage() {
                       </a>
                     </td>
                     <td className="py-2.5 px-3 text-brand-cyan">{route.forwardTarget}</td>
-                    <td className="py-2.5 px-3 text-emerald-400 flex items-center gap-1">
+                    <td className="py-2.5 px-3 text-slate-300 flex items-center gap-1">
                       <ShieldCheck className="w-3.5 h-3.5" />
                       <span>{route.ssl}</span>
                     </td>
@@ -235,8 +256,8 @@ export default function NetworkingPage() {
                       {route.type}
                     </td>
                     <td className="py-2.5 px-3 text-right">
-                      <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                        ROUTED
+                      <span className="text-[10px] text-slate-300 bg-white/[0.06] px-2 py-1 rounded border border-white/10">
+                        Declarado
                       </span>
                     </td>
                   </tr>
