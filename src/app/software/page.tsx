@@ -185,16 +185,15 @@ export default function SoftwarePage() {
     <div className="flex-1 flex flex-col pb-12">
       <Header onRefresh={fetchApps} isRefreshing={isLoading} />
 
-      <div className="px-6 py-6 max-w-7xl w-full mx-auto space-y-6">
-        <div>
-          <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-            <Boxes className="w-5 h-5 text-brand-cyan" />
-            <span>Control de Software, Versiones & Despliegues</span>
-          </h1>
-          <p className="text-xs text-gray-400 font-mono mt-0.5">
-            Matriz de repositorios Git, estado de ramas, hashes de commit y orquestación de Docker Compose.
+      <div className="hub-content space-y-7">
+        <section className="hub-hero space-y-3">
+          <p className="hub-eyebrow">Productos / Aplicaciones</p>
+          <h1 className="hub-hero-title">Tus productos, bajo control.</h1>
+          <p className="hub-description">
+            Estado de aplicaciones, repositorios y despliegues de NanoLabs.
+            Encontrá cada producto y sus acciones sin navegar por diferentes consolas.
           </p>
-        </div>
+        </section>
 
         {/* Filters and Search Bar */}
         <div className="hub-card p-3 flex flex-col sm:flex-row items-center justify-between gap-3">
