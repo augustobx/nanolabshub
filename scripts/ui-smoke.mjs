@@ -90,7 +90,7 @@ try {
     await page.locator('input[type="password"]').fill("ci_smoke_password");
     await page.locator('button[type="submit"]').click();
     await page.waitForURL((url) => url.pathname === "/", { timeout: 15000 });
-    await page.getByRole("heading", { name: "Centro de control" }).waitFor();
+    await page.getByRole("heading", { name: "Centro de control", level: 2 }).waitFor();
     await page.getByRole("heading", { name: "Aplicaciones y versiones" }).waitFor();
     await page.screenshot({ path: `ui-screenshots/${device.name}-overview.png`, fullPage: true });
     if (device.name === "desktop") {
