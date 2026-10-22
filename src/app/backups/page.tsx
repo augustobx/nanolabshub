@@ -229,7 +229,7 @@ export default function BackupsPage() {
                   />
                 </label>
               </div>
-              <div role="group" aria-label="Aplicaciones con base de datos" className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              <div role="group" aria-label="Aplicaciones con base de datos" className="grid max-h-[500px] grid-cols-1 gap-2.5 overflow-y-auto overscroll-contain pr-1 sm:grid-cols-2 xl:max-h-[460px]">
                 {manualApps.map((app) => {
                   const latest = lastBackupFor(app.slug);
                   const active = manualAppSlug === app.slug;
@@ -298,7 +298,7 @@ export default function BackupsPage() {
                   </div>
                 )}
               </div>
-              <button type="button" disabled={!selectedManualApp || isTriggering !== null || isLoading || !!pageError}
+              <button type="button" disabled={!selectedManualApp || isTriggering !== null || isLoading}
                 onClick={() => setConfirmBackupSlug(selectedManualApp?.slug || null)}
                 className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border border-brand-cyan/30 bg-brand-cyan px-4 py-3 text-sm font-bold text-[#0b1b2d] shadow-lg shadow-cyan-900/10 transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-cyan disabled:cursor-not-allowed disabled:opacity-40">
                 {isTriggering ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4 fill-current" />}
