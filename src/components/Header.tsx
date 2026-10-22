@@ -11,7 +11,7 @@ interface HeaderProps {
 }
 
 const PAGE_INFO: Record<string, { title: string; section: string }> = {
-  "/": { title: "Resumen ejecutivo", section: "Inicio" },
+  "/": { title: "Centro de control", section: "Operaciones" },
   "/governance": { title: "Clientes y SaaS", section: "Negocio" },
   "/software": { title: "Productos y versiones", section: "Productos" },
   "/hardware": { title: "Infraestructura", section: "Plataforma" },
