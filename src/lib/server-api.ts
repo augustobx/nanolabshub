@@ -258,50 +258,6 @@ PY`;
 /**
  * Fetches all backups from /opt/backups
  */
-export async function getBackupsList(): Promise<BackupRecord[]> {
-  const script = `
-    echo Qap.1029Qap.1029 | sudo -S find /opt/backups -type f \\( -name "*.sql.gz" -o -name "*.sql" -o -name "*.dump" -o -name "*.sqlite" \\) -printf "%p|||%s|||%T+ \\n" 2>/dev/null
-  `;
-
-  const { stdout } = await executeRemoteCommand(script);
-  if (!stdout) return [];
-
-  const lines = stdout.split("\n").filter((l) => l.includes("|||"));
-  return lines.map((line, idx) => {
-    const [fullPath, sizeStr, dateStr] = line.split("|||");
-    const filename = fullPath.split("/").pop() || "";
-    const sizeBytes = parseInt(sizeStr || "0", 10);
-
-    // Determine app slug
-    let appSlug = "system";
-    for (const app of KNOWN_APPS) {
-      if (fullPath.includes(`/${app.slug}/`) || filename.toLowerCase().includes(app.slug)) {
-        appSlug = app.slug;
-        break;
-      }
-    }
-    const appDef = KNOWN_APPS.find((a) => a.slug === appSlug);
-
-    // Format size
-    const sizeMB = (sizeBytes / (1024 * 1024)).toFixed(2);
-    const sizeFormatted = sizeBytes > 1024 * 1024 ? `${sizeMB} MB` : `${Math.round(sizeBytes / 1024)} KB`;
-
-    return {
-      id: `backup-${idx}-${filename}`,
-      appSlug,
-      appName: appDef ? appDef.name : appSlug,
-      dbType: appDef ? appDef.dbType : "database",
-      filename,
-      path: fullPath,
-      sizeBytes,
-      sizeFormatted,
-      createdAt: dateStr ? dateStr.split(".")[0].replace("T", " ") : "Desconocido",
-      status: sizeBytes > 1024 ? "verified" : "failed",
-      storageLocation: "local",
-    };
-  });
-}
-
 /**
  * Triggers a deployment for a specific app: git pull && docker compose up -d --build
  */
