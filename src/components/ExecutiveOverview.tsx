@@ -60,14 +60,14 @@ export function ExecutiveOverview() {
           Los indicadores de negocio no están disponibles. Consultá el módulo de Clientes y SaaS para revisar las conexiones.
         </div>
       )}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         {metrics.map(({ label, value, helper, icon: Icon }) => (
-          <div key={label} className="hub-card hub-stat p-5">
+          <div key={label} className="hub-card hub-stat min-w-0 p-4 sm:p-5">
             <div className="flex items-start justify-between gap-3">
               <span className="text-xs font-medium text-slate-400">{label}</span>
               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#2b3957] text-[#acc0ff]"><Icon className="h-[17px] w-[17px]" /></span>
             </div>
-            <div className="mt-3 text-[30px] font-bold leading-tight tracking-[-0.045em] text-slate-50 tabular-nums">
+            <div className="mt-3 text-[27px] sm:text-[30px] font-bold leading-tight tracking-[-0.045em] text-slate-50 tabular-nums">
               {state === "ready" && typeof value === "number" ? value.toLocaleString("es-AR") : state === "loading" ? "…" : "—"}
             </div>
             <p className="mt-1 text-[11px] text-slate-500">{helper}</p>
