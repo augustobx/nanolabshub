@@ -6,135 +6,82 @@ import { ServerMetrics, ContainerInfo, AppInfo, BackupRecord } from "./types";
  * Parses and returns live server hardware and system telemetry
  */
 export async function getServerTelemetry(): Promise<ServerMetrics> {
-  const script = `
-    python3 -c "
-import os, sys, json, subprocess, shutil
+  // A real host sample: never turn a failed read into a healthy-looking example value.
+  // /host/proc is bind-mounted read-only from the dedicated Linux host.
+  const script = String.raw`python3 - <<'PY'
+import json, os, shutil, socket, subprocess, time
 
-data = {}
+proc = '/host/proc' if os.path.exists('/host/proc/stat') else '/proc'
 
-# Hostname & Uptime
-try:
-    data['hostname'] = os.uname().nodename
-    with open('/proc/uptime', 'r') as f:
-        uptime_seconds = float(f.readline().split()[0])
-        days = int(uptime_seconds // 86400)
-        hours = int((uptime_seconds % 86400) // 3600)
-        minutes = int((uptime_seconds % 3600) // 60)
-        data['uptime'] = f'{days}d {hours}h {minutes}m'
-except Exception as e:
-    data['hostname'] = 'sd-6331567-l'
-    data['uptime'] = 'N/A'
+def cpu_sample():
+    with open(proc + '/stat') as f:
+        values = [int(x) for x in f.readline().split()[1:]]
+    return sum(values), values[3] + values[4]
 
-data['osInfo'] = 'Debian GNU/Linux 13 (x86_64)'
+total1, idle1 = cpu_sample()
+time.sleep(0.25)
+total2, idle2 = cpu_sample()
+delta = total2 - total1
+cpu_pct = round(100 * (1 - (idle2 - idle1) / delta), 1) if delta > 0 else 0
 
-# CPU
-try:
-    cores = os.cpu_count() or 12
-    load1, load5, load15 = os.getloadavg()
-    # Estimate cpu usage percent from 1-min load vs cores
-    usage = min(100.0, round((load1 / cores) * 100, 1))
-    data['cpu'] = {
-        'cores': cores,
-        'usagePercent': usage,
-        'loadAvg': [round(load1, 2), round(load5, 2), round(load15, 2)]
-    }
-except Exception as e:
-    data['cpu'] = {'cores': 12, 'usagePercent': 15.0, 'loadAvg': [0.5, 0.5, 0.5]}
+with open(proc + '/meminfo') as f:
+    mem = {key.strip(): int(value.split()[0]) * 1024
+           for line in f if ':' in line
+           for key, value in [line.split(':', 1)]}
+total = mem['MemTotal']
+available = mem['MemAvailable']
+swap_total = mem.get('SwapTotal', 0)
+swap_used = swap_total - mem.get('SwapFree', 0)
 
-# Memory
-try:
-    with open('/proc/meminfo', 'r') as f:
-        lines = f.readlines()
-        mem = {}
-        for l in lines:
-            parts = l.split(':')
-            if len(parts) == 2:
-                mem[parts[0].strip()] = int(parts[1].strip().split()[0]) * 1024
-        
-        total = mem.get('MemTotal', 16 * 1024**3)
-        available = mem.get('MemAvailable', 8 * 1024**3)
-        used = total - available
-        swap_total = mem.get('SwapTotal', 4 * 1024**3)
-        swap_free = mem.get('SwapFree', 2 * 1024**3)
-        swap_used = swap_total - swap_free
+with open(proc + '/uptime') as f:
+    up_seconds = int(float(f.read().split()[0]))
+days, rem = divmod(up_seconds, 86400)
+hours, rem = divmod(rem, 3600)
+minutes = rem // 60
 
-        data['memory'] = {
-            'totalBytes': total,
-            'usedBytes': used,
-            'freeBytes': available,
-            'usedPercent': round((used / total) * 100, 1),
-            'swapTotalBytes': swap_total,
-            'swapUsedBytes': swap_used,
-            'swapUsedPercent': round((swap_used / swap_total) * 100, 1) if swap_total > 0 else 0
-        }
-except Exception:
-    data['memory'] = {
-        'totalBytes': 16593920000,
-        'usedBytes': 7733248000,
-        'freeBytes': 8860672000,
-        'usedPercent': 46.6,
-        'swapTotalBytes': 3700000000,
-        'swapUsedBytes': 1800000000,
-        'swapUsedPercent': 48.6
-    }
+# /opt/apps is the actual host filesystem mounted in the Hub container.
+disk_path = '/opt/apps' if os.path.ismount('/opt/apps') else '/'
+disk = shutil.disk_usage(disk_path)
 
-# Disks
-try:
-    disks = []
-    stat_root = shutil.disk_usage('/')
-    disks.append({
-        'filesystem': '/dev/nvme0n1p3',
-        'mount': '/',
-        'totalBytes': stat_root.total,
-        'usedBytes': stat_root.used,
-        'freeBytes': stat_root.free,
-        'usedPercent': round((stat_root.used / stat_root.total) * 100, 1)
-    })
-    data['disks'] = disks
-except Exception:
-    data['disks'] = [{
-        'filesystem': '/dev/nvme0n1p3',
-        'mount': '/',
-        'totalBytes': 496000000000,
-        'usedBytes': 166000000000,
-        'freeBytes': 330000000000,
-        'usedPercent': 33.5
-    }]
+info = subprocess.check_output(
+    ['docker', 'info', '--format',
+     '{{.Name}}|||{{.ServerVersion}}|||{{.Containers}}|||{{.ContainersRunning}}|||{{.ContainersPaused}}|||{{.ContainersStopped}}'],
+    text=True, timeout=8).strip().split('|||')
+if len(info) != 6:
+    raise RuntimeError('Docker returned incomplete server information')
 
-# Docker Info
-try:
-    out = subprocess.check_output(['docker', 'info', '--format', '{{.ContainersRunning}},{{.ContainersPaused}},{{.ContainersStopped}},{{.Containers}},{{.ServerVersion}}'], text=True).strip()
-    parts = out.split(',')
-    data['docker'] = {
-        'containersRunning': int(parts[0]),
-        'containersPaused': int(parts[1]),
-        'containersStopped': int(parts[2]),
-        'containersTotal': int(parts[3]),
-        'version': parts[4] if len(parts) > 4 else '29.7.2'
-    }
-except Exception:
-    data['docker'] = {
-        'containersRunning': 24,
-        'containersPaused': 0,
-        'containersStopped': 3,
-        'containersTotal': 27,
-        'version': '29.7.2'
-    }
-
-data['timestamp'] = subprocess.check_output(['date', '-Iseconds'], text=True).strip()
+data = {
+    'hostname': info[0],
+    'uptime': f'{days}d {hours}h {minutes}m',
+    'osInfo': os.uname().sysname + ' ' + os.uname().release,
+    'cpu': {'cores': os.cpu_count(), 'usagePercent': cpu_pct,
+            'loadAvg': [round(n, 2) for n in os.getloadavg()]},
+    'memory': {
+        'totalBytes': total, 'usedBytes': total - available, 'freeBytes': available,
+        'usedPercent': round(100 * (total - available) / total, 1),
+        'swapTotalBytes': swap_total, 'swapUsedBytes': swap_used,
+        'swapUsedPercent': round(100 * swap_used / swap_total, 1) if swap_total else 0
+    },
+    'disks': [{
+        'filesystem': 'Host filesystem', 'mount': disk_path,
+        'totalBytes': disk.total, 'usedBytes': disk.used,
+        'freeBytes': disk.free, 'usedPercent': round(100 * disk.used / disk.total, 1)
+    }],
+    'docker': {
+        'version': info[1], 'containersTotal': int(info[2]),
+        'containersRunning': int(info[3]), 'containersPaused': int(info[4]),
+        'containersStopped': int(info[5])
+    },
+    'timestamp': __import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat()
+}
 print(json.dumps(data))
-"
-  `;
-
-  const { stdout, code, stderr } = await executeRemoteCommand(script);
-  if (code !== 0 || !stdout) {
-    throw new Error(`Failed to fetch server telemetry: ${stderr}`);
-  }
-
+PY`;
+  const { stdout, stderr, code } = await executeRemoteCommand(script);
+  if (code !== 0 || !stdout) throw new Error(`No se pudo leer el estado real del servidor: ${stderr || 'sin datos'}`);
   try {
-    return JSON.parse(stdout);
-  } catch (err) {
-    throw new Error(`Malformed telemetry JSON: ${stdout}`);
+    return JSON.parse(stdout) as ServerMetrics;
+  } catch {
+    throw new Error("La telemetría real devolvió un formato incorrecto");
   }
 }
 
@@ -143,7 +90,8 @@ print(json.dumps(data))
  */
 export async function getContainers(): Promise<ContainerInfo[]> {
   const cmd = `docker ps -a --format '{{.ID}}|||{{.Names}}|||{{.Image}}|||{{.Status}}|||{{.Ports}}|||{{.CreatedAt}}'`;
-  const { stdout } = await executeRemoteCommand(cmd);
+  const { stdout, stderr, code } = await executeRemoteCommand(cmd);
+  if (code !== 0) throw new Error(`No se pudo consultar Docker: ${stderr || "error desconocido"}`);
   if (!stdout) return [];
 
   const lines = stdout.split("\n").filter(Boolean);
@@ -184,7 +132,7 @@ export async function getAppsStatus(): Promise<AppInfo[]> {
   const gitScript = `
     for item in ${pathsToCheck}; do
       slug=$(echo $item | cut -d: -f1)
-      p=$(echo $item | cut -d: -f3)
+      p=$(echo $item | cut -d: -f4-)
       if [ -d "$p/.git" ]; then
         branch=$(git -C "$p" branch --show-current 2>/dev/null || echo "detached")
         commit=$(git -C "$p" log -1 --format="%h;;;%s;;;%an;;;%ad" --date=short 2>/dev/null || echo "none;;;none;;;none;;;none")
