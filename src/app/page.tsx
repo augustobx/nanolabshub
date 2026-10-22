@@ -393,6 +393,7 @@ export default function MissionControlPage() {
               const isSaas = app.type === "saas";
               const isDegraded = app.status === "degraded";
               const isDown = app.status === "down";
+              const isDeploying = app.status === "deploying";
 
               return (
                 <div
@@ -419,17 +420,17 @@ export default function MissionControlPage() {
                         className={`text-[10px] font-mono px-2 py-0.5 rounded-full border flex items-center gap-1.5 ${
                           isDown
                             ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
-                            : isDegraded
+                            : (isDegraded || isDeploying)
                             ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
                             : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                         }`}
                       >
                         <span
                           className={`w-1.5 h-1.5 rounded-full ${
-                            isDown ? "bg-rose-400" : isDegraded ? "bg-amber-400" : "bg-emerald-400 animate-pulse"
+                            isDown ? "bg-rose-400" : (isDegraded || isDeploying) ? "bg-amber-400" : "bg-emerald-400"
                           }`}
                         />
-                        {app.status.toUpperCase()}
+                        {app.status === "operational" ? "Operativa" : app.status === "degraded" ? "Degradada" : app.status === "deploying" ? "Desplegando" : "Caída"}
                       </span>
                     </div>
 
