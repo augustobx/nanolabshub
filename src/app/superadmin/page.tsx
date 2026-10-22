@@ -31,6 +31,7 @@ export default function SuperadminPage() {
     finally{setLoading(false);}
   };
   useEffect(()=>{void load();},[]);
+  const healthySources=new Set(overview?.sources?.filter(x=>x.status==="available").map(x=>x.saas)||[]);
   return <div className="min-w-0 flex-1 pb-14"><Header onRefresh={()=>void load()} isRefreshing={loading}/>
     <div className="hub-content space-y-6">
       <section className="hub-hero space-y-3">
@@ -41,7 +42,7 @@ export default function SuperadminPage() {
       {error&&<div role="alert" className="rounded-xl border border-amber-300/25 p-4 text-xs text-amber-200">El conector de tenants no respondió: {error}. Las cifras pueden estar incompletas.</div>}
       <section aria-label="Cobertura de gobierno" className="grid gap-4 sm:grid-cols-3">
         <div className="hub-card p-5"><div className="flex items-center gap-2 text-xs text-slate-400"><Layers3 className="h-4 w-4 text-[#abc2fa]"/> SaaS registradas</div><p className="mt-2 text-3xl font-semibold text-white">{SAAS_PRODUCTS.length}</p><p className="mt-1 text-xs text-slate-400">Todas con ficha estándar</p></div>
-        <div className="hub-card p-5"><div className="flex items-center gap-2 text-xs text-slate-400"><Users className="h-4 w-4 text-[#abc2fa]"/> Tenants reportados</div><p className="mt-2 text-3xl font-semibold text-white">{overview?overview.totalTenants:"—"}</p><p className="mt-1 text-xs text-slate-400">Según conectores actuales</p></div>
+        <div className="hub-card p-5"><div className="flex items-center gap-2 text-xs text-slate-400"><Users className="h-4 w-4 text-[#abc2fa]"/> Tenants reportados</div><p className="mt-2 text-3xl font-semibold text-white">{overview?.sources?.some(x=>x.status==="available")?overview.totalTenants:"—"}</p><p className="mt-1 text-xs text-slate-400">Según conectores actuales</p></div>
         <div className="hub-card p-5"><div className="flex items-center gap-2 text-xs text-slate-400"><ShieldCheck className="h-4 w-4 text-[#abc2fa]"/> Superadmin integrado por completo</div><p className="mt-2 text-3xl font-semibold text-white">0 / 6</p><p className="mt-1 text-xs text-slate-400">Falta completar contratos autenticados por SaaS</p></div>
       </section>
       <section className="hub-card overflow-hidden">
@@ -53,7 +54,7 @@ export default function SuperadminPage() {
           <thead><tr><th className="px-5">Plataforma</th>{CAPABILITIES.map(c=><th key={c.key}>{c.label}</th>)}</tr></thead>
           <tbody>{SAAS_PRODUCTS.map(product=><tr key={product.slug} className="border-t border-white/[0.07]">
             <td className="px-5"><Link className="font-semibold text-[#c6d8ff] hover:underline" href={"/saas/"+product.slug}>{product.name}</Link></td>
-            {CAPABILITIES.map(cap=><td key={cap.key}><span className={product.capabilities[cap.key]==="connected"?"hub-state hub-state-good":"hub-state hub-state-neutral"}>{LABELS[product.capabilities[cap.key]]}</span></td>)}
+            {CAPABILITIES.map(cap=><td key={cap.key}><span className={(product.capabilities[cap.key]==="connected"&&(cap.key!=="tenantRead"||healthySources.has(product.slug)))?"hub-state hub-state-good":"hub-state hub-state-neutral"}>{cap.key==="tenantRead"&&!healthySources.has(product.slug)?"Sin conectar":LABELS[product.capabilities[cap.key]]}</span></td>)}
           </tr>)}</tbody>
         </table></div>
       </section>
