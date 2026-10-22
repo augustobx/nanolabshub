@@ -1,4 +1,4 @@
-import { backupEngine } from "@/lib/backup-service";
+import { backupEngine, assertBackupSecurity } from "@/lib/backup-service";
 import { KNOWN_APPS } from "@/lib/apps-registry";
 import { requireMutatingSession } from "@/lib/action-security";
 export const dynamic="force-dynamic";
@@ -8,7 +8,7 @@ export async function POST(req: Request) {
   try { actor=await requireMutatingSession(req); }
   catch { return Response.json({success:false,error:"No autorizado"},{status:403}); }
   try {
-    if(process.env.HUB_BACKUPS_ENABLED!=="true") throw Error("Respaldos no habilitados");
+    assertBackupSecurity();
     const body=await req.json();
     backupEngine.schedule(KNOWN_APPS,body.slug,body.config,actor);
     return Response.json({success:true,data:backupEngine.schedules(KNOWN_APPS)});
