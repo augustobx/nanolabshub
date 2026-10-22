@@ -130,7 +130,9 @@ export function OperationsDashboard() {
     }
   };
 
-  const apps = snapshot?.apps ?? [];
+  const allApps = snapshot?.apps ?? [];
+  const archivedCount = allApps.filter((app) => app.lifecycle?.state === "archived").length;
+  const apps = allApps.filter((app) => app.lifecycle?.state !== "archived");
   const containers = snapshot?.containers ?? [];
   const metrics = snapshot?.telemetry;
   const running = containers.filter((c) => c.state === "running").length;
@@ -147,12 +149,14 @@ export function OperationsDashboard() {
   const websitesWithHttpErrors = apps.filter((a) => a.web?.status === "http_error").length;
   const attention = apps.filter((app) =>
     app.git.remoteStatus === "different" || app.git.dirtyFilesCount > 0 || app.web?.status === "offline" || app.web?.status === "http_error" ||
-    app.status === "down" || app.status === "degraded"
+    app.status === "down" || (app.lifecycle?.state !== "suspended" && app.status === "degraded") ||
+    app.lifecycle?.state === "pending_retirement"
   ).length;
 
   const filtered = useMemo(() => apps.filter((app) => {
     if (scope === "attention" && !(app.git.remoteStatus === "different" || app.git.dirtyFilesCount > 0 || app.web?.status === "offline" ||
-      app.web?.status === "http_error" || app.status === "down" || app.status === "degraded")) return false;
+      app.web?.status === "http_error" || app.status === "down" || (app.lifecycle?.state !== "suspended" && app.status === "degraded") ||
+      app.lifecycle?.state === "pending_retirement")) return false;
     const query = search.trim().toLocaleLowerCase("es");
     return !query || [app.name, app.slug, app.path].some((text) => text.toLocaleLowerCase("es").includes(query));
   }).sort((a, b) => {
@@ -216,7 +220,7 @@ export function OperationsDashboard() {
 
         <section aria-label="Indicadores operativos" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <Metric label="Aplicaciones" icon={Boxes} value={snapshot ? String(apps.length) : "—"}
-            detail={snapshot ? `${apps.filter((a) => a.status === "operational").length} con contenedores operativos` : "Consultando inventario"} />
+            detail={snapshot ? `${apps.filter((a) => a.lifecycle?.state !== "suspended" && a.status === "operational").length} operativas · ${archivedCount} archivadas` : "Consultando inventario"} />
           <Metric label="Contenedores activos" icon={Server} value={snapshot ? `${running} / ${containers.length}` : "—"}
             detail={snapshot ? `${unhealthy} detenidos o no saludables` : "Consultando Docker"} warning={unhealthy > 0} />
           <Metric label="Git por revisar" icon={GitBranch} value={snapshot ? String(gitReview) : "—"}
@@ -253,7 +257,10 @@ export function OperationsDashboard() {
               <h2 id="application-inventory" className="hub-section-heading">Aplicaciones y versiones</h2>
               <p className="mt-1 text-xs text-slate-400">Los tres identificadores son distintos: Git remoto, archivos del servidor e imagen realmente ejecutada.</p>
             </div>
-            <Link href="/software" className="flex items-center gap-1.5 text-xs font-semibold text-brand-cyan hover:underline">Gestión completa <ArrowUpRight className="h-4 w-4" /></Link>
+            <div className="flex flex-wrap items-center gap-3">
+              {archivedCount > 0 && <Link href="/software?archived=1" className="text-xs font-semibold text-slate-300 hover:underline">Archivadas ({archivedCount})</Link>}
+              <Link href="/software" className="flex items-center gap-1.5 text-xs font-semibold text-brand-cyan hover:underline">Gestionar ciclo de vida <ArrowUpRight className="h-4 w-4" /></Link>
+            </div>
           </div>
 
           <div className="hub-card space-y-4 p-4">
@@ -289,6 +296,8 @@ export function OperationsDashboard() {
                       <td className="px-3">
                         <div className="font-semibold text-slate-100">{app.name}</div>
                         <div className="mt-1 text-[11px] text-slate-400">{app.git.branch || (app.git.isRepo ? "Git inaccesible" : "Sin Git local")}</div>
+                        {app.lifecycle?.state === "suspended" && <div className="mt-1 text-[11px] font-semibold text-amber-200">Suspendida · monitoreo pausado</div>}
+                        {app.lifecycle?.state === "pending_retirement" && <div className="mt-1 text-[11px] font-semibold text-amber-200">Baja pendiente · monitoreo pausado</div>}
                       </td>
                       <td className="px-3"><WebBadge app={app} /></td>
                       <td className="px-3">
@@ -310,8 +319,8 @@ export function OperationsDashboard() {
                         {app.deployment?.imageTag && <div className="mt-1 max-w-[180px] truncate text-[11px] text-slate-500" title={app.deployment.imageTag}>{app.deployment.imageTag}</div>}
                       </td>
                       <td className="px-3">
-                        <Pill text={app.status === "not_deployed" ? "No desplegada" : `${app.containers.filter(c => c.state === "running").length}/${app.containers.length} activos`}
-                          tone={app.status === "operational" ? "good" : app.status === "not_deployed" ? "neutral" : "bad"} />
+                        <Pill text={app.lifecycle?.state === "suspended" ? "Suspendida" : app.lifecycle?.state === "pending_retirement" ? "Baja pendiente" : app.status === "not_deployed" ? "No desplegada" : `${app.containers.filter(c => c.state === "running").length}/${app.containers.length} activos`}
+                          tone={app.lifecycle?.state === "suspended" ? "neutral" : app.lifecycle?.state === "pending_retirement" ? "warn" : app.status === "operational" ? "good" : app.status === "not_deployed" ? "neutral" : "bad"} />
                       </td>
                       <td className="px-3">
                         <div className="flex justify-end gap-1">
@@ -319,7 +328,7 @@ export function OperationsDashboard() {
                             className="hub-icon-button !h-9 !w-9"><ExternalLink className="h-4 w-4" /></a>}
                           {app.containers[0] && <>
                             <button title="Consultar logs" aria-label={`Logs de ${app.name}`} onClick={() => void openLogs(app.containers[0].name)} className="hub-icon-button !h-9 !w-9"><Terminal className="h-4 w-4" /></button>
-                            <button title="Reiniciar contenedor" aria-label={`Reiniciar ${app.name}`} onClick={() => void restart(app.containers[0].name)} className="hub-icon-button !h-9 !w-9"><RotateCw className="h-4 w-4" /></button>
+                            <button disabled={app.lifecycle?.state !== undefined && app.lifecycle.state !== "active"} title={app.lifecycle?.state && app.lifecycle.state !== "active" ? "Gestioná el ciclo de vida en Productos" : "Reiniciar contenedor"} aria-label={`Reiniciar ${app.name}`} onClick={() => void restart(app.containers[0].name)} className="hub-icon-button !h-9 !w-9"><RotateCw className="h-4 w-4" /></button>
                           </>}
                         </div>
                       </td>
@@ -352,7 +361,7 @@ export function OperationsDashboard() {
                     <div className="flex gap-2">
                       {app.containers[0] && <>
                         <button onClick={() => void openLogs(app.containers[0].name)} className="hub-icon-button !h-9 !w-9" aria-label={`Logs de ${app.name}`}><Terminal className="h-4 w-4" /></button>
-                        <button onClick={() => void restart(app.containers[0].name)} className="hub-icon-button !h-9 !w-9" aria-label={`Reiniciar ${app.name}`}><RotateCw className="h-4 w-4" /></button>
+                        <button disabled={app.lifecycle?.state !== undefined && app.lifecycle.state !== "active"} onClick={() => void restart(app.containers[0].name)} className="hub-icon-button !h-9 !w-9" aria-label={`Reiniciar ${app.name}`}><RotateCw className="h-4 w-4" /></button>
                       </>}
                     </div>
                   </div>
@@ -399,7 +408,7 @@ export function OperationsDashboard() {
                 <div className="flex gap-2">
                   <button type="button" onClick={() => void openLogs(container.name)} title="Logs"
                     className="hub-icon-button !h-9 !w-9"><Terminal className="h-4 w-4" /></button>
-                  <button type="button" onClick={() => void restart(container.name)} title={`Reiniciar ${container.name}`}
+                  <button type="button" disabled={allApps.some((app) => app.lifecycle?.state !== undefined && app.lifecycle.state !== "active" && app.containers.some((owned) => owned.name === container.name))} onClick={() => void restart(container.name)} title={`Reiniciar ${container.name}`}
                     className="hub-icon-button !h-9 !w-9"><RotateCw className="h-4 w-4" /></button>
                 </div>
               </div>
