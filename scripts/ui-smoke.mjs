@@ -82,6 +82,8 @@ try {
     { name: "desktop", viewport: { width: 1440, height: 900 } },
     { name: "mobile", viewport: { width: 390, height: 844 } },
   ]) {
+    // Requests are mocked for each viewport independently.
+    apps[0].lifecycle.state = "active";
     const context = await browser.newContext({ viewport: device.viewport, deviceScaleFactor: 1 });
     const page = await context.newPage();
     const errors = [];
