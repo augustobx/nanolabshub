@@ -1,5 +1,5 @@
 import { getSessionUser } from "@/lib/auth";
-import { backupEngine } from "@/lib/backup-service";
+import { backupEngine, assertBackupSecurity } from "@/lib/backup-service";
 import { KNOWN_APPS } from "@/lib/apps-registry";
 import { createReadStream } from "node:fs";
 import { Readable } from "node:stream";
@@ -10,6 +10,7 @@ export async function GET(req: Request) {
   const id=new URL(req.url).searchParams.get("id");
   if (!id) return Response.json({success:false,error:"Falta ID"},{status:400});
   try {
+    assertBackupSecurity();
     const file=await backupEngine.download(KNOWN_APPS,id);
     return new Response(Readable.toWeb(createReadStream(file.file)) as ReadableStream,{
       headers:{"Content-Type":"application/gzip","Content-Length":String(file.size),
