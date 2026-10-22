@@ -230,7 +230,7 @@ export default function GovernancePage() {
 
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-20 right-6 z-50 px-4 py-3 rounded-xl bg-surface-50 border border-brand-cyan/40 text-xs font-mono text-white shadow-2xl shadow-cyan-950/50 flex items-center gap-2 animate-bounce">
+        <div className="fixed top-20 right-6 z-50 px-4 py-3 rounded-xl bg-surface-50 border border-brand-cyan/40 text-xs font-mono text-white shadow-2xl shadow-cyan-950/50 flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-brand-cyan" />
           <span>{toastMessage}</span>
         </div>
@@ -431,22 +431,26 @@ export default function GovernancePage() {
                     )}
                   </div>
 
-                  {/* Active Modules Badges */}
-                  <div className="space-y-1.5">
-                    <span className="text-[10px] font-mono text-gray-500 uppercase">Módulos Activos:</span>
-                    <div className="flex flex-wrap gap-1">
-                      {Object.entries(t.modules).map(([mod, active]) => (
-                        <span
-                          key={mod}
-                          className={`text-[9px] font-mono px-2 py-0.5 rounded border ${
-                            active
-                              ? "bg-white/5 text-gray-300 border-white/10"
-                              : "bg-transparent text-gray-600 border-white/5 line-through"
-                          }`}
-                        >
-                          {mod.replace(/_/g, " ")}
+                  {/* Compact modules preview: full list stays in tenant controls. */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-slate-400">Funcionalidades activas</span>
+                      <span className="font-semibold text-slate-200">
+                        {Object.values(t.modules).filter(Boolean).length} / {Object.keys(t.modules).length}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {Object.entries(t.modules).filter(([, active]) => active).slice(0, 3).map(([name]) => (
+                        <span key={name} className="rounded-lg border border-white/10 bg-white/[0.045] px-2 py-1 text-[10px] text-slate-300">
+                          {name.replace(/_/g, " ")}
                         </span>
                       ))}
+                      {Object.values(t.modules).filter(Boolean).length > 3 && (
+                        <span className="rounded-lg border border-white/10 px-2 py-1 text-[10px] text-slate-400">
+                          +{Object.values(t.modules).filter(Boolean).length - 3} más
+                        </span>
+                      )}
+                      {Object.values(t.modules).filter(Boolean).length === 0 && <span className="text-xs text-slate-500">Sin módulos activos</span>}
                     </div>
                   </div>
                 </div>
@@ -458,7 +462,7 @@ export default function GovernancePage() {
                     className="flex-1 py-1.5 px-3 rounded-lg bg-surface-100 hover:bg-surface-50 text-gray-200 hover:text-white border border-white/10 text-xs font-mono font-medium flex items-center justify-center gap-1.5 transition-all"
                   >
                     <Settings2 className="w-3.5 h-3.5 text-brand-cyan" />
-                    <span>Control & Módulos</span>
+                    <span>Administrar módulos</span>
                   </button>
 
                   <a
@@ -466,7 +470,7 @@ export default function GovernancePage() {
                     target="_blank"
                     rel="noreferrer"
                     className="py-1.5 px-3 rounded-lg bg-brand-cyan/10 hover:bg-brand-cyan/20 text-brand-cyan border border-brand-cyan/20 text-xs font-mono font-medium flex items-center gap-1 transition-all"
-                    title="Impersonar y abrir panel del tenant"
+                    title="Abrir portal del cliente"
                   >
                     <Key className="w-3.5 h-3.5" />
                     <span>Portal</span>
