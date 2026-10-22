@@ -15,8 +15,8 @@ async function queryDockerDB(container: string, cmdArgs: string[]): Promise<stri
       const { stdout } = await execFileAsync("docker", ["exec", container, ...cmdArgs]);
       return stdout.trim();
     } catch (err: any) {
-      console.error(`queryDockerDB error on ${container}:`, err.message);
-      return "";
+      console.error("queryDockerDB error", container, err instanceof Error ? err.message.slice(0,120) : "unknown");
+      throw new Error("Error consultando el conector " + container);
     }
   }
 
@@ -24,6 +24,7 @@ async function queryDockerDB(container: string, cmdArgs: string[]): Promise<stri
   const escapedArgs = cmdArgs.map((a) => `'${a.replace(/'/g, "'\\''")}'`).join(" ");
   const remoteCmd = `docker exec ${container} ${escapedArgs}`;
   const res = await executeRemoteCommand(remoteCmd);
+  if (res.code !== 0) throw new Error("El conector Docker no pudo ejecutar la consulta");
   return res.stdout || "";
 }
 
@@ -507,44 +508,44 @@ export async function getUniversalGovernanceOverview(): Promise<GovernanceOvervi
     {
       saas: "OnlyFood",
       legacyAdminUrl: "https://onlyfood.nanoapps.ar/admin",
-      sunsetStatus: "redirected_to_hub" as const,
+      sunsetStatus: "active_deprecated" as const,
       replacementUrl: "https://hub.nanoapps.ar/governance?saas=onlyfood",
-      notes: "Panel superadmin absorbido. Control total de locales en NanoLabsHUB.",
+      notes: "Panel anterior: migración de funciones administrativas por verificar.",
     },
     {
       saas: "OnlyPadel",
       legacyAdminUrl: "https://onlypadel.nanoapps.ar/admin",
-      sunsetStatus: "redirected_to_hub" as const,
+      sunsetStatus: "active_deprecated" as const,
       replacementUrl: "https://hub.nanoapps.ar/governance?saas=onlypadel",
-      notes: "SuperAdmin unificado. Gestión de clubes y canchas centralizada.",
+      notes: "Panel anterior: migración de funciones administrativas por verificar.",
     },
     {
       saas: "OnlyCars",
       legacyAdminUrl: "https://onlycars.nanoapps.ar/admin",
-      sunsetStatus: "redirected_to_hub" as const,
+      sunsetStatus: "active_deprecated" as const,
       replacementUrl: "https://hub.nanoapps.ar/governance?saas=onlycars",
-      notes: "Acceso supremo a concesionarias y stock desde el HUB.",
+      notes: "Panel anterior: migración de funciones administrativas por verificar.",
     },
     {
       saas: "OnlyGym",
       legacyAdminUrl: "https://onlygym.nanoapps.ar/admin",
-      sunsetStatus: "redirected_to_hub" as const,
+      sunsetStatus: "active_deprecated" as const,
       replacementUrl: "https://hub.nanoapps.ar/governance?saas=onlygym",
-      notes: "Panel de administración de gimnasios absorbido por el HUB.",
+      notes: "Panel anterior: migración de funciones administrativas por verificar.",
     },
     {
       saas: "OnlyTurn",
       legacyAdminUrl: "https://onlyturn.nanoapps.ar/admin",
-      sunsetStatus: "redirected_to_hub" as const,
+      sunsetStatus: "active_deprecated" as const,
       replacementUrl: "https://hub.nanoapps.ar/governance?saas=onlyturn",
-      notes: "Control de agendas y turnos transferido a NanoLabsHUB.",
+      notes: "Panel anterior: migración de funciones administrativas por verificar.",
     },
     {
       saas: "OnlyERP · Tommasi",
       legacyAdminUrl: "https://onlyerp.nanoapps.ar/superadmin",
-      sunsetStatus: "redirected_to_hub" as const,
+      sunsetStatus: "active_deprecated" as const,
       replacementUrl: "https://hub.nanoapps.ar/governance?saas=onlyerp",
-      notes: "Gobernanza de distribución y AFIP centralizada en el HUB.",
+      notes: "Panel anterior: migración de funciones administrativas por verificar.",
     },
   ];
 
@@ -690,31 +691,10 @@ export async function toggleTenantModuleInDB(
       `UPDATE tenants SET modulos = '${JSON.stringify(modsObj)}'::jsonb WHERE id = ${Number(tenantId) || 0};`,
     ]);
   } else {
-    // Default simulated or override table
-    output = `Módulo '${moduleKey}' configurado a ${enabled ? "ACTIVO" : "INACTIVO"} para tenant ${tenantId} (${saas})`;
+    // No production connector exists for these SaaS: never report a fake success.
+    throw new Error("La edición de módulos todavía no está integrada para esta SaaS");
   }
 
   return { success: true, output };
 }
 
-/**
- * Generates an administrative impersonation URL
- */
-export function generateImpersonationUrl(saas: SaaSSlug, slug: string): string {
-  switch (saas) {
-    case "onlyfood":
-      return `https://${slug}.nanoapps.ar?supreme_auth=nanolabs_master`;
-    case "onlypadel":
-      return `https://${slug}.nanoapps.ar?supreme_auth=nanolabs_master`;
-    case "onlycars":
-      return `https://${slug}.nanoapps.ar?supreme_auth=nanolabs_master`;
-    case "onlygym":
-      return `https://onlygym.nanoapps.ar/${slug}?supreme_auth=nanolabs_master`;
-    case "onlyturn":
-      return `https://${slug}.nanoapps.ar?supreme_auth=nanolabs_master`;
-    case "onlyerp":
-      return `https://onlyerp.nanoapps.ar?tenant=${slug}&supreme_auth=nanolabs_master`;
-    default:
-      return `https://${slug}.nanoapps.ar`;
-  }
-}
