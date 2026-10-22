@@ -362,9 +362,9 @@ export default function GovernancePage() {
               Registros gestionados
             </span>
             <div className="text-2xl font-bold text-brand-cyan font-mono">
-              {data ? data.totalRecordsManaged.toLocaleString() : "---"}
+              {data?.tenants.some(t => t.metrics.available !== false) ? data.totalRecordsManaged.toLocaleString() : "—"}
             </div>
-            <div className="text-[10px] text-gray-500 font-mono">Pedidos, Turnos, Stock</div>
+            <div className="text-[10px] text-gray-500 font-mono">Sin métricas de negocio integradas</div>
           </div>
         </div>
 
@@ -480,15 +480,10 @@ export default function GovernancePage() {
                     </div>
                     <div className="flex justify-between text-gray-400">
                       <span>Dominio:</span>
-                      <a
-                        href={`https://${t.domain}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-brand-cyan hover:underline flex items-center gap-1"
-                      >
-                        <span>{t.domain}</span>
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
+                      {t.domain ? <a href={`https://${t.domain}`} target="_blank" rel="noopener noreferrer"
+                        className="text-brand-cyan hover:underline flex items-center gap-1">
+                        <span>{t.domain}</span><ExternalLink className="w-3 h-3" />
+                      </a> : <span className="text-slate-500">Dominio no informado</span>}
                     </div>
                   </div>
 
@@ -634,7 +629,7 @@ export default function GovernancePage() {
                   <span className="text-[11px] text-slate-500">Cliente #{activeTenant.id}</span>
                 </div>
                 <h2 id="tenant-dialog-title" className="text-xl font-bold tracking-tight text-slate-50">{activeTenant.name}</h2>
-                <p className="truncate text-xs text-slate-400">{activeTenant.domain}</p>
+                <p className="truncate text-xs text-slate-400">{activeTenant.domain || "Dominio no informado"}</p>
               </div>
               <button type="button" aria-label="Cerrar administración de cliente"
                 disabled={isUpdating} onClick={() => setActiveTenant(null)}
@@ -759,11 +754,11 @@ export default function GovernancePage() {
                     </p>
                   </div>
                   <div className="rounded-xl border border-white/[0.08] bg-white/[0.025] p-4">
-                    <p className="break-all text-xs text-slate-400">https://{activeTenant.domain}</p>
-                    <a href={`https://${activeTenant.domain}`} target="_blank" rel="noopener noreferrer"
+                    <p className="break-all text-xs text-slate-400">{activeTenant.domain ? "https://" + activeTenant.domain : "El conector aún no proporcionó un dominio validado."}</p>
+                    {activeTenant.domain && <a href={`https://${activeTenant.domain}`} target="_blank" rel="noopener noreferrer"
                       className="mt-4 inline-flex items-center gap-2 rounded-xl bg-brand-cyan px-4 py-2.5 text-xs font-bold text-[#101827] hover:bg-[#bed0ff]">
                       <ExternalLink className="h-4 w-4" /> Abrir portal
-                    </a>
+                    </a>}
                   </div>
                 </div>
               )}
