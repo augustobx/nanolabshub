@@ -45,12 +45,12 @@ export async function GET(req: Request) {
         cd "$APP_PATH"
         echo "[1/4] Validando repositorio, rama y cambios locales..."
         GIT=(git -c "safe.directory=$APP_PATH" -C "$APP_PATH")
-        "${GIT[@]}" rev-parse --is-inside-work-tree | grep -qx true || { echo "No hay repositorio Git"; exit 2; }
-        BRANCH=$("${GIT[@]}" symbolic-ref --quiet --short HEAD) || {
+        "\${GIT[@]}" rev-parse --is-inside-work-tree | grep -qx true || { echo "No hay repositorio Git"; exit 2; }
+        BRANCH=$("\${GIT[@]}" symbolic-ref --quiet --short HEAD) || {
           echo "Despliegue cancelado: checkout detached, no hay rama activa"; exit 2;
         }
         test -n "$BRANCH" || { echo "No hay rama seleccionada"; exit 2; }
-        test -z "$("${GIT[@]}" status --porcelain)" || {
+        test -z "$("\${GIT[@]}" status --porcelain)" || {
           echo "Despliegue cancelado: hay cambios locales sin guardar"; exit 2;
         }
         docker compose config --services >/dev/null || {
@@ -58,7 +58,7 @@ export async function GET(req: Request) {
         }
 
         echo "[2/4] Git pull --ff-only de origin/$BRANCH..."
-        GIT_TERMINAL_PROMPT=0 "${GIT[@]}" pull --ff-only origin "$BRANCH"
+        GIT_TERMINAL_PROMPT=0 "\${GIT[@]}" pull --ff-only origin "$BRANCH"
 
         echo "[3/4] Reconstruyendo y levantando servicios..."
         docker compose up -d --build
