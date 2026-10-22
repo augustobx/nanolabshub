@@ -1,118 +1,91 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-import { executeRemoteCommand } from "./ssh";
-import type { GovernanceOverview, SaaSSlug, UniversalTenant } from "./types";
 import { SAAS_PRODUCTS } from "./product-taxonomy";
-const run = promisify(execFile);
-const quote = (s: string) => "'" + s.replace(/'/g, "'\\''") + "'";
-type DbTarget = {container:string; engine:"mysql"|"postgres"; database:string};
-const TARGETS: Record<SaaSSlug, DbTarget> = {
-  onlyfood:{container:"onlyfood-db-1",engine:"mysql",database:"onlyfood"},
-  onlypadel:{container:"onlypadel-db",engine:"mysql",database:"onlypadel"},
-  onlycars:{container:"onlycars-db-1",engine:"mysql",database:"onlycars"},
-  onlyerp:{container:"onlyerp-db",engine:"mysql",database:"onlyerp_db"},
-  onlygym:{container:"onlygym-db",engine:"postgres",database:"onlygym"},
-  onlyturn:{container:"onlyturn-db",engine:"postgres",database:"onlyturn"}
+import type { GovernanceOverview, SaaSSlug, UniversalTenant } from "./types";
+
+type WireTenant = {
+  id: string; slug: string; name: string; status: string; rawStatus: string;
+  createdAt: string; plan: string | null;
 };
-const QUERIES: Record<SaaSSlug,string> = {
-  onlyfood:"SELECT id,slug,name,status,createdAt FROM Tenant ORDER BY createdAt DESC LIMIT 2000;",
-  onlypadel:"SELECT id,slug,name,status,createdAt FROM tenant ORDER BY createdAt DESC LIMIT 2000;",
-  onlycars:"SELECT id,slug,name,status,createdAt FROM Tenant ORDER BY createdAt DESC LIMIT 2000;",
-  onlyerp:"SELECT id,slug,nombre,estado,fecha_alta,planId FROM Tenant ORDER BY fecha_alta DESC LIMIT 2000;",
-  onlygym:"SELECT id,slug,nombre,estado,creado_en,COALESCE(modulos::text, '{}'),plan FROM tenants ORDER BY creado_en DESC LIMIT 2000;",
-  onlyturn:'SELECT id,slug,name,status,"createdAt" FROM "Tenant" ORDER BY "createdAt" DESC LIMIT 2000;'
+type WireResponse = {
+  success: boolean; contract: string; product: SaaSSlug; capturedAt: string;
+  tenants: WireTenant[]; nextOffset: number | null;
+  capabilities: { tenantsRead: boolean; tenantWrite: boolean; moduleWrite: boolean };
 };
-// Never copy passwords into the Hub repository, command-line arguments or audit logs.
-// Credentials are read in the target DB container from its pre-existing environment.
-// Operators should provision a least-privileged read-only user in a separate change window.
-const MYSQL_SCRIPT = [
-  'user="$MARIADB_USER"; test -n "$user" || user="$MYSQL_USER"',
-  'export MYSQL_PWD="$MARIADB_PASSWORD"; test -n "$MYSQL_PWD" || export MYSQL_PWD="$MYSQL_PASSWORD"',
-  'test -n "$user" && test -n "$MYSQL_PWD" || exit 3',
-  'if command -v mariadb >/dev/null 2>&1; then dbclient=mariadb; else dbclient=mysql; fi',
-  'exec "$dbclient" -u "$user" -D "$1" -N -B --raw -e "$2"',
-].join("; ");
-const PG_SCRIPT = [
-  'export PGPASSWORD="$POSTGRES_PASSWORD"',
-  'exec psql -U "$POSTGRES_USER" -d "$1" -t -A -F "$(printf \'\\t\')" -c "$2"',
-].join("; ");
-async function selectOnly(saas: SaaSSlug): Promise<string> {
-  const sql=QUERIES[saas], target=TARGETS[saas];
-  if (!/^SELECT /i.test(sql) || /;\s*\S/.test(sql) || /--|\/\*/.test(sql)) throw Error("Consulta fuera del contrato de solo lectura");
-  const argv=["exec",target.container,"sh","-ec",target.engine==="mysql"?MYSQL_SCRIPT:PG_SCRIPT,
-    "hub-ro",target.database,sql];
-  if (process.env.DOCKER_HOST_MODE === "internal") {
-    try {return (await run("docker",argv,{timeout:10000,maxBuffer:4*1024*1024})).stdout.trim();}
-    catch {throw Error("Conector de solo lectura sin respuesta");}
+function normalizeStatus(raw: string): UniversalTenant["status"] {
+  if (raw === "ACTIVE" || raw === "TRIAL" || raw === "SUSPENDED" || raw === "CANCELED") return raw;
+  throw new Error("Estado de tenant desconocido en la integración");
+}
+function adaptTenant(saas: SaaSSlug, name: string, value: WireTenant): UniversalTenant {
+  if (!value.id || !value.slug || !value.name || typeof value.status !== "string") {
+    throw new Error("Respuesta incompleta del adaptador");
   }
-  const result=await executeRemoteCommand("timeout 12 docker " + argv.map(quote).join(" "));
-  if (result.code!==0) throw Error("Conector de solo lectura sin respuesta");
-  return result.stdout.trim();
-}
-export function normalizeTenantStatus(raw:string):UniversalTenant["status"] {
-  const status=raw.toUpperCase().trim();
-  if (["ACTIVE","ACTIVO"].includes(status))return "ACTIVE";
-  if (["TRIAL","PRUEBA","TRIALING"].includes(status))return "TRIAL";
-  if (["SUSPENDED","SUSPENDIDO"].includes(status))return "SUSPENDED";
-  if (["CANCELED","CANCELLED","CANCELADO","INACTIVO","INACTIVE"].includes(status))return "CANCELED";
-  throw Error("Estado no reconocido; se detuvo la lectura para evitar normalizaciones falsas");
-}
-function dateOrBlank(v:string):string {
-  if(!v||v==="NULL")return "";
-  const parsed=new Date(v);
-  return Number.isFinite(parsed.getTime())?parsed.toISOString():"";
-}
-function mapRows(saas:SaaSSlug,raw:string):UniversalTenant[] {
-  if (!raw) return [];
-  const product=SAAS_PRODUCTS.find(p=>p.slug===saas)!;
-  return raw.split("\n").filter(Boolean).map(line=>{
-    const fields=line.replace(/\r$/,"").split("\t");
-    const [id,slug,name,status,date]=fields;
-    if(!id||!slug||!name)throw Error("Fila incompleta; el conector " + saas + " no se considera saludable");
-    let modules:Record<string,boolean>={};
-    if(saas==="onlygym"&&fields[5]&&fields[5]!=="NULL") {
-      const parsed:unknown=JSON.parse(fields[5]);
-      if(parsed && typeof parsed==="object"&&!Array.isArray(parsed))
-        modules=Object.fromEntries(Object.entries(parsed).filter(([key,value])=>/^[a-z0-9_]+$/i.test(key)&&typeof value==="boolean")) as Record<string,boolean>;
-    }
-    return {
-      id:String(id),saas,saasName:product.name,slug:String(slug),name:String(name),
-      status:normalizeTenantStatus(status),rawStatus:status,
-      plan:saas==="onlygym" ? fields[6]||"Sin informar" :
-        saas==="onlyerp"?"Plan #" + (fields[5]||"—"):"Sin plan conectado",
-      createdAt:dateOrBlank(date),domain:"",
-      metrics:{totalRecords:0,recordLabel:"Métricas no conectadas",available:false},modules
-    };
-  });
-}
-export async function getUniversalGovernanceOverview():Promise<GovernanceOverview>{
-  const outcomes=await Promise.allSettled(SAAS_PRODUCTS.map(p=>selectOnly(p.slug).then(raw=>mapRows(p.slug,raw))));
-  const tenants=outcomes.flatMap(outcome=>outcome.status==="fulfilled"?outcome.value:[]);
-  const sources:NonNullable<GovernanceOverview["sources"]>=outcomes.map((outcome,index)=>({
-    saas:SAAS_PRODUCTS[index].slug,
-    status:outcome.status==="fulfilled"?"available":"unavailable",
-    count:outcome.status==="fulfilled"?outcome.value.length:null,
-    checkedAt:new Date().toISOString(),
-    message:outcome.status==="rejected"?"Consulta fallida: no equivale a cero clientes":null
-  }));
   return {
-    tenants,sources,saasCount:SAAS_PRODUCTS.length,
-    totalTenants:tenants.length,
-    activeTenants:tenants.filter(t=>t.status==="ACTIVE").length,
-    trialTenants:tenants.filter(t=>t.status==="TRIAL").length,
-    suspendedTenants:tenants.filter(t=>t.status==="SUSPENDED"||t.status==="CANCELED").length,
-    totalRecordsManaged:0,
-    legacyPanels:SAAS_PRODUCTS.map(p=>({
-      saas:p.name,legacyAdminUrl:"https://"+p.domain+"/superadmin",
-      sunsetStatus:"active_deprecated",replacementUrl:"https://hub.nanoapps.ar/saas/"+p.slug,
-      notes:"El panel anterior sigue siendo necesario para las acciones todavía no integradas."
-    }))
+    id: String(value.id), slug: String(value.slug), name: String(value.name),
+    saas, saasName: name, status: normalizeStatus(value.status),
+    rawStatus: value.rawStatus, plan: value.plan || "No informado",
+    createdAt: value.createdAt, domain: "",
+    metrics: { totalRecords: 0, recordLabel: "Métricas no disponibles", available: false },
+    modules: {},
   };
 }
-// No writes to any SaaS production database. Unsafe legacy SQL and credential literals removed.
-export async function updateTenantStatusInDB():Promise<never> {
-  throw Error("Cambios de estado deshabilitados: requiere adaptador API autenticado, auditado y probado.");
+async function readProduct(saas: SaaSSlug, name: string, domain: string): Promise<UniversalTenant[]> {
+  if (process.env.HUB_SAAS_INTEGRATION_ENABLED !== "true") {
+    throw new Error("Integración segura todavía no habilitada");
+  }
+  const token = process.env["HUB_INTEGRATION_" + saas.toUpperCase() + "_TOKEN"] || "";
+  if (Buffer.byteLength(token) < 32) throw new Error("Token de servicio no configurado");
+  const all: UniversalTenant[] = [];
+  let offset = 0;
+  // Bound pagination and network work. We will not claim complete data past this limit.
+  for (let i = 0; i < 20; i++) {
+    const url = "https://" + domain + "/api/integrations/nanolabs/tenants?offset=" + offset;
+    const response = await fetch(url, {
+      headers: { Authorization: "Bearer " + token, Accept: "application/json" },
+      redirect: "error", cache: "no-store",
+      signal: AbortSignal.timeout(7000),
+    });
+    if (!response.ok) throw new Error("Endpoint de integración no disponible");
+    const wire = await response.json() as WireResponse;
+    if (!wire.success || wire.contract !== "nanolabs.saas.tenants.v1" || wire.product !== saas ||
+        !Array.isArray(wire.tenants) || wire.tenants.length > 100 ||
+        wire.capabilities?.tenantsRead !== true ||
+        wire.capabilities?.tenantWrite !== false) throw new Error("Contrato de integración no válido");
+    all.push(...wire.tenants.map(tenant => adaptTenant(saas, name, tenant)));
+    if (wire.nextOffset === null) return all;
+    if (!Number.isInteger(wire.nextOffset) || wire.nextOffset <= offset ||
+        wire.nextOffset > 100000 || wire.tenants.length === 0) throw new Error("Paginación inválida");
+    offset = wire.nextOffset;
+  }
+  throw new Error("La fuente superó el límite seguro de paginación; datos no contabilizados");
 }
-export async function toggleTenantModuleInDB():Promise<never> {
-  throw Error("Edición de módulos deshabilitada: requiere adaptador API autenticado, auditado y probado.");
+export async function getUniversalGovernanceOverview(): Promise<GovernanceOverview> {
+  const results = await Promise.allSettled(SAAS_PRODUCTS.map(p => readProduct(p.slug, p.name, p.domain)));
+  const tenants = results.flatMap(result => result.status === "fulfilled" ? result.value : []);
+  return {
+    totalTenants: tenants.length,
+    activeTenants: tenants.filter(t => t.status === "ACTIVE").length,
+    trialTenants: tenants.filter(t => t.status === "TRIAL").length,
+    suspendedTenants: tenants.filter(t => t.status === "SUSPENDED" || t.status === "CANCELED").length,
+    totalRecordsManaged: 0, saasCount: SAAS_PRODUCTS.length, tenants,
+    sources: SAAS_PRODUCTS.map((p, i) => ({
+      saas: p.slug, status: results[i].status === "fulfilled" ? "available" : "unavailable",
+      count: results[i].status === "fulfilled" ? results[i].value.length : null,
+      checkedAt: new Date().toISOString(),
+      message: results[i].status === "rejected"
+        ? "Conector seguro deshabilitado, inaccesible o con contrato inválido" : null,
+    })),
+    legacyPanels: SAAS_PRODUCTS.map(p => ({
+      saas: p.name, legacyAdminUrl: "https://" + p.domain + "/superadmin",
+      sunsetStatus: "active_deprecated",
+      replacementUrl: "https://hub.nanoapps.ar/saas/" + p.slug,
+      notes: "El Hub solo ofrece lectura segura. El superadmin original mantiene las funciones de edición.",
+    })),
+  };
+}
+// Direct database writes were permanently removed from the Hub. A future
+// authenticated, role-scoped SaaS API must implement every change independently.
+export async function updateTenantStatusInDB(): Promise<never> {
+  throw new Error("Edición bloqueada: no existe contrato de escritura seguro");
+}
+export async function toggleTenantModuleInDB(): Promise<never> {
+  throw new Error("Edición bloqueada: no existe contrato de escritura seguro");
 }
