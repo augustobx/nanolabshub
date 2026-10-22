@@ -148,13 +148,16 @@ export async function getAppsStatus(containersInput?: ContainerInfo[]): Promise<
   const containers = containersInput ?? await getContainers();
 
   // Read the checkout HEAD even when detached, preserving errors rather than faking "clean".
+  // Trusted, explicitly registered application directories may belong to another UID on the host.
+  // Configure safe.directory per subprocess only: never disable ownership checks globally.
   const appPaths = Buffer.from(JSON.stringify(KNOWN_APPS.map(({ slug, path }) => ({ slug, path })))).toString("base64");
   const gitScript = `python3 - <<'PY'
 import os, json, base64, subprocess
 apps = json.loads(base64.b64decode("${appPaths}").decode())
 def git(p, *args):
     try:
-        r = subprocess.run(["git", "-C", p, *args], text=True, capture_output=True, timeout=4)
+        r = subprocess.run(["git", "-c", "safe.directory=" + os.path.realpath(p),
+                            "-C", p, *args], text=True, capture_output=True, timeout=4)
         return r.stdout.strip(), r.stderr.strip(), r.returncode
     except (OSError, subprocess.TimeoutExpired) as e:
         return "", str(e), 1
