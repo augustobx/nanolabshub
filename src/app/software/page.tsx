@@ -387,6 +387,7 @@ export default function SoftwarePage() {
                   </p>
                   <p className="text-[11px] leading-5 text-slate-500">
                     {app.deployment?.status === "identified" ? "SHA registrado en la imagen Docker" : app.deployment?.imageId ? "ID Docker (sin commit registrado)" : "No se detectó imagen activa"}
+                    {app.deployment?.imageTag ? ` · ${app.deployment.imageTag}` : ""}
                   </p>
                 </div>
 
