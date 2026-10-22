@@ -17,6 +17,17 @@ export interface AppDefinition {
 
 export const KNOWN_APPS: AppDefinition[] = [
   {
+    slug: "nanolabshub",
+    name: "NanoLabs Hub",
+    type: "internal",
+    path: "/opt/apps/nanolabshub-redesign",
+    url: "https://hub.nanoapps.ar",
+    containerNames: ["nanolabshub"],
+    dbType: "sqlite",
+    sqlitePath: "/opt/apps/nanolabshub/data/hub.sqlite",
+    description: "Centro de control de operaciones NanoLabs",
+  },
+  {
     slug: "onlyfood",
     name: "OnlyFood SaaS",
     type: "saas",
