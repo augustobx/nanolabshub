@@ -35,7 +35,7 @@ function WebBadge({ app }: { app: AppInfo }) {
 }
 function GitBadge({ app }: { app: AppInfo }) {
   if (app.git.remoteStatus === "synced" && app.git.dirtyFilesCount > 0) {
-    return <Pill text={`Mismo commit · ${app.git.dirtyFilesCount} cambios locales`} tone="warn" />;
+    return <Pill text={`Mismo commit · ${app.git.dirtyFilesCount} ${app.git.dirtyFilesCount === 1 ? "cambio local" : "cambios locales"}`} tone="warn" />;
   }
   if (app.git.remoteStatus === "synced") return <Pill text={app.git.remoteRef === "HEAD" ? "Coincide con HEAD remoto" : "Mismo commit remoto"} tone="good" />;
   if (app.git.remoteStatus === "different") return <Pill text={app.git.remoteRef === "HEAD" ? "Distinto al HEAD remoto" : "Commits diferentes"} tone="warn" />;
