@@ -160,7 +160,7 @@ export const KNOWN_APPS: AppDefinition[] = [
     name: "NanoMonitor",
     type: "internal",
     path: "/opt/apps/nanomonitor",
-    url: "https://monitor.nanoapps.site",
+    url: "https://monitor.nanolabs.com.ar",
     containerNames: ["nanomonitor-server", "nanomonitor-postgres", "nanomonitor-redis"],
     dbType: "postgres",
     dbContainer: "nanomonitor-postgres",
