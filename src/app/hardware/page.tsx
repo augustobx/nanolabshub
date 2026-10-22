@@ -176,27 +176,22 @@ export default function HardwarePage() {
     <div className="flex-1 flex flex-col pb-12">
       <Header onRefresh={fetchMetrics} isRefreshing={isLoading} />
 
-      <div className="px-6 py-6 max-w-7xl w-full mx-auto space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-              <Cpu className="w-5 h-5 text-brand-cyan" />
-              <span>Hardware, Infraestructura & Tendencias</span>
-            </h1>
-            <p className="text-xs text-gray-400 font-mono mt-0.5">
-              Dedicado Debian GNU/Linux 13 · 149.50.159.163 · DattaWeb Datacenter
+      <div className="hub-content space-y-7">
+        <section className="hub-hero flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-3">
+            <p className="hub-eyebrow">Operación / Infraestructura</p>
+            <h1 className="hub-hero-title">Infraestructura y rendimiento.</h1>
+            <p className="hub-description">
+              Uso de recursos, disponibilidad de contenedores y tendencias del servidor.
+              Supervisá el entorno sin salir del Hub.
             </p>
           </div>
-
-          <button
-            onClick={handleSafePrune}
-            className="px-3.5 py-2 rounded-xl bg-surface-100 hover:bg-surface-50 text-gray-300 hover:text-white border border-white/10 text-xs font-mono font-medium flex items-center gap-2 transition-all shadow-sm"
-            title="Elimina imágenes huérfanas <none> sin tocar volúmenes de datos"
-          >
-            <Trash2 className="w-3.5 h-3.5 text-amber-400" />
-            <span>LIMPIEZA SEGURA DOCKER</span>
+          <button type="button" onClick={handleSafePrune}
+            title="Elimina imágenes Docker huérfanas sin tocar volúmenes de datos"
+            className="inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-xl border border-amber-400/20 bg-amber-400/[0.07] px-4 py-3 text-xs font-semibold text-amber-200 transition-colors hover:bg-amber-400/10">
+            <Trash2 className="h-4 w-4" /> Limpiar imágenes Docker
           </button>
-        </div>
+        </section>
 
         {/* Primary Hardware Gauges */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -205,10 +200,10 @@ export default function HardwarePage() {
             <div className="flex items-center justify-between border-b border-white/5 pb-3">
               <span className="text-xs font-mono text-gray-400 flex items-center gap-2">
                 <Cpu className="w-4 h-4 text-brand-cyan" />
-                PROCESADOR FÍSICO
+                Procesador
               </span>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-brand-cyan/10 text-brand-cyan border border-brand-cyan/20">
-                12 THREADS
+                CPU
               </span>
             </div>
 
