@@ -119,16 +119,15 @@ export default function NetworkingPage() {
     <div className="flex-1 flex flex-col pb-12">
       <Header />
 
-      <div className="px-6 py-6 max-w-7xl w-full mx-auto space-y-6">
-        <div>
-          <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-            <Network className="w-5 h-5 text-brand-cyan" />
-            <span>Red, Nginx Proxy Manager & Certificados SSL</span>
-          </h1>
-          <p className="text-xs text-gray-400 font-mono mt-0.5">
-            Rutas de entrada públicas, terminación TLS y aislamiento en la red Docker compartida `proxy`.
+      <div className="hub-content space-y-7">
+        <section className="hub-hero space-y-3">
+          <p className="hub-eyebrow">Operación / Conectividad</p>
+          <h1 className="hub-hero-title">Dominios, red y certificados.</h1>
+          <p className="hub-description">
+            Mapa de configuración de accesos públicos, proxy y certificados.
+            Los valores de esta sección son declarativos y no reemplazan una comprobación en vivo.
           </p>
-        </div>
+        </section>
 
         {/* Network Infrastructure Summary */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -136,7 +135,7 @@ export default function NetworkingPage() {
             <div className="flex items-center justify-between text-xs font-mono text-gray-400">
               <span className="flex items-center gap-1.5">
                 <Globe className="w-4 h-4 text-brand-cyan" />
-                DOMINIOS PÚBLICOS ACTIVOS
+                Rutas en inventario
               </span>
             </div>
             <div className="text-2xl font-bold font-mono text-white">
@@ -152,15 +151,15 @@ export default function NetworkingPage() {
             <div className="flex items-center justify-between text-xs font-mono text-gray-400">
               <span className="flex items-center gap-1.5">
                 <Lock className="w-4 h-4 text-emerald-400" />
-                SEGURIDAD & CERTIFICADOS
+                Certificados declarados
               </span>
             </div>
             <div className="text-2xl font-bold font-mono text-emerald-400 flex items-center gap-2">
               <CheckCircle2 className="w-6 h-6" />
-              <span>100% SSL (HTTPS)</span>
+              <span>HTTPS configurado</span>
             </div>
             <div className="text-[11px] text-gray-500 font-mono">
-              Auto-renovación Let's Encrypt activa
+              Según la configuración registrada
             </div>
           </div>
 
@@ -168,7 +167,7 @@ export default function NetworkingPage() {
             <div className="flex items-center justify-between text-xs font-mono text-gray-400">
               <span className="flex items-center gap-1.5">
                 <Radio className="w-4 h-4 text-purple-400" />
-                PUERTOS PÚBLICOS AUTORIZADOS
+                Puertos documentados
               </span>
             </div>
             <div className="text-2xl font-bold font-mono text-white">
