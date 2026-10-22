@@ -6,6 +6,7 @@ import type { AppInfo, ContainerInfo, ServerMetrics } from "./types";
 interface VersionProbe {
   remoteCommit: string | null;
   checkedAt: string | null;
+  remoteRef: string | null;
 }
 interface ImageProbe {
   revision: string | null;
@@ -26,16 +27,19 @@ async function probeGitRemote(apps: AppInfo[]): Promise<Map<string, VersionProbe
   if (versionsPending) return versionsPending;
   versionsPending = (async () => {
     const map = new Map<string, VersionProbe>();
-    const candidates = apps.filter((app) => app.git.isRepo && isSafeBranch(app.git.branch));
+    const candidates = apps.filter((app) => app.git.isRepo && !app.git.localError);
     // Limit network concurrency and each remote lookup to 3 seconds.
     for (let i = 0; i < candidates.length; i += 5) {
       await Promise.all(candidates.slice(i, i + 5).map(async (app) => {
-        const cmd = `timeout 3 git -C ${shellQuote(app.path)} ls-remote --heads origin ${shellQuote("refs/heads/" + app.git.branch)}`;
+        const namedBranch = app.git.branch !== "detached" && isSafeBranch(app.git.branch);
+        const remoteRef = namedBranch ? "refs/heads/" + app.git.branch : "HEAD";
+        const cmd = `timeout 4 git -C ${shellQuote(app.path)} ls-remote origin ${shellQuote(remoteRef)}`;
         const result = await executeRemoteCommand(cmd);
         const commit = result.code === 0 ? result.stdout.split(/\s/)[0] : "";
         map.set(app.slug, {
           remoteCommit: validCommit(commit) ? commit : null,
           checkedAt: new Date().toISOString(),
+          remoteRef,
         });
       }));
     }
@@ -81,7 +85,7 @@ async function probeWebsite(url: string | undefined): Promise<AppInfo["web"]> {
       method: "HEAD", signal: AbortSignal.timeout(4500),
       cache: "no-store", redirect: "follow",
     });
-    if (response.status === 405 || response.status === 501) {
+    if (response.status === 404 || response.status === 405 || response.status === 501) {
       response = await fetch(url, {
         method: "GET", signal: AbortSignal.timeout(4500),
         cache: "no-store", redirect: "follow",
@@ -90,7 +94,7 @@ async function probeWebsite(url: string | undefined): Promise<AppInfo["web"]> {
     }
     return {
       status: response.status === 401 || response.status === 403 ? "restricted"
-        : response.ok ? "online" : "offline",
+        : response.ok ? "online" : "http_error",
       httpStatus: response.status,
       latencyMs: Date.now() - started,
       checkedAt,
@@ -122,9 +126,10 @@ export async function getOperationalApps(containersInput?: ContainerInfo[]): Pro
       ...app,
       git: {
         ...app.git, remoteCommit, remoteCheckedAt: source?.checkedAt ?? null,
+        remoteRef: source?.remoteRef ?? null,
         remoteStatus: !app.git.isRepo ? "not_repo"
-          : !remoteCommit ? "unavailable"
-          : validCommit(localCommit) && remoteCommit === localCommit ? "synced" : "different",
+          : !remoteCommit || !validCommit(localCommit) ? "unavailable"
+          : remoteCommit === localCommit ? "synced" : "different",
       },
       deployment: {
         revision: image?.revision ?? null, imageId: image?.imageId ?? null,
