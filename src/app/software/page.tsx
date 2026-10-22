@@ -187,8 +187,9 @@ export default function SoftwarePage() {
   };
 
   const filteredApps = apps.filter((app) => {
+    if (showArchived && app.lifecycle?.state !== "archived") return false;
     if (!showArchived && app.lifecycle?.state === "archived") return false;
-    const matchesFilter = filterType === "all" || portfolioSegment(app) === filterType;
+    const matchesFilter = showArchived || filterType === "all" || portfolioSegment(app) === filterType;
     const matchesSearch =
       app.name.toLowerCase().includes(search.toLowerCase()) ||
       app.slug.toLowerCase().includes(search.toLowerCase()) ||
