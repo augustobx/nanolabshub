@@ -11,9 +11,12 @@ interface HeaderProps {
 }
 
 const PAGE_INFO: Record<string, { title: string; section: string }> = {
-  "/": { title: "Centro de control", section: "Operaciones" },
-  "/governance": { title: "Clientes y SaaS", section: "Negocio" },
-  "/software": { title: "Productos y versiones", section: "Productos" },
+  "/": { title: "Inicio", section: "Gobierno" },
+  "/superadmin": { title: "Superadmin", section: "Gobierno" },
+  "/saas": { title: "Productos SaaS", section: "Negocio" },
+  "/operations": { title: "Operación técnica", section: "Plataforma" },
+  "/governance": { title: "Clientes y tenants", section: "Negocio" },
+  "/software": { title: "Aplicaciones y versiones", section: "Portafolio" },
   "/hardware": { title: "Infraestructura", section: "Plataforma" },
   "/backups": { title: "Copias de seguridad", section: "Plataforma" },
   "/networking": { title: "Dominios y red", section: "Plataforma" },
@@ -22,7 +25,7 @@ const PAGE_INFO: Record<string, { title: string; section: string }> = {
 export function Header({ onRefresh, isRefreshing = false }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const info = PAGE_INFO[pathname] ?? PAGE_INFO["/"];
+  const info = PAGE_INFO[pathname] ?? (pathname.startsWith("/saas/") ? { title: "Espacio de SaaS", section: "Negocio" } : PAGE_INFO["/"]);
   const [alerts, setAlerts] = useState<SystemAlert[]>([]);
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [alertsLoaded, setAlertsLoaded] = useState(false);
@@ -62,7 +65,7 @@ export function Header({ onRefresh, isRefreshing = false }: HeaderProps) {
   const critical = alerts.filter((a) => a.level === "critical").length;
 
   return (
-    <header className="hub-header sticky top-0 z-20 flex min-h-[76px] w-full items-center justify-between gap-3 border-b border-white/[0.07] bg-[#0b1220]/95 px-5 pl-[74px] backdrop-blur-xl sm:px-7 sm:pl-[74px] lg:px-9">
+    <header className="hub-header sticky top-0 z-20 flex min-h-[76px] w-full items-center justify-between gap-3 border-b border-white/[0.07] bg-[#142236]/95 px-5 pl-[74px] backdrop-blur-xl sm:px-7 sm:pl-[74px] lg:px-9">
       <div className="min-w-0">
         <div className="hidden items-center gap-1.5 text-[11px] font-medium text-slate-500 sm:flex">
           NanoLabs <ChevronRight className="h-3 w-3" /> {info.section}
