@@ -71,7 +71,10 @@ const responses = {
   "/api/apps": { success: true, data: apps },
   "/api/telemetry": { success: true, data: { telemetry, containers: [container] } },
   "/api/telemetry/history": { success: true, data: [] },
-  "/api/backups": { success: true, data: backups },
+  "/api/backups": { success: true, data: backups, schedules: [
+    { slug: "onlyfood", name: "OnlyFood", enabled: false, hourLocal: 3, weekdays: "0,1,2,3,4,5,6", lastRunDay: null },
+    { slug: "onlypadel", name: "OnlyPadel", enabled: true, hourLocal: 4, weekdays: "0", lastRunDay: "2026-10-21" },
+  ] },
   "/api/alerts": { success: true, data: { alerts: [] } },
 };
 
@@ -91,6 +94,13 @@ try {
     await page.route("**/api/**", (route) => {
       const url = new URL(route.request().url());
       if (url.pathname.startsWith("/api/auth/")) return route.continue();
+      if (url.pathname === "/api/backups/schedule" && route.request().method() === "POST") {
+        const input = route.request().postDataJSON();
+        const schedule = responses["/api/backups"].schedules.find((item) => item.slug === input.slug);
+        if (schedule) Object.assign(schedule, input.config);
+        return route.fulfill({ status: 200, contentType: "application/json",
+          body: JSON.stringify({ success: true, data: responses["/api/backups"].schedules }) });
+      }
       if (url.pathname === "/api/apps/lifecycle") {
         if (route.request().method() === "GET") {
           return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ success: true, data: [] }) });
@@ -150,6 +160,13 @@ try {
         if (width > device.viewport.width + 4) {
           throw new Error(`Mobile horizontal overflow at ${path}: ${width}px (viewport ${device.viewport.width}px)`);
         }
+      }
+      if (path === "/backups") {
+        await page.getByText("Backups programados").waitFor();
+        const selector = page.getByRole("combobox", { name: "Hora de OnlyFood" });
+        await selector.selectOption("5");
+        await page.getByRole("button", { name: "Guardar" }).first().click();
+        await page.getByRole("link", { name: "Descargar" }).count();
       }
       if (path === "/software") {
         const archived = page.getByText("Aplicación archivada demo");
