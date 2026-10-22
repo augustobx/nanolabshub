@@ -4,13 +4,13 @@
 
 :root {
   color-scheme: dark;
-  --bg-main: #0b1220;
-  --bg-card: #172233;
-  --border-subtle: rgba(187, 203, 226, .11);
+  --bg-main: #101b2c;
+  --bg-card: #203047;
+  --border-subtle: rgba(191, 209, 235, .14);
   --border-glow: rgba(155, 180, 255, .25);
   --accent: #9db5ff;
   --ink: #eff4fb;
-  --muted: #99a9be;
+  --muted: #b2c1d3;
 }
 * { -webkit-tap-highlight-color: transparent; }
 html { scroll-behavior: smooth; }
@@ -28,12 +28,12 @@ body {
 ::-webkit-scrollbar-thumb:hover { background: #4b607a; }
 
 .hub-shell { min-height: 100vh; }
-.hub-main { min-width: 0; background: linear-gradient(150deg, #0d1625 0%, #0b1220 45%, #0d1422 100%); }
-.hub-content { width: 100%; max-width: 1500px; margin: 0 auto; padding: 28px 24px 64px; }
+.hub-main { min-width: 0; background: linear-gradient(155deg, #142238 0%, #0f1a2b 48%, #101c2d 100%); }
+.hub-content { width: 100%; max-width: 1500px; margin: 0 auto; padding: 32px 28px 72px; }
 .hub-hero {
   border: 1px solid var(--border-subtle);
   border-radius: 18px;
-  background: linear-gradient(112deg, #1c2940 0%, #141e2e 58%, #141d2d 100%);
+  background: linear-gradient(115deg, #263e5b 0%, #1b2e47 48%, #1b2c41 100%);
   padding: 26px 30px;
   position: relative;
 }
@@ -42,13 +42,13 @@ body {
 .hub-description { color: #a6b4c8; font-size: 13px; line-height: 1.7; max-width: 680px; }
 .hub-section-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; color: #eef3fa; font-size: 17px; font-weight: 650; letter-spacing: -.025em; }
 .hub-card {
-  background: #172233;
+  background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: 16px;
   box-shadow: 0 2px 8px rgba(0,0,0,.08);
   transition: border-color .2s ease, background .2s ease, transform .2s ease;
 }
-.hub-card:hover { border-color: rgba(173,195,238,.24); }
+.hub-card:hover { border-color: rgba(173,195,238,.28); }
 .hub-card-active { border-color: rgba(154,182,255,.5); }
 .hub-stat { min-height: 126px; }
 .hub-icon-button {
@@ -98,4 +98,49 @@ body {
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+
+/* NanoLabs Hub v2 · cohesive enterprise surfaces */
+.hub-sidebar { box-shadow: 8px 0 30px rgba(4,10,21,.1); }
+.hub-hero { box-shadow: inset 0 1px 0 rgba(240,246,255,.035); }
+.hub-main .hub-card { background: #1b2b40; }
+.hub-section-heading { font-size: 17px; font-weight: 700; letter-spacing: -.027em; }
+.hub-description { color: #bed0e4; font-size: 14px; max-width: 780px; }
+.hub-eyebrow { font-size: 11px; letter-spacing: .12em; color: #bed1fa; }
+.hub-hero-title { font-size: clamp(24px, 2.8vw, 35px); line-height: 1.18; font-weight: 750; }
+.hub-primary-action, .hub-secondary-action {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 9px; min-height: 43px; padding: 10px 15px; border-radius: 11px;
+  font-size: 12px; line-height: 18px; font-weight: 700; text-decoration: none;
+  transition: background .2s ease, border-color .2s ease, transform .2s ease;
+}
+.hub-primary-action { background: #abc5fa; color: #162840; border: 1px solid #c5d9fe; }
+.hub-primary-action:hover { background: #c5d9fe; }
+.hub-secondary-action { background: rgba(221,233,250,.06); color: #d8e5fa; border: 1px solid rgba(209,224,247,.18); }
+.hub-secondary-action:hover { background: rgba(221,233,250,.12); }
+.hub-text-link { display: inline-flex; align-items: center; gap: 6px; color: #c6d9ff; font-size: 12px; font-weight: 700; text-decoration: none; }
+.hub-text-link:hover { text-decoration: underline; }
+.hub-state {
+  display: inline-flex; align-items: center; gap: 5px; max-width: 100%;
+  width: fit-content; border: 1px solid transparent; border-radius: 7px;
+  padding: 4px 9px; font-size: 11px; line-height: 17px; font-weight: 650;
+  white-space: nowrap;
+}
+.hub-state-good { border-color: rgba(82,188,155,.25); background: rgba(82,188,155,.09); color: #83e0b9; }
+.hub-state-warn { border-color: rgba(233,183,97,.26); background: rgba(233,183,97,.1); color: #f0c77e; }
+.hub-state-neutral { border-color: rgba(199,213,235,.15); background: rgba(194,210,236,.055); color: #bbcce1; }
+.hub-field {
+  min-height: 41px; border-radius: 10px; padding: 9px 12px;
+  border: 1px solid rgba(210,223,244,.18);
+  background: #16263b; color: #eff6ff; font-size: 13px;
+}
+.hub-field::placeholder { color: #8b9fb8; }
+.hub-field:focus { outline: 2px solid rgba(164,194,248,.75); outline-offset: 1px; }
+.hub-main table th { font-size: 11px; color: #aec0d8; }
+.hub-main table td { font-size: 12px; }
+.hub-main a, .hub-main button { -webkit-tap-highlight-color: transparent; }
+@media (max-width: 640px) {
+  .hub-content { padding: 22px 16px 48px; }
+  .hub-hero { padding: 24px 20px; }
+  .hub-main .hub-card { border-radius: 14px; }
 }
