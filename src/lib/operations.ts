@@ -147,6 +147,7 @@ export async function getOperationalApps(containersInput?: ContainerInfo[]): Pro
       },
       deployment: {
         revision: image?.revision ?? null, imageId: image?.imageId ?? null,
+        imageTag: firstRunning?.image ?? null,
         status: !firstRunning ? "not_running" : image?.revision ? "identified" : "unidentified",
       },
       web: sites[index],
