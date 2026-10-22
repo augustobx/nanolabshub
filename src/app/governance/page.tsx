@@ -38,6 +38,7 @@ import { UniversalTenant, GovernanceOverview, SaaSSlug } from "@/lib/types";
 export default function GovernancePage() {
   const [data, setData] = useState<GovernanceOverview | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedSaas, setSelectedSaas] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [sortTenants, setSortTenants] = useState<"name" | "activity" | "status">("name");
@@ -51,14 +52,17 @@ export default function GovernancePage() {
 
   const fetchGovernance = async () => {
     setIsLoading(true);
+    setLoadError(null);
     try {
       const res = await fetch("/api/governance");
+      if (!res.ok) throw new Error("No se pudo conectar con la gestión de clientes");
       const json = await res.json();
-      if (json.success) {
-        setData(json.data);
+      if (!json.success || !json.data || !Array.isArray(json.data.tenants)) {
+        throw new Error(json.error || "No hay datos disponibles");
       }
-    } catch (err) {
-      console.error("Error fetching governance data:", err);
+      setData(json.data);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "No se pudieron consultar los clientes");
     } finally {
       setIsLoading(false);
     }
@@ -287,6 +291,16 @@ export default function GovernancePage() {
           </button>
         </section>
 
+        {loadError && (
+          <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-400/20 bg-rose-400/[0.07] p-4 text-xs text-rose-200">
+            <span>{loadError}. La información anterior podría estar desactualizada.</span>
+            <button type="button" onClick={fetchGovernance}
+              className="rounded-lg border border-rose-400/25 px-3 py-2 font-semibold hover:bg-rose-400/10">
+              Reintentar
+            </button>
+          </div>
+        )}
+
         {/* Global KPIs */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
           <div className="hub-card p-4 space-y-1">
@@ -417,7 +431,7 @@ export default function GovernancePage() {
             <div className="col-span-full hub-card p-12 text-center space-y-3">
               <Building2 className="w-10 h-10 text-gray-600 mx-auto" />
               <div className="text-sm font-mono text-gray-400">
-                {isLoading ? "Consultando bases de datos SaaS..." : "No se encontraron tenants con los filtros aplicados."}
+                {isLoading ? "Consultando clientes…" : loadError ? "No fue posible actualizar los datos de clientes." : "No hay clientes que coincidan con la búsqueda o los filtros."}
               </div>
             </div>
           ) : (
