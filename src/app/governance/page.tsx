@@ -545,8 +545,8 @@ export default function GovernancePage() {
           )}
         </div>
 
+        {/* Legacy migration inventory only when records are provided. */}
         {(data?.legacyPanels?.length ?? 0) > 0 && (
-        {/* Phase 6: Legacy Standalone Panels Sunset Architecture */}
         <div className="hub-card p-6 space-y-4">
           <div className="flex items-center justify-between border-b border-white/5 pb-3">
             <div>
