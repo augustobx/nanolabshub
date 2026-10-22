@@ -1,0 +1,17 @@
+services:
+  nanolabshub:
+    environment:
+      HUB_BACKUPS_ENABLED: ${HUB_BACKUPS_ENABLED:-false}
+      HUB_BACKUP_SCHEDULER_KEY: ${HUB_BACKUP_SCHEDULER_KEY:-}
+  nanolabshub-backup-scheduler:
+    image: nanolabshub-nanolabshub:latest
+    container_name: nanolabshub-backup-scheduler
+    command: ["node", "/app/scripts/backup-scheduler.cjs"]
+    restart: unless-stopped
+    environment:
+      HUB_BACKUP_SCHEDULER_KEY: ${HUB_BACKUP_SCHEDULER_KEY:-}
+    networks:
+      - proxy
+networks:
+  proxy:
+    external: true
