@@ -1,10 +1,18 @@
 import { spawn } from "node:child_process";
 import { KNOWN_APPS } from "@/lib/apps-registry";
 import { getDatabase } from "@/lib/db";
+import { requireMutatingSession } from "@/lib/action-security";
+import { assertAppActive } from "@/lib/app-lifecycle";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request) {
+export async function POST(req: Request) {
+  let actor: string;
+  try {
+    actor = await requireMutatingSession(req);
+  } catch (error) {
+    return new Response(error instanceof Error ? error.message : "No autorizado", { status: 403 });
+  }
   const { searchParams } = new URL(req.url);
   const slug = searchParams.get("slug");
 
@@ -17,11 +25,17 @@ export async function GET(req: Request) {
     return new Response(`App ${slug} no encontrada`, { status: 404 });
   }
 
+  try {
+    assertAppActive(app.slug);
+  } catch (error) {
+    return new Response(error instanceof Error ? error.message : "Operación bloqueada", { status: 409 });
+  }
+
   const encoder = new TextEncoder();
 
   // Audit log start
   try {
-    getDatabase().logAudit("augusto", "DEPLOY_STARTED", app.slug, `Iniciado despliegue en ${app.path}`);
+    getDatabase().logAudit(actor, "DEPLOY_STARTED", app.slug, `Iniciado despliegue en ${app.path}`);
   } catch {}
 
   const stream = new ReadableStream({
@@ -93,7 +107,7 @@ export async function GET(req: Request) {
       child.on("close", (code) => {
         try {
           getDatabase().logAudit(
-            "augusto",
+            actor,
             code === 0 ? "DEPLOY_SUCCESS" : "DEPLOY_FAILED",
             app.slug,
             `Despliegue finalizado con código ${code}`
