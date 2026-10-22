@@ -84,7 +84,7 @@ export interface AppInfo {
     backupSize?: string;
     backupStatus?: "success" | "warning" | "error";
   };
-  deployment?: { revision: string | null; imageId: string | null; status: "identified" | "unidentified" | "not_running" };
+  deployment?: { revision: string | null; imageId: string | null; imageTag?: string | null; status: "identified" | "unidentified" | "not_running" };
   web?: { status: "online" | "restricted" | "http_error" | "offline" | "unknown"; httpStatus: number | null; latencyMs: number | null; checkedAt: string | null };
   hasDockerCompose: boolean;
   status: "operational" | "degraded" | "down" | "deploying" | "not_deployed";
