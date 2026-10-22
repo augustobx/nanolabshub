@@ -28,13 +28,14 @@ function WebBadge({ app }: { app: AppInfo }) {
   switch (app.web?.status) {
     case "online": return <Pill text={`Online${app.web.latencyMs != null ? ` · ${app.web.latencyMs} ms` : ""}`} tone="good" />;
     case "restricted": return <Pill text={`Restringida · ${app.web.httpStatus}`} tone="warn" />;
-    case "offline": return <Pill text={app.web.httpStatus ? `HTTP ${app.web.httpStatus}` : "Sin respuesta"} tone="bad" />;
+    case "http_error": return <Pill text={`Web HTTP ${app.web.httpStatus || "error"}`} tone="warn" />;
+    case "offline": return <Pill text="Sin conexión web" tone="bad" />;
     default: return <Pill text="Sin comprobación" />;
   }
 }
 function GitBadge({ app }: { app: AppInfo }) {
-  if (app.git.remoteStatus === "synced") return <Pill text="Git sincronizado" tone="good" />;
-  if (app.git.remoteStatus === "different") return <Pill text="Commits diferentes" tone="warn" />;
+  if (app.git.remoteStatus === "synced") return <Pill text={app.git.remoteRef === "HEAD" ? "Coincide con HEAD remoto" : "Git sincronizado"} tone="good" />;
+  if (app.git.remoteStatus === "different") return <Pill text={app.git.remoteRef === "HEAD" ? "Distinto al HEAD remoto" : "Commits diferentes"} tone="warn" />;
   if (app.git.remoteStatus === "not_repo") return <Pill text="Sin Git local" />;
   return <Pill text="Git remoto no accesible" />;
 }
@@ -65,6 +66,7 @@ export function OperationsDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [scope, setScope] = useState<"all" | "attention">("all");
+  const [showFinishedTasks, setShowFinishedTasks] = useState(false);
   const [terminal, setTerminal] = useState({ open: false, title: "", output: "", loading: false });
 
   const reload = useCallback(async (signal?: AbortSignal) => {
@@ -129,11 +131,17 @@ export function OperationsDashboard() {
   const containers = snapshot?.containers ?? [];
   const metrics = snapshot?.telemetry;
   const running = containers.filter((c) => c.state === "running").length;
-  const unhealthy = containers.filter((c) => c.health === "unhealthy" || c.state === "exited").length;
+  const finishedTasks = containers.filter((c) => c.isJob && c.state === "exited" && c.exitCode === 0);
+  const visibleContainers = containers.filter((c) =>
+    showFinishedTasks || !(c.isJob && c.state === "exited" && c.exitCode === 0)
+  );
+  const unhealthy = containers.filter((c) => c.health === "unhealthy" ||
+    (c.state === "exited" && !(c.isJob && c.exitCode === 0))).length;
   const gitDiff = apps.filter((a) => a.git.remoteStatus === "different").length;
   const websitesDown = apps.filter((a) => a.web?.status === "offline").length;
+  const websitesWithHttpErrors = apps.filter((a) => a.web?.status === "http_error").length;
   const attention = apps.filter((app) =>
-    app.git.remoteStatus === "different" || app.web?.status === "offline" ||
+    app.git.remoteStatus === "different" || app.web?.status === "offline" || app.web?.status === "http_error" || app.web?.status === "http_error" ||
     app.status === "down" || app.status === "degraded"
   ).length;
 
@@ -143,7 +151,7 @@ export function OperationsDashboard() {
     const query = search.trim().toLocaleLowerCase("es");
     return !query || [app.name, app.slug, app.path].some((text) => text.toLocaleLowerCase("es").includes(query));
   }).sort((a, b) => {
-    const priority = (app: AppInfo) => Number(app.web?.status === "offline") * 4 +
+    const priority = (app: AppInfo) => Number(app.web?.status === "offline") * 4 + Number(app.web?.status === "http_error") * 2 +
       Number(app.status === "down") * 3 + Number(app.git.remoteStatus === "different") * 2;
     return priority(b) - priority(a) || a.name.localeCompare(b.name, "es");
   }), [apps, search, scope]);
@@ -208,7 +216,7 @@ export function OperationsDashboard() {
           <Metric label="Diferencias Git" icon={GitBranch} value={snapshot ? String(gitDiff) : "—"}
             detail="Solo repositorios con remoto consultado" warning={gitDiff > 0} />
           <Metric label="Webs sin respuesta" icon={Wifi} value={snapshot ? String(websitesDown) : "—"}
-            detail="Según comprobación HTTP desde Hub" warning={websitesDown > 0} />
+            detail={`Fallos de conexión · ${websitesWithHttpErrors} respuestas HTTP anómalas`} warning={websitesDown > 0 || websitesWithHttpErrors > 0} />
         </section>
 
         <section aria-labelledby="hardware-overview" className="space-y-3">
@@ -266,7 +274,7 @@ export function OperationsDashboard() {
               <table className="w-full min-w-[990px] text-left">
                 <thead><tr>
                   <th className="px-3">Producto</th><th className="px-3">Web</th><th className="px-3">Servidor / Git</th>
-                  <th className="px-3">GitHub / remoto</th><th className="px-3">Imagen desplegada</th>
+                  <th className="px-3">Git remoto</th><th className="px-3">Imagen desplegada</th>
                   <th className="px-3">Docker</th><th className="px-3 text-right">Acciones</th>
                 </tr></thead>
                 <tbody className="divide-y divide-white/[0.07]">
@@ -279,11 +287,12 @@ export function OperationsDashboard() {
                       <td className="px-3"><WebBadge app={app} /></td>
                       <td className="px-3">
                         <div className="font-mono text-xs text-slate-100" title={app.git.commitHash}>{shortSha(app.git.commitHash)}</div>
-                        <div className="mt-1 text-[11px] text-slate-400">{app.git.dirtyFilesCount ? `${app.git.dirtyFilesCount} archivos modificados` : app.git.isRepo ? "Árbol limpio" : "Sin repositorio"}</div>
+                        <div className="mt-1 text-[11px] text-slate-400">{app.git.localError ? "Git no verificable" : app.git.dirtyFilesCount ? `${app.git.dirtyFilesCount} archivos modificados` : app.git.isRepo ? "Árbol limpio" : "Sin repositorio"}</div>
                       </td>
                       <td className="px-3">
                         <div className="font-mono text-xs text-slate-100" title={app.git.remoteCommit || undefined}>{shortSha(app.git.remoteCommit)}</div>
                         <div className="mt-1"><GitBadge app={app} /></div>
+                        {app.git.remoteRef === "HEAD" && <div className="mt-1 text-[10px] text-slate-500">Rama remota por defecto</div>}
                       </td>
                       <td className="px-3">
                         <div className="font-mono text-xs text-slate-100" title={app.deployment?.revision || app.deployment?.imageId || undefined}>
@@ -292,8 +301,8 @@ export function OperationsDashboard() {
                         <div className="mt-1 text-[11px] text-slate-400">{app.deployment?.status === "identified" ? "Commit de build" : app.deployment?.imageId ? `Imagen ${app.deployment.imageId.slice(7, 19)}` : "Sin identificar"}</div>
                       </td>
                       <td className="px-3">
-                        <Pill text={`${app.containers.filter(c => c.state === "running").length}/${app.containers.length} activos`}
-                          tone={app.status === "operational" ? "good" : "bad"} />
+                        <Pill text={app.status === "not_deployed" ? "No desplegada" : `${app.containers.filter(c => c.state === "running").length}/${app.containers.length} activos`}
+                          tone={app.status === "operational" ? "good" : app.status === "not_deployed" ? "neutral" : "bad"} />
                       </td>
                       <td className="px-3">
                         <div className="flex justify-end gap-1">
@@ -349,10 +358,18 @@ export function OperationsDashboard() {
         <section aria-labelledby="containers-overview" className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div><p className="hub-eyebrow mb-1">Docker en vivo</p><h2 id="containers-overview" className="hub-section-heading">Contenedores</h2></div>
-            <Link href="/hardware" className="flex items-center gap-1.5 text-xs font-semibold text-brand-cyan hover:underline">Inventario técnico <ArrowUpRight className="h-4 w-4" /></Link>
+            <div className="flex flex-wrap items-center gap-3">
+              {finishedTasks.length > 0 && (
+                <button type="button" aria-pressed={showFinishedTasks} onClick={() => setShowFinishedTasks(v => !v)}
+                  className="rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-white/5">
+                  {showFinishedTasks ? "Ocultar tareas completadas" : `Ver ${finishedTasks.length} tareas terminadas`}
+                </button>
+              )}
+              <Link href="/hardware" className="flex items-center gap-1.5 text-xs font-semibold text-brand-cyan hover:underline">Inventario técnico <ArrowUpRight className="h-4 w-4" /></Link>
+            </div>
           </div>
           <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-            {containers.map((container: ContainerInfo) => (
+            {visibleContainers.map((container: ContainerInfo) => (
               <div key={container.id} className="hub-card flex flex-wrap items-center justify-between gap-3 px-4 py-4">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
