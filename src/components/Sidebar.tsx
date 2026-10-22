@@ -34,7 +34,8 @@ export function Sidebar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  useEffect(() => setMobileOpen(false), [pathname]);
+  const [currentSearch, setCurrentSearch] = useState("");
+  useEffect(() => { setMobileOpen(false); setCurrentSearch(window.location.search); }, [pathname]);
   useEffect(() => {
     try { setCollapsed(window.localStorage.getItem("hub-sidebar-collapsed") === "1"); } catch {}
   }, []);
@@ -78,11 +79,10 @@ export function Sidebar() {
                   const [base, query] = item.href.split("?");
                   const matchesPath = base === "/" ? pathname === "/" :
                     pathname === base || pathname.startsWith(base + "/");
-                  const active = matchesPath && (!query || (
-                    typeof window !== "undefined" && new URLSearchParams(window.location.search).toString().includes(query)
-                  ));
+                  const active = matchesPath && (!query || currentSearch.includes(query));
                   return (
                     <Link key={item.href} href={item.href} title={item.description}
+                      onClick={() => setCurrentSearch(query ? "?" + query : "")}
                       aria-current={active ? "page" : undefined}
                       className={"group flex min-h-[43px] items-center gap-3 rounded-xl px-3 py-2 text-[12px] font-semibold transition-colors " +
                         (active ? "bg-[#30476a] text-white" : "text-[#b5c3d5] hover:bg-white/[0.06] hover:text-white")}>
