@@ -30,6 +30,9 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
+      - name: Backup engine safety tests
+        run: node --test scripts/backup-engine.test.cjs
+
       - name: Production build
         run: npm run build
 
