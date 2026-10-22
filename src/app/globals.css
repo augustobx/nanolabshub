@@ -68,7 +68,21 @@ body {
 .hub-main td { color: #d7e0eb; }
 .hub-main th, .hub-main td { padding-top: 12px; padding-bottom: 12px; }
 .hub-main :is(h1,h2,h3) { text-wrap: pretty; }
-.hub-main .font-mono { letter-spacing: -.02em; }
+.hub-main .font-mono:not(pre):not(code) {
+  font-family: var(--font-inter), ui-sans-serif, sans-serif;
+  letter-spacing: normal;
+}
+.hub-main pre.font-mono, .hub-main code, .hub-main .terminal-window {
+  font-family: var(--font-mono), ui-monospace, monospace;
+}
+/* The original interface used 9–10px labels throughout. Make them readable. */
+.hub-main [class*="text-[9px]"],
+.hub-main [class*="text-[10px]"] {
+  font-size: 11px;
+  line-height: 1.45;
+}
+.hub-main .text-gray-500 { color: #96a7bc; }
+.hub-main .text-gray-600 { color: #8393ab; }
 .gauge-track { overflow: hidden; background: #2d3c50; border-radius: 999px; }
 .gauge-fill-cyan { background: #93adff; }
 .gauge-fill-emerald { background: #52bc9b; }
