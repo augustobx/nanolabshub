@@ -1,0 +1,292 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { Header } from "@/components/Header";
+import {
+  Cpu,
+  Layers,
+  HardDrive,
+  Boxes,
+  Activity,
+  Server,
+  Clock,
+  CheckCircle2,
+  AlertTriangle,
+  RotateCw,
+  Terminal,
+} from "lucide-react";
+import { ServerMetrics, ContainerInfo } from "@/lib/types";
+
+export default function HardwarePage() {
+  const [metrics, setMetrics] = useState<ServerMetrics | null>(null);
+  const [containers, setContainers] = useState<ContainerInfo[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchMetrics = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch("/api/telemetry");
+      const data = await res.json();
+      if (data.success) {
+        setMetrics(data.data.telemetry);
+        setContainers(data.data.containers);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMetrics();
+    const interval = setInterval(fetchMetrics, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="flex-1 flex flex-col pb-12">
+      <Header onRefresh={fetchMetrics} isRefreshing={isLoading} />
+
+      <div className="px-6 py-6 max-w-7xl w-full mx-auto space-y-6">
+        <div>
+          <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+            <Cpu className="w-5 h-5 text-brand-cyan" />
+            <span>Hardware & Infraestructura del Servidor</span>
+          </h1>
+          <p className="text-xs text-gray-400 font-mono mt-0.5">
+            Dedicado Debian GNU/Linux 13 · IP: 149.50.159.163 · DattaWeb Datacenter
+          </p>
+        </div>
+
+        {/* Primary Hardware Gauges */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {/* CPU Card */}
+          <div className="hub-card p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-white/5 pb-3">
+              <span className="text-xs font-mono text-gray-400 flex items-center gap-2">
+                <Cpu className="w-4 h-4 text-brand-cyan" />
+                PROCESADOR FÍSICO
+              </span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-brand-cyan/10 text-brand-cyan border border-brand-cyan/20">
+                12 THREADS
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-xs text-gray-400">Modelo:</div>
+              <div className="text-sm font-bold text-white font-mono">
+                12th Gen Intel(R) Core(TM) i5-12400
+              </div>
+              <div className="text-xs text-gray-500 font-mono">
+                Arquitectura: x86_64 · 6 Cores / 12 Hilos
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-white/5 space-y-2">
+              <div className="flex justify-between text-xs font-mono">
+                <span className="text-gray-400">Carga Actual:</span>
+                <span className="text-brand-cyan font-bold">
+                  {metrics ? `${metrics.cpu.usagePercent}%` : "---"}
+                </span>
+              </div>
+              <div className="gauge-track h-2.5">
+                <div
+                  className="gauge-fill-cyan h-full transition-all duration-500"
+                  style={{ width: `${metrics ? metrics.cpu.usagePercent : 0}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-[11px] font-mono text-gray-500 pt-1">
+                <span>Load Avg 1m: {metrics ? metrics.cpu.loadAvg[0] : "---"}</span>
+                <span>5m: {metrics ? metrics.cpu.loadAvg[1] : "---"}</span>
+                <span>15m: {metrics ? metrics.cpu.loadAvg[2] : "---"}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* RAM Card */}
+          <div className="hub-card p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-white/5 pb-3">
+              <span className="text-xs font-mono text-gray-400 flex items-center gap-2">
+                <Layers className="w-4 h-4 text-purple-400" />
+                MEMORIA RAM & SWAP
+              </span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                DDR4
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs font-mono">
+                  <span className="text-gray-400">RAM en uso:</span>
+                  <span className="text-purple-300 font-bold">
+                    {metrics ? `${metrics.memory.usedPercent}%` : "---"}
+                  </span>
+                </div>
+                <div className="gauge-track h-2.5">
+                  <div
+                    className="h-full bg-gradient-to-r from-purple-600 to-purple-400 transition-all duration-500"
+                    style={{ width: `${metrics ? metrics.memory.usedPercent : 0}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-[11px] font-mono text-gray-500">
+                  <span>
+                    Usado: {metrics ? (metrics.memory.usedBytes / 1024 ** 3).toFixed(2) : "0"} GB
+                  </span>
+                  <span>
+                    Total: {metrics ? (metrics.memory.totalBytes / 1024 ** 3).toFixed(2) : "0"} GB
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5 pt-2 border-t border-white/5">
+                <div className="flex justify-between text-xs font-mono">
+                  <span className="text-gray-400">SWAP en uso:</span>
+                  <span className="text-gray-300">
+                    {metrics ? `${metrics.memory.swapUsedPercent}%` : "---"}
+                  </span>
+                </div>
+                <div className="gauge-track h-2">
+                  <div
+                    className="h-full bg-gray-500 transition-all duration-500"
+                    style={{ width: `${metrics ? metrics.memory.swapUsedPercent : 0}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-[11px] font-mono text-gray-500">
+                  <span>
+                    Usado: {metrics ? (metrics.memory.swapUsedBytes / 1024 ** 3).toFixed(2) : "0"} GB
+                  </span>
+                  <span>
+                    Total: {metrics ? (metrics.memory.swapTotalBytes / 1024 ** 3).toFixed(2) : "0"} GB
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* NVMe Storage Card */}
+          <div className="hub-card p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-white/5 pb-3">
+              <span className="text-xs font-mono text-gray-400 flex items-center gap-2">
+                <HardDrive className="w-4 h-4 text-emerald-400" />
+                DISCO NVMe PRODUCTIVO
+              </span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                PCIe Gen4
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-xs text-gray-400">Partición Raíz & Docker:</div>
+              <div className="text-sm font-bold text-white font-mono">
+                /dev/nvme0n1p3 sobre /
+              </div>
+              <div className="text-xs text-gray-500 font-mono">
+                Montajes compartidos: /opt, /srv, /var/lib/docker
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-white/5 space-y-2">
+              <div className="flex justify-between text-xs font-mono">
+                <span className="text-gray-400">Espacio Ocupado:</span>
+                <span className="text-emerald-400 font-bold">
+                  {metrics && metrics.disks[0] ? `${metrics.disks[0].usedPercent}%` : "---"}
+                </span>
+              </div>
+              <div className="gauge-track h-2.5">
+                <div
+                  className="gauge-fill-emerald h-full transition-all duration-500"
+                  style={{
+                    width: `${metrics && metrics.disks[0] ? metrics.disks[0].usedPercent : 0}%`,
+                  }}
+                />
+              </div>
+              <div className="flex justify-between text-[11px] font-mono text-gray-500 pt-1">
+                <span>
+                  Ocupado:{" "}
+                  {metrics && metrics.disks[0]
+                    ? `${(metrics.disks[0].usedBytes / 1024 ** 3).toFixed(1)} GB`
+                    : "---"}
+                </span>
+                <span className="text-emerald-400 font-medium">
+                  Libre:{" "}
+                  {metrics && metrics.disks[0]
+                    ? `${(metrics.disks[0].freeBytes / 1024 ** 3).toFixed(1)} GB`
+                    : "---"}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Live Docker Containers Fleet Table */}
+        <div className="hub-card p-5 space-y-4">
+          <div className="flex items-center justify-between border-b border-white/5 pb-3">
+            <div>
+              <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
+                <Boxes className="w-5 h-5 text-brand-cyan" />
+                <span>Inventario Activo de Contenedores Docker</span>
+              </h2>
+              <p className="text-xs text-gray-500 font-mono">
+                {containers.length} contenedores registrados en el Docker Daemon
+              </p>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs font-mono">
+              <thead className="bg-surface-100/60 text-gray-400 uppercase text-[10px] tracking-wider border-b border-white/5">
+                <tr>
+                  <th className="py-2.5 px-3">Contenedor</th>
+                  <th className="py-2.5 px-3">Imagen</th>
+                  <th className="py-2.5 px-3">Estado</th>
+                  <th className="py-2.5 px-3">Healthcheck</th>
+                  <th className="py-2.5 px-3">Puertos</th>
+                  <th className="py-2.5 px-3 text-right">Creado</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5 text-gray-300">
+                {containers.map((c) => (
+                  <tr key={c.id} className="hover:bg-white/[0.02] transition-colors">
+                    <td className="py-2.5 px-3 font-semibold text-white flex items-center gap-2">
+                      <span
+                        className={`w-2 h-2 rounded-full ${
+                          c.state === "running"
+                            ? "bg-emerald-400 animate-pulse"
+                            : c.state === "exited"
+                            ? "bg-gray-600"
+                            : "bg-amber-400"
+                        }`}
+                      />
+                      <span>{c.name}</span>
+                    </td>
+                    <td className="py-2.5 px-3 text-gray-400 truncate max-w-[200px]" title={c.image}>
+                      {c.image}
+                    </td>
+                    <td className="py-2.5 px-3 text-gray-300">{c.status}</td>
+                    <td className="py-2.5 px-3">
+                      {c.health === "healthy" ? (
+                        <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                          HEALTHY
+                        </span>
+                      ) : c.health === "unhealthy" ? (
+                        <span className="text-[10px] text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">
+                          UNHEALTHY
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-gray-500">STANDBY</span>
+                      )}
+                    </td>
+                    <td className="py-2.5 px-3 text-gray-400 truncate max-w-[150px]" title={c.ports}>
+                      {c.ports || "interna"}
+                    </td>
+                    <td className="py-2.5 px-3 text-right text-gray-500">{c.created}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
