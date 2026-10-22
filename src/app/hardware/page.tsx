@@ -399,7 +399,7 @@ export default function HardwarePage() {
             <div>
               <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
                 <Boxes className="w-5 h-5 text-brand-cyan" />
-                <span>Inventario Activo de Contenedores Docker</span>
+                <span>Contenedores del servidor</span>
               </h2>
               <p className="text-xs text-gray-500 font-mono">
                 {containers.length} contenedores registrados en el Docker Daemon
@@ -407,7 +407,42 @@ export default function HardwarePage() {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="space-y-3 md:hidden">
+            {containers.length === 0 ? (
+              <div className="rounded-xl border border-white/10 bg-white/[0.025] p-5 text-center text-xs text-slate-400">
+                No hay contenedores registrados.
+              </div>
+            ) : containers.map((container) => (
+              <div key={container.id} className="rounded-xl border border-white/[0.09] bg-white/[0.025] p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="break-all text-xs font-semibold text-white">{container.name}</div>
+                    <div className="mt-1 break-all text-[11px] text-slate-500">{container.image}</div>
+                  </div>
+                  <span className={`shrink-0 rounded-md px-2 py-1 text-[10px] font-semibold ${container.state === "running"
+                    ? "bg-emerald-400/10 text-emerald-300" : "bg-amber-400/10 text-amber-200"}`}>
+                    {container.state === "running" ? "Activo" : container.state === "exited" ? "Detenido" : container.state}
+                  </span>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
+                  <div><p className="text-slate-500">Salud</p><p className="mt-1 text-slate-300">{container.health === "none" ? "Sin verificación" : container.health}</p></div>
+                  <div><p className="text-slate-500">Puertos</p><p className="mt-1 break-all text-slate-300">{container.ports || "Internos"}</p></div>
+                </div>
+                <div className="mt-4 flex gap-2 border-t border-white/[0.08] pt-3">
+                  <button type="button" onClick={() => handleOpenStreamingLogs(container.name)}
+                    className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] text-xs text-slate-200">
+                    <Terminal className="h-4 w-4 text-brand-cyan" /> Logs
+                  </button>
+                  <button type="button" onClick={() => handleRestartContainer(container.name)}
+                    className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg border border-amber-400/20 bg-amber-400/[0.04] text-xs text-amber-200">
+                    <RotateCw className="h-4 w-4" /> Reiniciar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-left text-xs font-mono">
               <thead className="bg-surface-100/60 text-gray-400 uppercase text-[10px] tracking-wider border-b border-white/5">
                 <tr>
@@ -427,7 +462,7 @@ export default function HardwarePage() {
                       <span
                         className={`w-2 h-2 rounded-full ${
                           c.state === "running"
-                            ? "bg-emerald-400 animate-pulse"
+                            ? "bg-emerald-400"
                             : c.state === "exited"
                             ? "bg-gray-600"
                             : "bg-amber-400"
