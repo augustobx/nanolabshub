@@ -21,6 +21,8 @@ RUN npm run build
 
 # Runner stage
 FROM base AS runner
+ARG BUILD_REVISION=unknown
+LABEL org.opencontainers.image.revision="$BUILD_REVISION"
 WORKDIR /app
 RUN apk add --no-cache curl python3 docker-cli git
 ENV NODE_ENV=production
