@@ -151,7 +151,7 @@ export default function SoftwarePage() {
 
     try {
       const res = await fetch(`/api/apps/deploy/stream?slug=${encodeURIComponent(app.slug)}`, {
-        signal: controller.signal,
+        method: "POST", signal: controller.signal,
       });
 
       if (!res.ok) {
