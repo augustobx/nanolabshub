@@ -34,6 +34,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { UniversalTenant, GovernanceOverview, SaaSSlug } from "@/lib/types";
+import { SAAS_PRODUCTS } from "@/lib/product-taxonomy";
 
 export default function GovernancePage() {
   const [data, setData] = useState<GovernanceOverview | null>(null);
@@ -69,6 +70,8 @@ export default function GovernancePage() {
   };
 
   useEffect(() => {
+    const selected = new URLSearchParams(window.location.search).get("saas");
+    if (selected && SAAS_PRODUCTS.some((product) => product.slug === selected)) setSelectedSaas(selected);
     fetchGovernance();
   }, []);
 
@@ -552,10 +555,10 @@ export default function GovernancePage() {
             <div>
               <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
                 <Shield className="w-5 h-5 text-amber-400" />
-                <span>Consolidación de paneles anteriores</span>
+                <span>Integración de superadmin heredado</span>
               </h2>
               <p className="text-xs text-gray-400 font-mono mt-0.5">
-                Inventario de migración de accesos administrativos anteriores.
+                Estado de los accesos anteriores; la migración funcional está pendiente de comprobarse.
               </p>
             </div>
             <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">
@@ -699,9 +702,14 @@ export default function GovernancePage() {
                   <div>
                     <h3 className="text-sm font-semibold text-white">Funcionalidades contratadas</h3>
                     <p className="mt-2 text-xs leading-5 text-slate-400">
-                      Activá o desactivá funciones para este cliente. Cada cambio se guarda en su base productiva.
+                      Los módulos se muestran en todas las SaaS con el mismo formato. El cambio solo está disponible cuando existe integración real; los demás se presentan en modo consulta.
                     </p>
                   </div>
+                  {activeTenant.saas !== "onlygym" && (
+                    <p className="rounded-lg border border-amber-300/20 bg-amber-300/[0.045] p-3 text-xs text-amber-100">
+                      Lectura de módulos disponible. La edición central aún no está conectada: los controles están deshabilitados para evitar falsos éxitos.
+                    </p>
+                  )}
                   {Object.keys(activeTenant.modules).length === 0 ? (
                     <div className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-center text-xs text-slate-400">
                       No hay módulos configurables para este cliente.
@@ -716,7 +724,8 @@ export default function GovernancePage() {
                           </div>
                           <button type="button" role="switch" aria-checked={enabled}
                             aria-label={`${key.replace(/_/g, " ")}: ${enabled ? "activado" : "desactivado"}`}
-                            disabled={isUpdating}
+                            disabled={isUpdating || activeTenant.saas !== "onlygym"}
+                            title={activeTenant.saas !== "onlygym" ? "Integración de escritura pendiente para esta SaaS" : "Modificar módulo de OnlyGym"}
                             onClick={() => handleToggleModule(activeTenant, key, enabled)}
                             className={`relative h-7 w-12 shrink-0 rounded-full border transition-colors disabled:opacity-50 ${enabled
                               ? "border-[#9db5ff]/50 bg-[#6c86d7]"
