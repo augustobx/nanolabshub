@@ -186,7 +186,7 @@ export default function BackupsPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-3">
             <div>
               <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
-                <span>Historial de Archivos de Resguardo</span>
+                <span>Historial de copias de seguridad</span>
               </h2>
               <p className="text-xs text-gray-500 font-mono">
                 {filteredBackups.length} archivos mostrados
@@ -210,7 +210,33 @@ export default function BackupsPage() {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="space-y-3 md:hidden">
+            {filteredBackups.length === 0 ? (
+              <div className="rounded-xl border border-white/10 bg-white/[0.025] p-5 text-center text-xs text-slate-400">
+                No hay respaldos registrados para este filtro.
+              </div>
+            ) : filteredBackups.map((backup) => (
+              <div key={backup.id} className="rounded-xl border border-white/[0.08] bg-white/[0.025] p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold text-white">{backup.appName}</div>
+                    <p className="mt-1 break-all text-[11px] leading-5 text-slate-400">{backup.filename}</p>
+                  </div>
+                  <span className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-semibold ${backup.status === "verified"
+                    ? "bg-emerald-400/10 text-emerald-300"
+                    : backup.status === "failed" ? "bg-rose-400/10 text-rose-300" : "bg-amber-400/10 text-amber-200"}`}>
+                    {backup.status === "verified" ? "Verificado" : backup.status === "failed" ? "Fallido" : "No verificado"}
+                  </span>
+                </div>
+                <div className="mt-3 flex flex-wrap justify-between gap-2 border-t border-white/[0.07] pt-3 text-[11px]">
+                  <span className="text-slate-400">{backup.dbType.toUpperCase()} · {backup.sizeFormatted}</span>
+                  <span className="text-slate-500">{backup.createdAt}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-left text-xs font-mono">
               <thead className="bg-surface-100/60 text-gray-400 uppercase text-[10px] tracking-wider border-b border-white/5">
                 <tr>
@@ -237,8 +263,12 @@ export default function BackupsPage() {
                     <td className="py-2.5 px-3 text-gray-400 uppercase">{b.dbType}</td>
                     <td className="py-2.5 px-3 text-brand-cyan font-bold">{b.sizeFormatted}</td>
                     <td className="py-2.5 px-3">
-                      <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 flex items-center gap-1 w-fit">
-                        <CheckCircle2 className="w-2.5 h-2.5" /> VERIFICADO
+                      <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-semibold ${b.status === "verified"
+                        ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
+                        : b.status === "failed"
+                        ? "border-rose-400/20 bg-rose-400/10 text-rose-300"
+                        : "border-amber-400/20 bg-amber-400/10 text-amber-200"}`}>
+                        {b.status === "verified" ? "Verificado" : b.status === "failed" ? "Fallido" : "No verificado"}
                       </span>
                     </td>
                     <td className="py-2.5 px-3 text-right text-gray-400">{b.createdAt}</td>
