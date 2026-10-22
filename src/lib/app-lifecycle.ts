@@ -133,13 +133,18 @@ async function stopApp(slug: string, names: string[], actor: string, oldState: L
   for (const c of inspected) {
     await docker("docker update --restart=no " + quote(c.Name.replace(/^\//, "")));
   }
-  for (const name of names) {
+  // Stop workers first, frontend/application processes next and databases last.
+  const stopRank = (name: string) => /(?:^|[-_])(worker|collector|detector)(?:$|[-_])/.test(name) ? 0 :
+    /(?:^|[-_])(db|postgres|mariadb|mysql|redis)(?:$|[-_])/.test(name) ? 2 : 1;
+  for (const name of [...names].sort((a, b) => stopRank(a) - stopRank(b))) {
     if (inspected.some((c) => c.Name.replace(/^\//, "") === name && c.State.Running)) {
       await docker("docker stop --time 25 " + quote(name));
     }
   }
   const after = await inspect(names);
-  if (after.some((c) => c.State.Running)) throw new Error("No se pudieron detener todos los contenedores");
+  if (after.some((c) => c.State.Running || c.HostConfig.RestartPolicy.Name !== "no")) {
+    throw new Error("No se pudo confirmar que todos los contenedores están detenidos y con restart=no");
+  }
   return { plan: JSON.stringify(plan), stopped: inspected.filter((c) => c.State.Running).length, existing: inspected.length };
 }
 
@@ -168,6 +173,11 @@ async function startApp(names: string[], rawPlan: string | null) {
   }
   for (const item of plan) {
     await docker("docker update --restart=" + quote(item.restart) + " " + quote(item.name));
+  }
+  const after = await inspect(names);
+  if (plan.some((item) => item.wasRunning && !after.some((c) =>
+    c.Name.replace(/^\//, "") === item.name && c.State.Running))) {
+    throw new Error("Reactivación incompleta: algún contenedor no permanece en ejecución");
   }
   return { started: plan.filter((item) => item.wasRunning).length, restoredPolicies: plan.length };
 }
