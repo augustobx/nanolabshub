@@ -17,6 +17,7 @@ const PAGE_INFO: Record<string, { title: string; section: string }> = {
   "/operations": { title: "Operación técnica", section: "Plataforma" },
   "/governance": { title: "Clientes y tenants", section: "Negocio" },
   "/software": { title: "Aplicaciones y versiones", section: "Portafolio" },
+  "/infrastructure": { title: "Infraestructura", section: "Plataforma" },
   "/hardware": { title: "Infraestructura", section: "Plataforma" },
   "/backups": { title: "Copias de seguridad", section: "Plataforma" },
   "/networking": { title: "Dominios y red", section: "Plataforma" },
