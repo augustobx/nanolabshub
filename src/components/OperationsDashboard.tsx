@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  Activity, AlertTriangle, ArrowUpRight, Boxes, Building2, CheckCircle2, Cpu,
+  AlertTriangle, ArrowUpRight, Boxes, Building2, Cpu,
   ExternalLink, GitBranch, HardDrive, Layers, RefreshCw, RotateCw, Search,
   Server, Terminal, Wifi, DatabaseBackup,
 } from "lucide-react";
@@ -132,7 +132,10 @@ export function OperationsDashboard() {
   const unhealthy = containers.filter((c) => c.health === "unhealthy" || c.state === "exited").length;
   const gitDiff = apps.filter((a) => a.git.remoteStatus === "different").length;
   const websitesDown = apps.filter((a) => a.web?.status === "offline").length;
-  const attention = gitDiff + websitesDown + unhealthy;
+  const attention = apps.filter((app) =>
+    app.git.remoteStatus === "different" || app.web?.status === "offline" ||
+    app.status === "down" || app.status === "degraded"
+  ).length;
 
   const filtered = useMemo(() => apps.filter((app) => {
     if (scope === "attention" && !(app.git.remoteStatus === "different" || app.web?.status === "offline" ||
