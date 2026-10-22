@@ -307,25 +307,29 @@ export async function getBackupsList(): Promise<BackupRecord[]> {
  */
 export async function deployApp(slug: string): Promise<string> {
   const app = KNOWN_APPS.find((a) => a.slug === slug);
-  if (!app) throw new Error(`App ${slug} no encontrada en el registro`);
+  if (!app) throw new Error("Aplicación fuera del registro");
 
-  const cmd = `
-    cd "${app.path}" && \\
-    echo "=== [1/4] GIT STATUS PRE-PULL ===" && \\
-    git status -s && \\
-    echo "=== [2/4] GIT PULL ===" && \\
-    git pull origin $(git branch --show-current) && \\
-    echo "=== [3/4] DOCKER COMPOSE REBUILD & UP ===" && \\
-    docker compose up -d --build && \\
-    echo "=== [4/4] DOCKER COMPOSE PS ===" && \\
+  // Require an attached branch, a clean checkout, a default Compose manifest
+  // and a successful FF-only Git pull BEFORE any production rebuild.
+  const script = `
+    set -eu
+    cd ${JSON.stringify(app.path)}
+    GIT="git -c safe.directory=${app.path}"
+    test -d .git || { echo "Despliegue cancelado: sin repositorio Git"; exit 2; }
+    branch=$($GIT symbolic-ref --quiet --short HEAD) || {
+      echo "Despliegue cancelado: checkout detached"; exit 2;
+    }
+    test -n "$branch" || { echo "Despliegue cancelado: sin rama"; exit 2; }
+    test -z "$($GIT status --porcelain)" || {
+      echo "Despliegue cancelado: cambios locales pendientes"; exit 2;
+    }
+    docker compose config --services >/dev/null
+    GIT_TERMINAL_PROMPT=0 $GIT pull --ff-only origin "$branch"
+    docker compose up -d --build
     docker compose ps
   `;
-
-  const { stdout, stderr, code } = await executeRemoteCommand(cmd);
-  if (code !== 0) {
-    throw new Error(`Error durante el despliegue de ${app.name}:\n${stderr || stdout}`);
-  }
-
+  const { stdout, stderr, code } = await executeRemoteCommand(script);
+  if (code !== 0) throw new Error(`Despliegue cancelado para ${app.name}: ${stderr || stdout}`);
   return stdout;
 }
 
