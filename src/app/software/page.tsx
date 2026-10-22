@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Header } from "@/components/Header";
 import { TerminalModal } from "@/components/TerminalModal";
+import { AppLifecycleControls } from "@/components/AppLifecycleControls";
 import {
   Boxes,
   GitBranch,
@@ -25,6 +26,7 @@ export default function SoftwarePage() {
   const [filterType, setFilterType] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<"name" | "status">("name");
+  const [showArchived, setShowArchived] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -53,6 +55,7 @@ export default function SoftwarePage() {
   };
 
   useEffect(() => {
+    setShowArchived(new URLSearchParams(window.location.search).get("archived") === "1");
     fetchApps();
   }, []);
 
@@ -178,6 +181,7 @@ export default function SoftwarePage() {
   };
 
   const filteredApps = apps.filter((app) => {
+    if (!showArchived && app.lifecycle?.state === "archived") return false;
     const matchesFilter = filterType === "all" || app.type === filterType;
     const matchesSearch =
       app.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -245,6 +249,11 @@ export default function SoftwarePage() {
           <div role="status" className="text-xs text-slate-400">
             {isLoading ? "Cargando productos…" : loadError ? "Inventario no disponible" : `${filteredApps.length} de ${apps.length} productos`}
           </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="button" aria-pressed={showArchived} onClick={() => setShowArchived((value) => !value)}
+              className="rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-white/5">
+              {showArchived ? "Ocultar archivadas" : "Mostrar archivadas (" + apps.filter((app) => app.lifecycle?.state === "archived").length + ")"}
+            </button>
           <label className="flex items-center gap-2 text-xs text-slate-400">
             Ordenar por
             <select value={sortBy} onChange={(event) => setSortBy(event.target.value as typeof sortBy)}
@@ -253,6 +262,7 @@ export default function SoftwarePage() {
               <option value="status">Estado</option>
             </select>
           </label>
+          </div>
         </div>
         {loadError && (
           <div role="alert" className="rounded-xl border border-rose-400/20 bg-rose-400/[0.07] p-4 text-xs text-rose-200">
@@ -288,7 +298,10 @@ export default function SoftwarePage() {
                           : "text-amber-400 bg-amber-500/10 border border-amber-500/20"
                       }`}
                     >
-                      {app.status === "operational" ? "Operativa" : app.status === "degraded" ? "Degradada" : app.status === "deploying" ? "Desplegando" : app.status === "not_deployed" ? "No desplegada" : "Caída"}
+                      {app.lifecycle?.state === "archived" ? "Archivada" : app.lifecycle?.state === "suspended" ? "Suspendida" :
+                        app.lifecycle?.state === "pending_retirement" ? "Baja pendiente" :
+                        app.status === "operational" ? "Operativa" : app.status === "degraded" ? "Degradada" :
+                        app.status === "deploying" ? "Desplegando" : app.status === "not_deployed" ? "No desplegada" : "Caída"}
                     </span>
                   </div>
                   <div className="mt-2 flex min-w-0 flex-wrap items-center gap-3 break-all text-xs text-gray-500 font-mono">
@@ -320,9 +333,10 @@ export default function SoftwarePage() {
                   )}
                   {app.containers[0] && (
                     <button
+                      disabled={app.lifecycle?.state !== undefined && app.lifecycle.state !== "active"}
                       onClick={() => handleRestart(app.containers[0].name)}
                       className="px-3 py-1.5 rounded-lg bg-surface-100 hover:bg-surface-50 text-gray-300 hover:text-white border border-white/10 text-xs font-mono flex items-center gap-1.5 transition-colors"
-                      title="Reiniciar contenedor principal"
+                      title={app.lifecycle?.state && app.lifecycle.state !== "active" ? "Bloqueado por ciclo de vida" : "Reiniciar contenedor principal"}
                     >
                       <RotateCw className="w-3.5 h-3.5" />
                       <span>Reiniciar</span>
@@ -331,22 +345,24 @@ export default function SoftwarePage() {
                   {app.hasDockerCompose && (
                     <button
                       type="button"
-                      disabled={!app.git.isRepo || !!app.git.localError || !app.git.branch ||
+                      disabled={(app.lifecycle?.state !== undefined && app.lifecycle.state !== "active") || !app.git.isRepo || !!app.git.localError || !app.git.branch ||
                         app.git.branch === "detached" || app.git.dirtyFilesCount > 0}
                       onClick={() => handleStreamingDeploy(app)}
-                      title={!app.git.isRepo ? "La aplicación no tiene un repositorio Git local" :
+                      title={app.lifecycle?.state && app.lifecycle.state !== "active" ? "Reactiva la aplicación antes de desplegar" : !app.git.isRepo ? "La aplicación no tiene un repositorio Git local" :
                         app.git.localError ? app.git.localError :
                         app.git.branch === "detached" ? "Checkout detached: seleccioná una rama válida en el servidor antes de desplegar" :
                         app.git.dirtyFilesCount > 0 ? "Hay cambios locales. Revisalos antes de desplegar" : "Desplegar con Git pull --ff-only"}
                       className="px-3 py-1.5 rounded-lg bg-brand-cyan/15 hover:bg-brand-cyan/25 text-brand-cyan border border-brand-cyan/30 text-xs font-mono font-semibold flex items-center gap-1.5 transition-all shadow-glow disabled:cursor-not-allowed disabled:border-slate-700 disabled:bg-slate-700/20 disabled:text-slate-400 disabled:shadow-none"
                     >
                       <Play className="w-3.5 h-3.5 fill-current" />
-                      <span>{!app.git.isRepo || !!app.git.localError || !app.git.branch ||
+                      <span>{(app.lifecycle?.state !== undefined && app.lifecycle.state !== "active") || !app.git.isRepo || !!app.git.localError || !app.git.branch ||
                         app.git.branch === "detached" || app.git.dirtyFilesCount > 0 ? "Deploy bloqueado" : "Desplegar"}</span>
                     </button>
                   )}
                 </div>
               </div>
+
+              <AppLifecycleControls app={app} onChanged={fetchApps} />
 
               {/* Git & Stack Status Bar */}
               <div className="grid grid-cols-1 gap-3 border-t border-white/5 pt-3 text-xs sm:grid-cols-2 xl:grid-cols-3">
