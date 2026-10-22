@@ -1,4 +1,5 @@
 import { restartContainer } from "@/lib/server-api";
+import { getDatabase } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,10 @@ export async function POST(req: Request) {
     }
 
     const output = await restartContainer(containerName);
+
+    try {
+      getDatabase().logAudit("augusto", "CONTAINER_RESTART", containerName, `Reinicio exitoso de contenedor ${containerName}`);
+    } catch {}
 
     return Response.json({
       success: true,

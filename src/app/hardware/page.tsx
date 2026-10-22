@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Header } from "@/components/Header";
 import { TerminalModal } from "@/components/TerminalModal";
 import {
@@ -18,6 +18,7 @@ import {
   Trash2,
   TrendingUp,
   Sparkles,
+  Play,
 } from "lucide-react";
 import { ServerMetrics, ContainerInfo } from "@/lib/types";
 
@@ -27,11 +28,92 @@ export default function HardwarePage() {
   const [history, setHistory] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Terminal modal for safe prune
+  // Terminal modal state
   const [terminalOpen, setTerminalOpen] = useState(false);
   const [terminalTitle, setTerminalTitle] = useState("");
   const [terminalOutput, setTerminalOutput] = useState("");
   const [terminalLoading, setTerminalLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const handleStopStream = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsStreaming(false);
+    setTerminalLoading(false);
+  };
+
+  const handleOpenStreamingLogs = async (containerName: string) => {
+    handleStopStream();
+    setTerminalTitle(`Logs en Vivo: ${containerName}`);
+    setTerminalOutput(`Conectando con contenedor ${containerName}...\n`);
+    setTerminalLoading(true);
+    setIsStreaming(true);
+    setTerminalOpen(true);
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    try {
+      const res = await fetch(`/api/apps/logs/stream?container=${encodeURIComponent(containerName)}&lines=120`, {
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      setTerminalLoading(false);
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          setTerminalOutput((prev) => prev + decoder.decode(value, { stream: true }));
+        }
+      }
+    } catch (err: any) {
+      if (err.name !== "AbortError") {
+        setTerminalOutput((prev) => `${prev}\n[ERROR]: ${err.message}`);
+      }
+    } finally {
+      setIsStreaming(false);
+      setTerminalLoading(false);
+    }
+  };
+
+  const handleRestartContainer = async (containerName: string) => {
+    if (!confirm(`¿Estás seguro de reiniciar el contenedor ${containerName}?`)) return;
+    handleStopStream();
+    setTerminalTitle(`Reiniciando ${containerName}`);
+    setTerminalOutput(`Enviando orden de reinicio seguro a Docker daemon para ${containerName}...\n`);
+    setTerminalLoading(true);
+    setIsStreaming(false);
+    setTerminalOpen(true);
+
+    try {
+      const res = await fetch("/api/apps/restart", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ containerName }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setTerminalOutput(`✅ CONTENEDOR REINICIADO EXITOSAMENTE:\n\n${data.data.output}`);
+        fetchMetrics();
+      } else {
+        setTerminalOutput(`❌ Error reiniciando contenedor:\n\n${data.error}`);
+      }
+    } catch (err: any) {
+      setTerminalOutput(`Error: ${err.message}`);
+    } finally {
+      setTerminalLoading(false);
+    }
+  };
 
   const fetchMetrics = async () => {
     setIsLoading(true);
@@ -339,7 +421,8 @@ export default function HardwarePage() {
                   <th className="py-2.5 px-3">Estado</th>
                   <th className="py-2.5 px-3">Healthcheck</th>
                   <th className="py-2.5 px-3">Puertos</th>
-                  <th className="py-2.5 px-3 text-right">Creado</th>
+                  <th className="py-2.5 px-3">Creado</th>
+                  <th className="py-2.5 px-3 text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 text-gray-300">
@@ -377,7 +460,27 @@ export default function HardwarePage() {
                     <td className="py-2.5 px-3 text-gray-400 truncate max-w-[150px]" title={c.ports}>
                       {c.ports || "interna"}
                     </td>
-                    <td className="py-2.5 px-3 text-right text-gray-500">{c.created}</td>
+                    <td className="py-2.5 px-3 text-gray-500">{c.created}</td>
+                    <td className="py-2.5 px-3 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => handleOpenStreamingLogs(c.name)}
+                          className="px-2 py-1 rounded bg-surface-100 hover:bg-brand-cyan/20 text-gray-300 hover:text-brand-cyan border border-white/5 hover:border-brand-cyan/30 text-[10px] font-mono flex items-center gap-1 transition-all"
+                          title={`Ver logs en streaming de ${c.name}`}
+                        >
+                          <Terminal className="w-3 h-3 text-brand-cyan" />
+                          <span>Logs</span>
+                        </button>
+                        <button
+                          onClick={() => handleRestartContainer(c.name)}
+                          className="px-2 py-1 rounded bg-surface-100 hover:bg-amber-500/20 text-gray-300 hover:text-amber-400 border border-white/5 hover:border-amber-500/30 text-[10px] font-mono flex items-center gap-1 transition-all"
+                          title={`Reiniciar contenedor ${c.name}`}
+                        >
+                          <RotateCw className="w-3 h-3 text-amber-400" />
+                          <span>Reiniciar</span>
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -388,10 +491,15 @@ export default function HardwarePage() {
 
       <TerminalModal
         isOpen={terminalOpen}
-        onClose={() => setTerminalOpen(false)}
+        onClose={() => {
+          handleStopStream();
+          setTerminalOpen(false);
+        }}
         title={terminalTitle}
         output={terminalOutput}
         isLoading={terminalLoading}
+        isStreaming={isStreaming}
+        onStopStream={handleStopStream}
       />
     </div>
   );
