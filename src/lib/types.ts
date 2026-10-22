@@ -45,6 +45,8 @@ export interface ContainerInfo {
   created: string;
   cpuPercent?: string;
   memoryUsage?: string;
+  deployedRevision?: string | null;
+  imageId?: string | null;
 }
 
 export interface AppInfo {
@@ -61,6 +63,9 @@ export interface AppInfo {
     commitDate: string;
     commitAuthor: string;
     dirtyFilesCount: number;
+    remoteCommit?: string | null;
+    remoteStatus?: "synced" | "different" | "unavailable" | "not_repo";
+    remoteCheckedAt?: string | null;
     remoteAhead?: number;
     remoteBehind?: number;
   };
@@ -73,6 +78,8 @@ export interface AppInfo {
     backupSize?: string;
     backupStatus?: "success" | "warning" | "error";
   };
+  deployment?: { revision: string | null; imageId: string | null; status: "identified" | "unidentified" | "not_running" };
+  web?: { status: "online" | "restricted" | "offline" | "unknown"; httpStatus: number | null; latencyMs: number | null; checkedAt: string | null };
   hasDockerCompose: boolean;
   status: "operational" | "degraded" | "down" | "deploying";
 }
