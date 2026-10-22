@@ -16,8 +16,8 @@ const tenants = [
 ];
 const governance = {
   totalTenants: 2, activeTenants: 1, trialTenants: 1, suspendedTenants: 0,
-  saasCount: 6, totalRecordsManaged: 1820, tenants, legacyPanels: [],
-  sources: ["onlyfood","onlypadel","onlycars","onlyerp","onlygym","onlyturn"].map(saas => ({
+  saasCount: 7, totalRecordsManaged: 1820, tenants, legacyPanels: [],
+  sources: ["onlyfood","onlypadel","onlycars","onlyerp","onlygym","onlyturn","onlymob"].map(saas => ({
     saas, status: ["onlyfood","onlypadel"].includes(saas) ? "available" : "unavailable",
     count: saas === "onlyfood" || saas === "onlypadel" ? 1 : null,
     checkedAt: new Date().toISOString(), message: null
@@ -206,7 +206,7 @@ try {
       }
       if (path === "/superadmin") {
         await page.getByRole("heading", { name: "Mapa de integración por producto" }).waitFor();
-        await page.getByText("0 / 6").waitFor();
+        await page.getByText("0 / 7").waitFor();
       }
       if (path === "/backups") {
         await page.getByRole("heading", { name: "Generar backup manual" }).waitFor();
