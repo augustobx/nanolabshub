@@ -141,13 +141,13 @@ export function OperationsDashboard() {
   const websitesDown = apps.filter((a) => a.web?.status === "offline").length;
   const websitesWithHttpErrors = apps.filter((a) => a.web?.status === "http_error").length;
   const attention = apps.filter((app) =>
-    app.git.remoteStatus === "different" || app.web?.status === "offline" || app.web?.status === "http_error" || app.web?.status === "http_error" ||
+    app.git.remoteStatus === "different" || app.web?.status === "offline" || app.web?.status === "http_error" ||
     app.status === "down" || app.status === "degraded"
   ).length;
 
   const filtered = useMemo(() => apps.filter((app) => {
     if (scope === "attention" && !(app.git.remoteStatus === "different" || app.web?.status === "offline" ||
-      app.status === "down" || app.status === "degraded")) return false;
+      app.web?.status === "http_error" || app.status === "down" || app.status === "degraded")) return false;
     const query = search.trim().toLocaleLowerCase("es");
     return !query || [app.name, app.slug, app.path].some((text) => text.toLocaleLowerCase("es").includes(query));
   }).sort((a, b) => {
