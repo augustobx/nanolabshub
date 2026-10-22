@@ -88,7 +88,7 @@ export function ExecutiveHome() {
   const missingBackups = backups ? saas.filter(x => !backups.some(b => b.appSlug === x.product.slug && b.status === "verified")).length : null;
   const healthy = saas.filter(x => x.app?.status === "operational" && (x.app.lifecycle?.state || "active") === "active").length;
   const running = snapshot?.containers.filter(c => c.state === "running").length;
-  const activeTenants = governance?.activeTenants;
+  const activeTenants = governance?.sources?.some(s=>s.status==="available") ? governance.activeTenants : null;
   const countInternal = current.filter(a => portfolioSegment(a) === "internal").length;
 
   return <div className="min-w-0 flex-1 pb-12">
@@ -113,7 +113,7 @@ export function ExecutiveHome() {
         <Tile title="Productos SaaS" value={snapshot ? healthy + " / " + SAAS_PRODUCTS.length : "—"}
           note="Operativos en el inventario Docker" href="/saas" icon={LayoutGrid}/>
         <Tile title="Tenants activos" value={activeTenants == null ? "—" : String(activeTenants)}
-          note={governance ? "Según conectores de las SaaS" : "Esperando integraciones"} href="/governance" icon={Building2}/>
+          note={governance?.sources?.every(x=>x.status==="available") ? "Según conectores de las SaaS" : "Cobertura parcial o pendiente"} href="/governance" icon={Building2}/>
         <Tile title="Contenedores activos" value={running == null ? "—" : String(running)}
           note={snapshot ? String(snapshot.containers.length) + " detectados" : "Sin telemetría"} href="/operations" icon={ServerCog}/>
         <Tile title="SaaS sin backup íntegro" value={missingBackups == null ? "—" : String(missingBackups)}
