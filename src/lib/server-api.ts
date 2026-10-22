@@ -94,6 +94,16 @@ export async function getContainers(): Promise<ContainerInfo[]> {
   if (code !== 0) throw new Error(`No se pudo consultar Docker: ${stderr || "error desconocido"}`);
   if (!stdout) return [];
 
+  const stats = new Map<string, { cpuPercent: string; memoryUsage: string }>();
+  // Live Docker statistics, with no fabricated percentages on timeout or error.
+  const sample = await executeRemoteCommand("timeout 8 docker stats --no-stream --format '{{.Name}}|||{{.CPUPerc}}|||{{.MemUsage}}'");
+  if (sample.code === 0) {
+    for (const line of sample.stdout.split("\n").filter(Boolean)) {
+      const [name, cpuPercent, memoryUsage] = line.split("|||");
+      if (name) stats.set(name, { cpuPercent, memoryUsage });
+    }
+  }
+
   const lines = stdout.split("\n").filter(Boolean);
   return lines.map((line) => {
     const [id, name, image, status, ports, created] = line.split("|||");
@@ -117,6 +127,7 @@ export async function getContainers(): Promise<ContainerInfo[]> {
       health,
       ports: ports || "",
       created: created ? created.split(" ")[0] : "",
+      ...stats.get(name || ""),
     };
   });
 }
@@ -124,8 +135,8 @@ export async function getContainers(): Promise<ContainerInfo[]> {
 /**
  * Fetches the complete software inventory across /opt/apps and /opt/infrastructure
  */
-export async function getAppsStatus(): Promise<AppInfo[]> {
-  const containers = await getContainers();
+export async function getAppsStatus(containersInput?: ContainerInfo[]): Promise<AppInfo[]> {
+  const containers = containersInput ?? await getContainers();
 
   // Run a unified shell script to collect git status for all known apps
   const pathsToCheck = KNOWN_APPS.map((a) => `${a.slug}:::${a.path}`).join(" ");
@@ -135,7 +146,7 @@ export async function getAppsStatus(): Promise<AppInfo[]> {
       p=$(echo $item | cut -d: -f4-)
       if [ -d "$p/.git" ]; then
         branch=$(git -C "$p" branch --show-current 2>/dev/null || echo "detached")
-        commit=$(git -C "$p" log -1 --format="%h;;;%s;;;%an;;;%ad" --date=short 2>/dev/null || echo "none;;;none;;;none;;;none")
+        commit=$(git -C "$p" log -1 --format="%H;;;%s;;;%an;;;%ad" --date=short 2>/dev/null || echo "none;;;none;;;none;;;none")
         dirty=$(git -C "$p" status --porcelain 2>/dev/null | wc -l)
         has_compose="false"
         if [ -f "$p/compose.yml" ] || [ -f "$p/docker-compose.yml" ] || [ -f "$p/docker-compose.yaml" ]; then
