@@ -40,6 +40,7 @@ export default function GovernancePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedSaas, setSelectedSaas] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
+  const [sortTenants, setSortTenants] = useState<"name" | "activity" | "status">("name");
   const [search, setSearch] = useState("");
   const [activeTenant, setActiveTenant] = useState<UniversalTenant | null>(null);
   const [tenantTab, setTenantTab] = useState<"status" | "modules" | "access">("status");
@@ -190,15 +191,16 @@ export default function GovernancePage() {
     if (selectedSaas !== "all" && t.saas !== selectedSaas) return false;
     if (selectedStatus !== "all" && t.status !== selectedStatus) return false;
     if (search.trim()) {
-      const q = search.toLowerCase();
-      return (
-        t.name.toLowerCase().includes(q) ||
-        t.slug.toLowerCase().includes(q) ||
-        t.domain.toLowerCase().includes(q) ||
-        t.saasName.toLowerCase().includes(q)
+      const q = search.trim().toLocaleLowerCase("es");
+      return [t.name, t.slug, t.domain, t.saasName].some((value) =>
+        value.toLocaleLowerCase("es").includes(q)
       );
     }
     return true;
+  }).sort((a, b) => {
+    if (sortTenants === "activity") return b.metrics.totalRecords - a.metrics.totalRecords;
+    if (sortTenants === "status") return a.status.localeCompare(b.status) || a.name.localeCompare(b.name, "es");
+    return a.name.localeCompare(b.name, "es");
   });
 
   const getSaasIcon = (saas: SaaSSlug) => {
@@ -391,6 +393,22 @@ export default function GovernancePage() {
               <option value="CANCELED">Cancelados</option>
             </select>
           </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div role="status" className="text-xs text-slate-400">
+            {isLoading ? "Consultando clientes…" : `${filteredTenants.length} de ${data?.totalTenants ?? "—"} clientes`}
+          </div>
+          <label className="flex items-center gap-2 text-xs text-slate-400">
+            Ordenar por
+            <select aria-label="Orden de clientes" value={sortTenants}
+              onChange={(event) => setSortTenants(event.target.value as typeof sortTenants)}
+              className="rounded-lg border border-white/10 bg-surface-100 px-3 py-2 text-xs text-slate-100">
+              <option value="name">Nombre</option>
+              <option value="activity">Mayor actividad</option>
+              <option value="status">Estado</option>
+            </select>
+          </label>
         </div>
 
         {/* Universal Tenants Fleet Grid */}
@@ -608,6 +626,16 @@ export default function GovernancePage() {
                   aria-selected={tenantTab === tab.id}
                   tabIndex={tenantTab === tab.id ? 0 : -1}
                   onClick={() => setTenantTab(tab.id)}
+                  onKeyDown={(event) => {
+                    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+                    event.preventDefault();
+                    const ids = ["status", "modules", "access"] as const;
+                    const current = ids.indexOf(tenantTab);
+                    const next = event.key === "Home" ? 0 : event.key === "End" ? 2
+                      : (current + (event.key === "ArrowRight" ? 1 : -1) + ids.length) % ids.length;
+                    setTenantTab(ids[next]);
+                    requestAnimationFrame(() => document.getElementById(`tenant-tab-${ids[next]}`)?.focus());
+                  }}
                   className={`whitespace-nowrap rounded-lg px-4 py-2.5 text-xs font-semibold transition-colors ${tenantTab === tab.id
                     ? "bg-[#304366] text-[#dae4ff]"
                     : "text-slate-400 hover:bg-white/[0.05] hover:text-white"}`}>
