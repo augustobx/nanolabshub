@@ -19,7 +19,7 @@ const governance = {
   saasCount: 2, totalRecordsManaged: 1820, tenants, legacyPanels: [],
 };
 const container = {
-  id: "demo-1", name: "onlyfood-web", image: "onlyfood:latest", status: "Up 3 hours",
+  id: "demo-1", name: "onlyfood-web", image: "onlyfood:latest", cpuPercent: "2.7%", memoryUsage: "115MiB / 1GiB", status: "Up 3 hours",
   state: "running", health: "healthy", ports: "3000/tcp", created: "hace 3 horas",
 };
 const telemetry = {
@@ -39,14 +39,14 @@ const telemetry = {
 const apps = [
   { slug: "onlyfood", name: "OnlyFood", path: "/opt/apps/onlyfood", type: "saas",
     url: "https://onlyfood.example.com", hasDockerCompose: true, status: "operational",
-    git: { isRepo: true, branch: "main", commitHash: "ab12345", commitMessage: "UI test example",
+    git: { isRepo: true, branch: "main", commitHash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", remoteCommit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", remoteStatus: "different", commitMessage: "UI test example",
       commitDate: "2026-10-22", commitAuthor: "NanoLabs", dirtyFilesCount: 0 },
-    containers: [container], database: { type: "postgres", host: "localhost", port: 5432 } },
+    containers: [container], web: { status: "online", httpStatus: 200, latencyMs: 55, checkedAt: new Date().toISOString() }, deployment: {revision: null,imageId: "sha256:aaaabbbbcccc", status: "unidentified"}, database: { type: "postgres", host: "localhost", port: 5432 } },
   { slug: "onlypadel", name: "OnlyPadel", path: "/opt/apps/onlypadel", type: "saas",
     hasDockerCompose: true, status: "degraded",
-    git: { isRepo: true, branch: "main", commitHash: "cd67890", commitMessage: "UI test example",
+    git: { isRepo: true, branch: "main", commitHash: "cccccccccccccccccccccccccccccccccccccccc", remoteCommit: "cccccccccccccccccccccccccccccccccccccccc", remoteStatus: "synced", commitMessage: "UI test example",
       commitDate: "2026-10-22", commitAuthor: "NanoLabs", dirtyFilesCount: 1 },
-    containers: [], database: { type: "postgres", host: "localhost", port: 5432 } },
+    containers: [], web: { status: "offline", httpStatus: null, latencyMs: null, checkedAt: new Date().toISOString() }, deployment: {revision: null,imageId: null,status: "not_running"}, database: { type: "postgres", host: "localhost", port: 5432 } },
 ];
 const backups = [{
   id: "demo-backup", appSlug: "onlyfood", appName: "OnlyFood", dbType: "postgres",
@@ -56,6 +56,8 @@ const backups = [{
 }];
 const responses = {
   "/api/governance": { success: true, data: governance },
+  "/api/operations": { success: true, data: { timestamp: new Date().toISOString(), telemetry, containers: [container], apps } },
+  "/api/apps/logs": { success: true, data: { logs: "fixture: real logs require the production server" } },
   "/api/apps": { success: true, data: apps },
   "/api/telemetry": { success: true, data: { telemetry, containers: [container] } },
   "/api/telemetry/history": { success: true, data: [] },
@@ -88,8 +90,20 @@ try {
     await page.locator('input[type="password"]').fill("ci_smoke_password");
     await page.locator('button[type="submit"]').click();
     await page.waitForURL((url) => url.pathname === "/", { timeout: 15000 });
-    await page.getByText("NanoLabs en números").waitFor();
+    await page.getByRole("heading", { name: "Centro de control" }).waitFor();
+    await page.getByRole("heading", { name: "Aplicaciones y versiones" }).waitFor();
     await page.screenshot({ path: `ui-screenshots/${device.name}-overview.png`, fullPage: true });
+    if (device.name === "desktop") {
+      await page.getByText("Commits diferentes").first().waitFor();
+      await page.getByRole("button", { name: "Logs de OnlyFood" }).first().click();
+      await page.getByRole("dialog", { name: /Logs de onlyfood-web/ }).waitFor();
+      await page.getByText(/fixture: real logs/).waitFor();
+      await page.keyboard.press("Escape");
+    }
+    if (device.name === "mobile") {
+      const width = await page.evaluate(() => document.documentElement.scrollWidth);
+      if (width > device.viewport.width + 4) throw new Error(`Mobile homepage overflows: ${width}px`);
+    }
 
     for (const [path, label] of [
       ["/governance", "Clientes y SaaS"],
@@ -127,7 +141,8 @@ try {
         await dialog.getByRole("heading", { name: /de ejemplo/i }).waitFor();
         await page.getByRole("tab", { name: "Funcionalidades" }).click();
         await page.getByRole("switch", { name: /pedidos/i }).waitFor();
-        await page.waitForTimeout(250); // Wait for the tab transition before snapshot.\n        await page.screenshot({ path: `ui-screenshots/${device.name}-tenant-dialog.png`, fullPage: false });
+        await page.waitForTimeout(250);
+        await page.screenshot({ path: `ui-screenshots/${device.name}-tenant-dialog.png`, fullPage: false });
         await page.keyboard.press("Escape");
         await page.getByRole("dialog").waitFor({ state: "hidden" });
       }
@@ -136,7 +151,8 @@ try {
       await page.goto(origin, { waitUntil: "domcontentloaded" });
       await page.getByRole("button", { name: "Abrir navegación" }).click();
       await page.getByRole("navigation", { name: "Espacio de trabajo" }).getByRole("link", { name: /Clientes y SaaS/ }).waitFor();
-      await page.waitForTimeout(250); // Wait until the sidebar finishes sliding in.\n      await page.screenshot({ path: "ui-screenshots/mobile-navigation.png", fullPage: false });
+      await page.waitForTimeout(250);
+      await page.screenshot({ path: "ui-screenshots/mobile-navigation.png", fullPage: false });
     }
     if (errors.length) throw new Error(`${device.name} browser errors: ${errors.join("; ")}`);
     await context.close();
