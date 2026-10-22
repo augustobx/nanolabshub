@@ -172,31 +172,15 @@ export default function GovernancePage() {
     }
   };
 
-  const getSaasColor = (saas: SaaSSlug) => {
-    switch (saas) {
-      case "onlyfood":
-        return "border-orange-500/30 text-orange-400 bg-orange-500/10";
-      case "onlypadel":
-        return "border-emerald-500/30 text-emerald-400 bg-emerald-500/10";
-      case "onlycars":
-        return "border-blue-500/30 text-blue-400 bg-blue-500/10";
-      case "onlygym":
-        return "border-purple-500/30 text-purple-400 bg-purple-500/10";
-      case "onlyturn":
-        return "border-amber-500/30 text-amber-400 bg-amber-500/10";
-      case "onlyerp":
-        return "border-cyan-500/30 text-cyan-400 bg-cyan-500/10";
-      default:
-        return "border-gray-500/30 text-gray-400 bg-gray-500/10";
-    }
-  };
+  const getSaasColor = (_saas: SaaSSlug) =>
+    "border-white/10 text-slate-300 bg-white/[0.035]";
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "ACTIVE":
         return (
           <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
             ACTIVO
           </span>
         );
@@ -204,7 +188,7 @@ export default function GovernancePage() {
         return (
           <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-            TRIAL / PRUEBA
+            EN PRUEBA
           </span>
         );
       case "SUSPENDED":
