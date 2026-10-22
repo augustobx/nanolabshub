@@ -108,6 +108,11 @@ export interface BackupRecord {
   createdAt: string;
   status: "verified" | "unverified" | "failed";
   storageLocation: "local" | "cloud_synced";
+  checksum?: string | null;
+  integrityStatus?: "running" | "integrity_ok" | "failed";
+  error?: string | null;
+  trigger?: "manual" | "scheduled";
+  restoreTested?: boolean;
 }
 
 export type SaaSSlug = "onlyfood" | "onlypadel" | "onlycars" | "onlygym" | "onlyturn" | "onlyerp";
