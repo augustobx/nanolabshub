@@ -545,6 +545,7 @@ export default function GovernancePage() {
           )}
         </div>
 
+        {(data?.legacyPanels?.length ?? 0) > 0 && (
         {/* Phase 6: Legacy Standalone Panels Sunset Architecture */}
         <div className="hub-card p-6 space-y-4">
           <div className="flex items-center justify-between border-b border-white/5 pb-3">
@@ -554,7 +555,7 @@ export default function GovernancePage() {
                 <span>Consolidación de paneles anteriores</span>
               </h2>
               <p className="text-xs text-gray-400 font-mono mt-0.5">
-                Redirección de accesos /admin y /superadmin hacia la consola central NanoLabsHUB
+                Inventario de migración de accesos administrativos anteriores.
               </p>
             </div>
             <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">
@@ -598,6 +599,7 @@ export default function GovernancePage() {
             </table>
           </div>
         </div>
+        )}
       </div>
 
       {/* Universal tenant control dialog, organized by action category. */}
