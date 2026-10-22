@@ -37,7 +37,7 @@ function GitBadge({ app }: { app: AppInfo }) {
   if (app.git.remoteStatus === "synced") return <Pill text={app.git.remoteRef === "HEAD" ? "Coincide con HEAD remoto" : "Git sincronizado"} tone="good" />;
   if (app.git.remoteStatus === "different") return <Pill text={app.git.remoteRef === "HEAD" ? "Distinto al HEAD remoto" : "Commits diferentes"} tone="warn" />;
   if (app.git.remoteStatus === "not_repo") return <Pill text="Sin Git local" />;
-  return <Pill text="Git remoto no accesible" />;
+  return <span title={app.git.remoteError || app.git.localError || "No se pudo confirmar el commit remoto"}><Pill text={app.git.localError ? "Revisar Git local" : app.git.remoteError ? "Remoto no consultable" : "Git remoto no accesible"} /></span>;
 }
 function Metric({ label, value, detail, icon: Icon, percent, warning }: {
   label: string; value: string; detail: string; icon: typeof Cpu; percent?: number; warning?: boolean;
@@ -282,17 +282,19 @@ export function OperationsDashboard() {
                     <tr key={app.slug} className="transition-colors hover:bg-white/[0.025]">
                       <td className="px-3">
                         <div className="font-semibold text-slate-100">{app.name}</div>
-                        <div className="mt-1 text-[11px] text-slate-400">{app.git.branch || "Sin rama"}</div>
+                        <div className="mt-1 text-[11px] text-slate-400">{app.git.branch || (app.git.isRepo ? "Git inaccesible" : "Sin Git local")}</div>
                       </td>
                       <td className="px-3"><WebBadge app={app} /></td>
                       <td className="px-3">
                         <div className="font-mono text-xs text-slate-100" title={app.git.commitHash}>{shortSha(app.git.commitHash)}</div>
-                        <div className="mt-1 text-[11px] text-slate-400">{app.git.localError ? "Git no verificable" : app.git.dirtyFilesCount ? `${app.git.dirtyFilesCount} archivos modificados` : app.git.isRepo ? "Árbol limpio" : "Sin repositorio"}</div>
+                        <div className="mt-1 text-[11px] text-slate-400" title={app.git.localError || undefined}>{app.git.localError ? "Error Git local (ver detalle)" : app.git.dirtyFilesCount ? `${app.git.dirtyFilesCount} archivos modificados` : app.git.isRepo ? "Árbol limpio" : "Sin repositorio"}</div>
+                        {app.git.localError && <div className="mt-1 max-w-[220px] break-words text-[11px] leading-4 text-amber-200">{app.git.localError}</div>}
                       </td>
                       <td className="px-3">
                         <div className="font-mono text-xs text-slate-100" title={app.git.remoteCommit || undefined}>{shortSha(app.git.remoteCommit)}</div>
                         <div className="mt-1"><GitBadge app={app} /></div>
                         {app.git.remoteRef === "HEAD" && <div className="mt-1 text-[10px] text-slate-500">Rama remota por defecto</div>}
+                        {app.git.remoteError && <div className="mt-1 max-w-[220px] text-[11px] leading-4 text-amber-200">{app.git.remoteError}</div>}
                       </td>
                       <td className="px-3">
                         <div className="font-mono text-xs text-slate-100" title={app.deployment?.revision || app.deployment?.imageId || undefined}>
@@ -335,6 +337,9 @@ export function OperationsDashboard() {
                     <div><div className="text-[10px] text-slate-500">Git remoto</div><div className="mt-1 font-mono text-xs text-white">{shortSha(app.git.remoteCommit)}</div></div>
                     <div><div className="text-[10px] text-slate-500">Desplegado</div><div className="mt-1 font-mono text-xs text-white">{shortSha(app.deployment?.revision)}</div></div>
                   </div>
+                  {(app.git.localError || app.git.remoteError) && (
+                    <p className="mt-2 break-words text-[11px] leading-5 text-amber-200">{app.git.localError || app.git.remoteError}</p>
+                  )}
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                     <GitBadge app={app} />
                     <div className="flex gap-2">
