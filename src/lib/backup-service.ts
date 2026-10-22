@@ -1,4 +1,14 @@
 import { KNOWN_APPS } from "./apps-registry";
+export function assertBackupSecurity() {
+  const password = process.env.ADMIN_PASS || "";
+  const master = process.env.HUB_MASTER_KEY || "";
+  if (process.env.HUB_BACKUPS_ENABLED !== "true" ||
+      password.length < 16 || password === "Qap.1029Qap.1029" ||
+      master.length < 32 || master === "nanolabs_governance_supreme_2026") {
+    throw new Error("Backups bloqueados: habilitá HUB_BACKUPS_ENABLED y configurá credenciales administrativas seguras.");
+  }
+}
+
 // Node-only engine shared with the scheduled worker. No shell interpolation of user inputs.
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 export const backupEngine = require("../../scripts/backup-engine.cjs") as {
