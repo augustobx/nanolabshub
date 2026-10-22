@@ -1,4 +1,5 @@
 import { executeRemoteCommand } from "./ssh";
+import { KNOWN_APPS } from "./apps-registry";
 import { getAppsStatus, getContainers, getServerTelemetry } from "./server-api";
 import type { AppInfo, ContainerInfo, ServerMetrics } from "./types";
 
@@ -104,7 +105,11 @@ export async function getOperationalApps(containersInput?: ContainerInfo[]): Pro
     const source = remotes.get(app.slug);
     const localCommit = app.git.commitHash;
     const remoteCommit = source?.remoteCommit ?? null;
-    const firstRunning = app.containers.find((container) => container.state === "running");
+    const mainContainerName = KNOWN_APPS.find((item) => item.slug === app.slug)?.containerNames[0];
+    const firstRunning = app.containers.find((container) =>
+      container.state === "running" && mainContainerName &&
+      (container.name === mainContainerName || container.name.startsWith(`${mainContainerName}-`))
+    ) ?? app.containers.find((container) => container.state === "running");
     const image = firstRunning ? images.get(firstRunning.name) : undefined;
     return {
       ...app,
