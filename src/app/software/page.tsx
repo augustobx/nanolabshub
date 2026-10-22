@@ -371,8 +371,8 @@ export default function SoftwarePage() {
                     <span className="font-mono text-sm font-semibold text-white" title={app.git.remoteCommit || undefined}>
                       {app.git.remoteCommit?.slice(0, 8) || "—"}
                     </span>
-                    <span className={`text-[11px] font-medium ${app.git.remoteStatus === "synced" ? "text-emerald-300" : app.git.remoteStatus === "different" ? "text-amber-300" : "text-slate-400"}`}>
-                      {app.git.remoteStatus === "synced" ? "Sin diferencias" : app.git.remoteStatus === "different" ? "Versiones distintas" : "Remoto no comprobado"}
+                    <span className={`text-[11px] font-medium ${app.git.remoteStatus === "synced" && app.git.dirtyFilesCount === 0 ? "text-emerald-300" : app.git.remoteStatus === "different" || app.git.dirtyFilesCount > 0 ? "text-amber-300" : "text-slate-400"}`}>
+                      {app.git.remoteStatus === "synced" && app.git.dirtyFilesCount > 0 ? "Mismo commit · cambios locales" : app.git.remoteStatus === "synced" ? "Mismo commit" : app.git.remoteStatus === "different" ? "Commits distintos" : "Remoto no comprobado"}
                     </span>
                   </div>
                   <p className="text-[11px] leading-5 text-slate-500">
