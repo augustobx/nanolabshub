@@ -5,21 +5,12 @@ export const dynamic = "force-dynamic";
 
 export async function POST() {
   try {
-    // Audit start
     try {
       getDatabase().logAudit("augusto", "DOCKER_PRUNE_INIT", "DOCKER", "Iniciando limpieza segura de imágenes huérfanas");
     } catch {}
 
-    // Strictly prune dangling images and builder cache - NEVER touch volumes or containers
-    const cmd = `
-      echo "=== [1/2] LIMPIEZA SEGURA DE IMAGENES HUERFANAS (<none>) ==="
-      docker image prune -f
-      echo "\n=== [2/2] LIMPIEZA DE CACHE DE BUILD ANTERIOR ==="
-      docker builder prune -f --keep-storage=1GB
-      echo "\n=== [ESTADO FINAL DEL DISCO Y DOCKER] ==="
-      docker system df
-    `;
-
+    // Strictly prune dangling untagged images - safe and fast
+    const cmd = `docker image prune -f && docker system df`;
     const { stdout, stderr, code } = await executeRemoteCommand(cmd);
 
     if (code !== 0) {

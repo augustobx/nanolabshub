@@ -15,28 +15,50 @@ export async function GET(req: Request) {
 
   const stream = new ReadableStream({
     start(controller) {
-      // Spawn docker logs with follow
+      let isClosed = false;
       const child = spawn("docker", ["logs", "--tail", lines, "-f", container]);
 
       child.stdout.on("data", (chunk: Buffer) => {
-        controller.enqueue(encoder.encode(chunk.toString()));
+        if (!isClosed) {
+          try {
+            controller.enqueue(encoder.encode(chunk.toString()));
+          } catch {
+            isClosed = true;
+          }
+        }
       });
 
       child.stderr.on("data", (chunk: Buffer) => {
-        controller.enqueue(encoder.encode(chunk.toString()));
+        if (!isClosed) {
+          try {
+            controller.enqueue(encoder.encode(chunk.toString()));
+          } catch {
+            isClosed = true;
+          }
+        }
       });
 
       child.on("close", () => {
-        controller.close();
+        if (!isClosed) {
+          isClosed = true;
+          try {
+            controller.close();
+          } catch {}
+        }
       });
 
       child.on("error", (err) => {
-        controller.enqueue(encoder.encode(`\n[STREAM ERROR]: ${err.message}\n`));
-        controller.close();
+        if (!isClosed) {
+          isClosed = true;
+          try {
+            controller.enqueue(encoder.encode(`\n[STREAM ERROR]: ${err.message}\n`));
+            controller.close();
+          } catch {}
+        }
       });
 
-      // Cleanup when request aborted
       req.signal.addEventListener("abort", () => {
+        isClosed = true;
         child.kill();
       });
     },

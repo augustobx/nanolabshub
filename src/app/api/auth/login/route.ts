@@ -5,7 +5,29 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   try {
-    const { username, password } = await req.json();
+    let username = "";
+    let password = "";
+
+    const contentType = req.headers.get("content-type") || "";
+
+    if (contentType.includes("application/json")) {
+      const body = await req.json();
+      username = body.username || "";
+      password = body.password || "";
+    } else if (contentType.includes("application/x-www-form-urlencoded")) {
+      const formData = await req.formData();
+      username = (formData.get("username") as string) || "";
+      password = (formData.get("password") as string) || "";
+    } else {
+      const text = await req.text();
+      try {
+        const parsed = JSON.parse(text);
+        username = parsed.username || "";
+        password = parsed.password || "";
+      } catch {
+        // Fallback
+      }
+    }
 
     if (!username || !password) {
       return Response.json({ success: false, error: "Usuario y contraseña requeridos" }, { status: 400 });

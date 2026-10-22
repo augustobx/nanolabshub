@@ -26,6 +26,8 @@ export async function GET(req: Request) {
 
   const stream = new ReadableStream({
     start(controller) {
+      let isClosed = false;
+
       controller.enqueue(
         encoder.encode(
           `=== [NANOLABSHUB] INICIANDO DESPLIEGUE CONTROLADO: ${app.name.toUpperCase()} ===\n` +
@@ -56,11 +58,23 @@ export async function GET(req: Request) {
       const child = spawn("bash", ["-c", deployScript]);
 
       child.stdout.on("data", (chunk: Buffer) => {
-        controller.enqueue(encoder.encode(chunk.toString()));
+        if (!isClosed) {
+          try {
+            controller.enqueue(encoder.encode(chunk.toString()));
+          } catch {
+            isClosed = true;
+          }
+        }
       });
 
       child.stderr.on("data", (chunk: Buffer) => {
-        controller.enqueue(encoder.encode(chunk.toString()));
+        if (!isClosed) {
+          try {
+            controller.enqueue(encoder.encode(chunk.toString()));
+          } catch {
+            isClosed = true;
+          }
+        }
       });
 
       child.on("close", (code) => {
@@ -73,18 +87,31 @@ export async function GET(req: Request) {
           );
         } catch {}
 
-        if (code !== 0) {
-          controller.enqueue(encoder.encode(`\n[ERROR]: El proceso finalizo con codigo ${code}\n`));
+        if (!isClosed) {
+          isClosed = true;
+          if (code !== 0) {
+            try {
+              controller.enqueue(encoder.encode(`\n[ERROR]: El proceso finalizo con codigo ${code}\n`));
+            } catch {}
+          }
+          try {
+            controller.close();
+          } catch {}
         }
-        controller.close();
       });
 
       child.on("error", (err) => {
-        controller.enqueue(encoder.encode(`\n[FALLO CRITICO]: ${err.message}\n`));
-        controller.close();
+        if (!isClosed) {
+          isClosed = true;
+          try {
+            controller.enqueue(encoder.encode(`\n[FALLO CRITICO]: ${err.message}\n`));
+            controller.close();
+          } catch {}
+        }
       });
 
       req.signal.addEventListener("abort", () => {
+        isClosed = true;
         child.kill();
       });
     },
