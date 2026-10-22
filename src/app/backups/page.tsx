@@ -165,13 +165,13 @@ export default function BackupsPage() {
           <div className="hub-card p-4 space-y-2">
             <div className="flex items-center justify-between text-xs font-mono text-gray-400">
               <span className="flex items-center gap-1.5">
-                <Cloud className="w-4 h-4 text-emerald-400" />
+                <Cloud className="w-4 h-4 text-amber-300" />
                 Copia externa (configuración)
               </span>
             </div>
-            <div className="text-2xl font-bold font-mono text-emerald-400 flex items-center gap-2">
-              <CheckCircle2 className="w-6 h-6" />
-              <span>Sin verificar</span>
+            <div className="text-2xl font-bold font-mono text-amber-300 flex items-center gap-2">
+              <AlertTriangle className="w-6 h-6" />
+              <span>No conectada</span>
             </div>
             <div className="text-[11px] text-gray-500 font-mono">
               No hay copia externa verificada por el Hub
