@@ -70,6 +70,7 @@ export interface AppInfo {
     remoteStatus?: "synced" | "different" | "unavailable" | "not_repo";
     remoteCheckedAt?: string | null;
     remoteRef?: string | null;
+    remoteError?: string | null;
     localError?: string | null;
     remoteAhead?: number;
     remoteBehind?: number;
