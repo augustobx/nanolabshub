@@ -37,6 +37,20 @@ export function getLifecycleRecords(): Map<string, LifecycleRecord> {
   return new Map((database().getLifecycleStates() as LifecycleRecord[]).map((r) => [r.slug, r]));
 }
 
+export function assertAppActive(slug: string) {
+  const state = getLifecycleRecords().get(slug)?.state || "active";
+  if (state !== "active") {
+    throw new Error("Operación bloqueada: aplicación " + state + ". Reactivala desde Productos antes de iniciar o desplegar contenedores.");
+  }
+}
+
+export function assertContainerAppActive(containerName: string) {
+  const owner = KNOWN_APPS.find((a) => a.containerNames.some((name) =>
+    name === containerName || containerName.startsWith(name + "-")));
+  if (!owner) throw new Error("Contenedor fuera del inventario permitido");
+  assertAppActive(owner.slug);
+}
+
 export function getLifecycleHistory(slug: string) {
   if (!KNOWN_APPS.some((app) => app.slug === slug)) throw new Error("Aplicación no registrada");
   return database().getLifecycleHistory(slug, 40);
