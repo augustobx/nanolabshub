@@ -1,6 +1,6 @@
 import { getSessionUser } from "@/lib/auth";
 import { requireMutatingSession } from "@/lib/action-security";
-import { backupEngine } from "@/lib/backup-service";
+import { backupEngine, assertBackupSecurity } from "@/lib/backup-service";
 import { KNOWN_APPS } from "@/lib/apps-registry";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +24,7 @@ export async function POST(req: Request) {
     return Response.json({success:false,error:"Se requiere JSON"},{status:415,headers});
   }
   try {
+    assertBackupSecurity();
     const body=await req.json();
     if(typeof body.slug!=="string"||!KNOWN_APPS.some(a=>a.slug===body.slug)) {
       return Response.json({success:false,error:"App no registrada"},{status:400,headers});
