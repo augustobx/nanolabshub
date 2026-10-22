@@ -1,9 +1,12 @@
 import { deployApp } from "@/lib/server-api";
+import { requireMutatingSession } from "@/lib/action-security";
+import { assertAppActive } from "@/lib/app-lifecycle";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   try {
+    await requireMutatingSession(req);
     const body = await req.json();
     const { slug } = body;
 
@@ -11,6 +14,7 @@ export async function POST(req: Request) {
       return Response.json({ success: false, error: "slug is required" }, { status: 400 });
     }
 
+    assertAppActive(slug);
     const output = await deployApp(slug);
 
     return Response.json({
