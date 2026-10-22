@@ -288,7 +288,7 @@ export default function SoftwarePage() {
                           : "text-amber-400 bg-amber-500/10 border border-amber-500/20"
                       }`}
                     >
-                      {app.status === "operational" ? "Operativa" : app.status === "degraded" ? "Degradada" : app.status === "deploying" ? "Desplegando" : "Caída"}
+                      {app.status === "operational" ? "Operativa" : app.status === "degraded" ? "Degradada" : app.status === "deploying" ? "Desplegando" : app.status === "not_deployed" ? "No desplegada" : "Caída"}
                     </span>
                   </div>
                   <div className="mt-2 flex min-w-0 flex-wrap items-center gap-3 break-all text-xs text-gray-500 font-mono">
@@ -367,7 +367,9 @@ export default function SoftwarePage() {
                       {app.git.remoteStatus === "synced" ? "Sin diferencias" : app.git.remoteStatus === "different" ? "Versiones distintas" : "Remoto no comprobado"}
                     </span>
                   </div>
-                  <p className="text-[11px] leading-5 text-slate-500">Comparación de commits; no implica que el servidor haya desplegado la nueva versión.</p>
+                  <p className="text-[11px] leading-5 text-slate-500">
+                    {app.git.remoteRef === "HEAD" ? "Comparado con HEAD de la rama remota predeterminada (checkout detached)." : "Comparación de commits; no implica que el servidor haya desplegado la nueva versión."}
+                  </p>
                 </div>
 
                 <div className="min-w-0 rounded-lg border border-white/5 bg-surface-100/50 p-3 space-y-2">
@@ -383,7 +385,7 @@ export default function SoftwarePage() {
                 <div className="min-w-0 rounded-lg border border-white/5 bg-surface-100/50 p-3 space-y-2">
                   <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Sitio público</div>
                   <p className={`text-sm font-semibold ${app.web?.status === "online" ? "text-emerald-300" : app.web?.status === "offline" ? "text-rose-300" : "text-amber-200"}`}>
-                    {app.web?.status === "online" ? "Responde" : app.web?.status === "restricted" ? "Acceso restringido" : app.web?.status === "offline" ? "Sin respuesta correcta" : "Sin comprobación"}
+                    {app.web?.status === "online" ? "Responde" : app.web?.status === "restricted" ? "Acceso restringido" : app.web?.status === "offline" ? "No conecta" : app.web?.status === "http_error" ? `La web responde HTTP ${app.web.httpStatus}` : "Sin comprobación"}
                   </p>
                   <p className="text-[11px] text-slate-500">
                     {app.web?.httpStatus ? `HTTP ${app.web.httpStatus}` : "HTTP no disponible"}
@@ -410,7 +412,11 @@ export default function SoftwarePage() {
                 <div className="p-2.5 rounded-lg bg-surface-100/50 border border-white/5 space-y-1">
                   <div className="text-[10px] text-gray-500 uppercase">Estado Local Git</div>
                   <div className="flex items-center gap-1.5">
-                    {app.git.dirtyFilesCount === 0 ? (
+                    {app.git.localError ? (
+                      <span className="text-amber-300 flex items-center gap-1" title={app.git.localError}>
+                        <AlertTriangle className="w-3.5 h-3.5" /> Git no verificable
+                      </span>
+                    ) : app.git.dirtyFilesCount === 0 ? (
                       <span className="text-emerald-400 flex items-center gap-1">
                         <CheckCircle2 className="w-3.5 h-3.5" /> Limpio (clean)
                       </span>
