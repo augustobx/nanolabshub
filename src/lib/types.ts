@@ -115,7 +115,7 @@ export interface BackupRecord {
   restoreTested?: boolean;
 }
 
-export type SaaSSlug = "onlyfood" | "onlypadel" | "onlycars" | "onlygym" | "onlyturn" | "onlyerp";
+export type SaaSSlug = "onlyfood" | "onlypadel" | "onlycars" | "onlygym" | "onlyturn" | "onlyerp" | "onlymob";
 
 export interface UniversalTenant {
   id: string;
