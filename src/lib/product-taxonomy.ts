@@ -10,25 +10,25 @@ export const SAAS_PRODUCTS: ReadonlyArray<{
   category: "saas";
   capabilities: {
     tenantRead: "connected";
-    statusWrite: "legacy_review";
-    moduleWrite: "connected" | "pending";
+    statusWrite: "pending";
+    moduleWrite: "pending";
     impersonation: "pending";
     settings: "pending";
     activity: "pending";
   };
 }> = [
   { slug: "onlyfood", name: "OnlyFood", focus: "Gastronomía y pedidos", domain: "onlyfood.nanoapps.ar", category: "saas",
-    capabilities: { tenantRead: "connected", statusWrite: "legacy_review", moduleWrite: "pending", impersonation: "pending", settings: "pending", activity: "pending" } },
+    capabilities: { tenantRead: "connected", statusWrite: "pending", moduleWrite: "pending", impersonation: "pending", settings: "pending", activity: "pending" } },
   { slug: "onlypadel", name: "OnlyPadel", focus: "Clubes y reservas", domain: "onlypadel.nanoapps.ar", category: "saas",
-    capabilities: { tenantRead: "connected", statusWrite: "legacy_review", moduleWrite: "pending", impersonation: "pending", settings: "pending", activity: "pending" } },
+    capabilities: { tenantRead: "connected", statusWrite: "pending", moduleWrite: "pending", impersonation: "pending", settings: "pending", activity: "pending" } },
   { slug: "onlycars", name: "OnlyCars", focus: "Concesionarias", domain: "onlycars.nanoapps.ar", category: "saas",
-    capabilities: { tenantRead: "connected", statusWrite: "legacy_review", moduleWrite: "pending", impersonation: "pending", settings: "pending", activity: "pending" } },
+    capabilities: { tenantRead: "connected", statusWrite: "pending", moduleWrite: "pending", impersonation: "pending", settings: "pending", activity: "pending" } },
   { slug: "onlygym", name: "OnlyGym", focus: "Gimnasios y membresías", domain: "onlygym.nanoapps.ar", category: "saas",
-    capabilities: { tenantRead: "connected", statusWrite: "legacy_review", moduleWrite: "connected", impersonation: "pending", settings: "pending", activity: "pending" } },
+    capabilities: { tenantRead: "connected", statusWrite: "pending", moduleWrite: "pending", impersonation: "pending", settings: "pending", activity: "pending" } },
   { slug: "onlyturn", name: "OnlyTurn", focus: "Turnos inteligentes", domain: "onlyturn.nanoapps.ar", category: "saas",
-    capabilities: { tenantRead: "connected", statusWrite: "legacy_review", moduleWrite: "pending", impersonation: "pending", settings: "pending", activity: "pending" } },
+    capabilities: { tenantRead: "connected", statusWrite: "pending", moduleWrite: "pending", impersonation: "pending", settings: "pending", activity: "pending" } },
   { slug: "onlyerp", name: "OnlyERP", focus: "Gestión industrial y distribución", domain: "onlyerp.nanoapps.ar", category: "saas",
-    capabilities: { tenantRead: "connected", statusWrite: "legacy_review", moduleWrite: "pending", impersonation: "pending", settings: "pending", activity: "pending" } },
+    capabilities: { tenantRead: "connected", statusWrite: "pending", moduleWrite: "pending", impersonation: "pending", settings: "pending", activity: "pending" } },
 ] as const;
 
 const SAAS_SLUGS = new Set<string>(SAAS_PRODUCTS.map(p => p.slug));
