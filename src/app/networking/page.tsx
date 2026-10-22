@@ -15,6 +15,13 @@ import {
 
 const PROXY_ROUTES = [
   {
+    domain: "hub.nanoapps.ar",
+    forwardTarget: "nanolabshub:3000",
+    ssl: "Let's Encrypt (*.nanoapps.ar)",
+    status: "active",
+    type: "governance",
+  },
+  {
     domain: "proxy.nanoapps.site",
     forwardTarget: "nginx-proxy-manager:81",
     ssl: "Let's Encrypt",

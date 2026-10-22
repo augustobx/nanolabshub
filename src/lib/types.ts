@@ -90,3 +90,47 @@ export interface BackupRecord {
   status: "verified" | "unverified" | "failed";
   storageLocation: "local" | "cloud_synced";
 }
+
+export type SaaSSlug = "onlyfood" | "onlypadel" | "onlycars" | "onlygym" | "onlyturn" | "onlyerp";
+
+export interface UniversalTenant {
+  id: string;
+  saas: SaaSSlug;
+  saasName: string;
+  slug: string;
+  name: string;
+  status: "ACTIVE" | "TRIAL" | "SUSPENDED" | "CANCELED";
+  rawStatus: string;
+  plan: string;
+  planExpiresAt?: string | null;
+  createdAt: string;
+  domain: string;
+  adminEmail?: string;
+  metrics: {
+    totalRecords: number;
+    recordLabel: string;
+    secondaryMetric?: {
+      label: string;
+      value: number;
+    };
+  };
+  modules: Record<string, boolean>;
+}
+
+export interface GovernanceOverview {
+  totalTenants: number;
+  activeTenants: number;
+  trialTenants: number;
+  suspendedTenants: number;
+  saasCount: number;
+  totalRecordsManaged: number;
+  tenants: UniversalTenant[];
+  legacyPanels: Array<{
+    saas: string;
+    legacyAdminUrl: string;
+    sunsetStatus: "redirected_to_hub" | "active_deprecated" | "planned";
+    replacementUrl: string;
+    notes: string;
+  }>;
+}
+
