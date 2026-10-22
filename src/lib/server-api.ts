@@ -18,6 +18,13 @@ def cpu_sample():
         values = [int(x) for x in f.readline().split()[1:]]
     return sum(values), values[3] + values[4]
 
+try:
+    with open(proc + '/cpuinfo') as cpu_file:
+        cpu_model = next((line.split(':', 1)[1].strip()
+                          for line in cpu_file if line.lower().startswith('model name')), None)
+except OSError:
+    cpu_model = None
+
 total1, idle1 = cpu_sample()
 time.sleep(0.25)
 total2, idle2 = cpu_sample()
@@ -54,7 +61,7 @@ data = {
     'hostname': info[0],
     'uptime': f'{days}d {hours}h {minutes}m',
     'osInfo': os.uname().sysname + ' ' + os.uname().release,
-    'cpu': {'cores': os.cpu_count(), 'usagePercent': cpu_pct,
+    'cpu': {'cores': os.cpu_count(), 'model': cpu_model, 'usagePercent': cpu_pct,
             'loadAvg': [round(n, 2) for n in os.getloadavg()]},
     'memory': {
         'totalBytes': total, 'usedBytes': total - available, 'freeBytes': available,
