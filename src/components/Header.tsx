@@ -75,7 +75,7 @@ export function Header({ onRefresh, isRefreshing = false }: HeaderProps) {
         {onRefresh && (
           <button type="button" onClick={onRefresh} disabled={isRefreshing}
             aria-label="Actualizar datos" title="Actualizar datos"
-            className="hub-icon-button flex items-center gap-2 px-3 disabled:cursor-wait disabled:opacity-50">
+            className="hub-icon-button !w-auto min-w-[38px] flex items-center gap-2 px-3 disabled:cursor-wait disabled:opacity-50">
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
             <span className="hidden text-xs font-medium sm:inline">{isRefreshing ? "Actualizando" : "Actualizar"}</span>
           </button>
