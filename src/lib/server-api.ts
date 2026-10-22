@@ -197,12 +197,12 @@ export async function getAppsStatus(containersInput?: ContainerInfo[]): Promise<
 
     // Match associated containers
     const appContainers = containers.filter((c) =>
-      app.containerNames.some((name) => c.name.includes(name) || name.includes(c.name))
+      app.containerNames.some((name) => c.name === name || c.name.startsWith(`${name}-`))
     );
 
     // Compute health
     let status: AppInfo["status"] = "operational";
-    if (appContainers.length === 0 && app.type !== "internal") {
+    if (appContainers.length === 0) {
       status = "down";
     } else if (appContainers.some((c) => c.state !== "running" || c.health === "unhealthy")) {
       status = "degraded";
