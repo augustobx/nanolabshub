@@ -201,6 +201,7 @@ PY`;
       commitDate: "-",
       dirtyFilesCount: 0,
       hasCompose: false,
+      localError: null,
     };
 
     // Match associated containers
