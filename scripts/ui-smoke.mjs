@@ -16,7 +16,12 @@ const tenants = [
 ];
 const governance = {
   totalTenants: 2, activeTenants: 1, trialTenants: 1, suspendedTenants: 0,
-  saasCount: 2, totalRecordsManaged: 1820, tenants, legacyPanels: [],
+  saasCount: 6, totalRecordsManaged: 1820, tenants, legacyPanels: [],
+  sources: ["onlyfood","onlypadel","onlycars","onlyerp","onlygym","onlyturn"].map(saas => ({
+    saas, status: ["onlyfood","onlypadel"].includes(saas) ? "available" : "unavailable",
+    count: saas === "onlyfood" || saas === "onlypadel" ? 1 : null,
+    checkedAt: new Date().toISOString(), message: null
+  })),
 };
 const container = {
   id: "demo-1", name: "onlyfood-web", image: "onlyfood:latest", cpuPercent: "2.7%", memoryUsage: "115MiB / 1GiB", status: "Up 3 hours",
@@ -67,6 +72,16 @@ const backups = [{
 const responses = {
   "/api/governance": { success: true, data: governance },
   "/api/operations": { success: true, data: { timestamp: new Date().toISOString(), telemetry, containers: [container], apps } },
+  "/api/infrastructure": { success: true, data: {
+    timestamp: new Date().toISOString(), host: telemetry,
+    totals: { running: 1, unhealthy: 0, unassigned: 0, databases: 0, domains: 1 },
+    containers: [{ name: "onlyfood-web", kind: "service", state: "running", health: "healthy", appName: "OnlyFood", owner: "onlyfood", expectedStopped: false, image: "onlyfood:latest", ports: "3000/tcp" }],
+    groups: {
+      core: [], database: [], service: [{ name: "onlyfood-web", kind: "service", state: "running", health: "healthy", appName: "OnlyFood", owner: "onlyfood", expectedStopped: false, image: "onlyfood:latest", ports: "3000/tcp" }],
+      worker: [], unassigned: []
+    },
+    domains: [{ slug: "onlyfood", appName: "OnlyFood", url: "https://onlyfood.example.com", lifecycle: "active", status: "online", httpStatus: 200, checkedAt: new Date().toISOString(), source: "registry_probe" }]
+  } },
   "/api/apps/logs": { success: true, data: { logs: "fixture: real logs require the production server" } },
   "/api/apps": { success: true, data: apps },
   "/api/telemetry": { success: true, data: { telemetry, containers: [container] } },
@@ -151,6 +166,7 @@ try {
       ["/saas", "Productos SaaS"],
       ["/saas/onlyfood", "Espacio de SaaS"],
       ["/software", "Aplicaciones y versiones"],
+      ["/infrastructure", "Infraestructura"],
       ["/hardware", "Infraestructura"],
       ["/backups", "Copias de seguridad"],
       ["/networking", "Dominios y red"],
@@ -166,6 +182,15 @@ try {
         if (width > device.viewport.width + 4) {
           throw new Error(`Mobile horizontal overflow at ${path}: ${width}px (viewport ${device.viewport.width}px)`);
         }
+      }
+      if (path === "/infrastructure") {
+        await page.getByRole("heading", { name: "Inventario técnico clasificado" }).waitFor();
+        await page.getByRole("button", { name: /Servicios web/ }).click();
+        await page.getByText("onlyfood-web").first().waitFor();
+      }
+      if (path === "/networking") {
+        await page.getByRole("heading", { name: "Inventario de URLs" }).waitFor();
+        await page.getByText("HTTP responde").first().waitFor();
       }
       if (path === "/saas") {
         await page.getByRole("link", { name: "Abrir OnlyFood" }).waitFor();
