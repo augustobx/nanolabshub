@@ -93,16 +93,15 @@ export default function BackupsPage() {
     <div className="flex-1 flex flex-col pb-12">
       <Header onRefresh={fetchBackups} isRefreshing={isLoading} />
 
-      <div className="px-6 py-6 max-w-7xl w-full mx-auto space-y-6">
-        <div>
-          <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-            <Database className="w-5 h-5 text-brand-cyan" />
-            <span>Centro de Backups & Disaster Recovery</span>
-          </h1>
-          <p className="text-xs text-gray-400 font-mono mt-0.5">
-            Volcados de bases de datos PostgreSQL, MariaDB, MySQL y SQLite almacenados en /opt/backups.
+      <div className="hub-content space-y-7">
+        <section className="hub-hero space-y-3">
+          <p className="hub-eyebrow">Operación / Respaldo</p>
+          <h1 className="hub-hero-title">Copias de seguridad y recuperación.</h1>
+          <p className="hub-description">
+            Visualizá los respaldos registrados y ejecutá copias manuales por aplicación.
+            La disponibilidad real de una copia depende de su última verificación.
           </p>
-        </div>
+        </section>
 
         {/* Backups Summary Gauges */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -110,7 +109,7 @@ export default function BackupsPage() {
             <div className="flex items-center justify-between text-xs font-mono text-gray-400">
               <span className="flex items-center gap-1.5">
                 <FileArchive className="w-4 h-4 text-brand-cyan" />
-                TOTAL VOLCADOS REGISTRADOS
+                Respaldos registrados
               </span>
             </div>
             <div className="text-2xl font-bold font-mono text-white">
@@ -126,7 +125,7 @@ export default function BackupsPage() {
             <div className="flex items-center justify-between text-xs font-mono text-gray-400">
               <span className="flex items-center gap-1.5">
                 <HardDrive className="w-4 h-4 text-purple-400" />
-                PESO TOTAL EN DISCO
+                Espacio utilizado
               </span>
             </div>
             <div className="text-2xl font-bold font-mono text-white">
@@ -141,15 +140,15 @@ export default function BackupsPage() {
             <div className="flex items-center justify-between text-xs font-mono text-gray-400">
               <span className="flex items-center gap-1.5">
                 <Cloud className="w-4 h-4 text-emerald-400" />
-                COPIA EXTERNA (GOOGLE DRIVE)
+                Copia externa (configuración)
               </span>
             </div>
             <div className="text-2xl font-bold font-mono text-emerald-400 flex items-center gap-2">
               <CheckCircle2 className="w-6 h-6" />
-              <span>CONFIGURADA</span>
+              <span>Declarada</span>
             </div>
             <div className="text-[11px] text-gray-500 font-mono">
-              Sincronización vía rclone activada
+              Confirmar ejecución en el destino
             </div>
           </div>
         </div>
