@@ -40,7 +40,7 @@ export default function SaaSCatalogPage() {
       {errors.length > 0 && <p role="status" className="rounded-xl border border-amber-400/20 p-3 text-xs text-amber-200">Algunos conectores no respondieron: {errors.join(", ")}. No se muestran datos inventados.</p>}
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="hub-card p-5"><span className="text-xs font-medium text-slate-400">Productos definidos</span><p className="mt-2 text-[28px] font-semibold text-white">{SAAS_PRODUCTS.length}</p><span className="text-xs text-slate-400">Contrato visual compartido</span></div>
-        <div className="hub-card p-5"><span className="text-xs font-medium text-slate-400">Tenants reportados</span><p className="mt-2 text-[28px] font-semibold text-white">{governance ? governance.totalTenants : "—"}</p><span className="text-xs text-slate-400">Por conectores disponibles</span></div>
+        <div className="hub-card p-5"><span className="text-xs font-medium text-slate-400">Tenants reportados</span><p className="mt-2 text-[28px] font-semibold text-white">{governance && governance.sources?.some(x=>x.status === "available") ? governance.totalTenants : "—"}</p><span className="text-xs text-slate-400">Por conectores disponibles</span></div>
         <div className="hub-card p-5"><span className="text-xs font-medium text-slate-400">SaaS operativas</span><p className="mt-2 text-[28px] font-semibold text-white">{operations ? SAAS_PRODUCTS.filter(p => operations.apps.some(a => a.slug === p.slug && a.status === "operational" && (a.lifecycle?.state || "active") === "active")).length : "—"}</p><span className="text-xs text-slate-400">Según contenedores registrados</span></div>
       </div>
       <div className="hub-card overflow-hidden">
@@ -51,7 +51,8 @@ export default function SaaSCatalogPage() {
         <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3 sm:p-5">
           {products.map((p,index) => {
             const app = operations?.apps.find(a => a.slug === p.slug);
-            const count = governance?.tenants.filter(t => t.saas === p.slug).length;
+            const source = governance?.sources?.find(item => item.saas === p.slug);
+            const count = source?.status === "available" ? source.count : null;
             const inactive = app?.lifecycle?.state && app.lifecycle.state !== "active";
             const healthy = app?.status === "operational" && !inactive;
             return <Link key={p.slug} href={"/saas/" + p.slug} aria-label={"Abrir " + p.name}
@@ -64,7 +65,7 @@ export default function SaaSCatalogPage() {
               </div>
               <div><h3 className="text-lg font-semibold tracking-tight text-white">{p.name}</h3><p className="mt-1 text-[13px] text-slate-400">{p.focus}</p></div>
               <div className="mt-auto flex items-center justify-between border-t border-white/10 pt-4">
-                <span className="flex items-center gap-2 text-xs text-[#b9c9df]"><Users className="h-4 w-4"/> {count == null ? "Tenants sin datos" : count + " tenants reportados"}</span>
+                <span className="flex items-center gap-2 text-xs text-[#b9c9df]"><Users className="h-4 w-4"/> {count == null ? "Conector pendiente" : count + " tenants reportados"}</span>
                 <ChevronRight className="h-4 w-4 text-[#a5bbd9] transition group-hover:translate-x-0.5"/>
               </div>
             </Link>;
