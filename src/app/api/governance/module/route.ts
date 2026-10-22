@@ -10,6 +10,11 @@ export async function POST(req: Request) {
   let actor: string;
   try { actor = await requireMutatingSession(req); }
   catch { return Response.json({ success: false, error: "Sesión o origen no autorizado" }, { status: 403 }); }
+  return Response.json({
+    success: false,
+    error: "Edición de datos productivos bloqueada. Primero deben auditarse y habilitarse los contratos seguros de cada SaaS."
+  }, { status: 501, headers: { "Cache-Control": "no-store" } });
+  /* Escritura heredada desactivada preventivamente.
   try {
     const body = await req.json();
     const { saas, tenantId, moduleKey, enabled, tenantName } = body;
@@ -51,4 +56,5 @@ export async function POST(req: Request) {
       { status: 500 }
     );
   }
+  */
 }
