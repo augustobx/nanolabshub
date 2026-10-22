@@ -48,6 +48,16 @@ const apps = [
       commitDate: "2026-10-22", commitAuthor: "NanoLabs", dirtyFilesCount: 1 },
     containers: [], web: { status: "offline", httpStatus: null, latencyMs: null, checkedAt: new Date().toISOString() }, deployment: {revision: null,imageId: null,status: "not_running"}, database: { type: "postgres", host: "localhost", port: 5432 } },
 ];
+apps.forEach((app) => {
+  app.lifecycle = { state: "active", updatedAt: null, updatedBy: null, note: "" };
+});
+apps.push({
+  ...apps[0], slug: "retired-demo", name: "Aplicación archivada demo",
+  type: "client", path: "/opt/apps/retired-demo",
+  containers: [], status: "degraded",
+  lifecycle: { state: "archived", updatedAt: new Date().toISOString(), updatedBy: "admin", note: "Cierre de prueba" },
+});
+
 const backups = [{
   id: "demo-backup", appSlug: "onlyfood", appName: "OnlyFood", dbType: "postgres",
   filename: "onlyfood_demo_backup.sql.gz", path: "/opt/backups/onlyfood",
@@ -79,6 +89,19 @@ try {
     await page.route("**/api/**", (route) => {
       const url = new URL(route.request().url());
       if (url.pathname.startsWith("/api/auth/")) return route.continue();
+      if (url.pathname === "/api/apps/lifecycle") {
+        if (route.request().method() === "GET") {
+          return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ success: true, data: [] }) });
+        }
+        const body = route.request().postDataJSON();
+        const target = apps.find((app) => app.slug === body.slug);
+        if (!target || body.confirmation !== target.slug || (body.action === "archive" && body.acknowledgeBackup !== true)) {
+          return route.fulfill({ status: 422, contentType: "application/json", body: JSON.stringify({ success: false, error: "Confirmación insuficiente" }) });
+        }
+        const next = { suspend: "suspended", archive: "archived", resume: "active", pending_retirement: "pending_retirement" }[body.action];
+        target.lifecycle = { ...target.lifecycle, state: next };
+        return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ success: true, data: { label: next, details: "Docker: acción confirmada en fixture" } }) });
+      }
       const fixture = responses[url.pathname];
       if (!fixture) return route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ success: false, error: "UI test fixture missing" }) });
       return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(fixture) });
@@ -125,6 +148,27 @@ try {
         if (width > device.viewport.width + 4) {
           throw new Error(`Mobile horizontal overflow at ${path}: ${width}px (viewport ${device.viewport.width}px)`);
         }
+      }
+      if (path === "/software") {
+        const archived = page.getByText("Aplicación archivada demo");
+        if (await archived.isVisible().catch(() => false)) throw new Error("An archived app appeared in active catalog");
+        await page.getByRole("button", { name: /Mostrar archivadas/ }).click();
+        await archived.waitFor();
+        await page.getByRole("button", { name: "Ocultar archivadas" }).click();
+        await archived.waitFor({ state: "hidden" });
+
+        const onlyFood = page.locator("#software-item-onlyfood");
+        await onlyFood.getByRole("button", { name: "Archivar aplicación" }).click();
+        const dialog = page.getByRole("dialog", { name: "Archivar aplicación" });
+        await dialog.waitFor();
+        const confirmButton = dialog.getByRole("button", { name: "Confirmar archivar aplicación" });
+        if (await confirmButton.isEnabled()) throw new Error("Archive button initially enabled without confirmation");
+        await dialog.getByRole("textbox", { name: "Confirmar identificador de aplicación" }).fill("onlyfood");
+        if (await confirmButton.isEnabled()) throw new Error("Archive button enabled without backup acknowledgement");
+        await dialog.getByRole("checkbox").check();
+        await confirmButton.click();
+        await dialog.waitFor({ state: "hidden" });
+        await onlyFood.waitFor({ state: "hidden" });
       }
       if (path === "/governance") {
         const button = page.getByRole("button", { name: "Administrar módulos" }).first();
