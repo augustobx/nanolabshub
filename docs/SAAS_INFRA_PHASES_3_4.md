@@ -13,6 +13,7 @@ Código preparado en ramas de integración. No fusionado ni desplegado en SaaS p
 | OnlyERP | main | https://github.com/augustobx/onlyerp/pull/1 | Sin cambios de datos/esquema |
 | OnlyGym | main | https://github.com/augustobx/onlygym/pull/1 | Sin cambios de datos/esquema |
 | OnlyTurn | main | https://github.com/augustobx/onlyturn/pull/12 | Sin cambios de datos/esquema |
+| OnlyMob | main | https://github.com/augustobx/onlymob/pull/28 | Sin cambios de datos/esquema |
 
 ## Contrato de tenants v1
 
@@ -43,6 +44,7 @@ Los nuevos endpoints no entran en producción hasta revisar, fusionar y desplega
    - `HUB_INTEGRATION_ONLYERP_TOKEN`
    - `HUB_INTEGRATION_ONLYGYM_TOKEN`
    - `HUB_INTEGRATION_ONLYTURN_TOKEN`
+   - `HUB_INTEGRATION_ONLYMOB_TOKEN`
 6. Incluir `compose.integrations.yml` como capa opcional en el despliegue **solo del Hub**. Con `HUB_SAAS_INTEGRATION_ENABLED=false`, no consulta ninguna SaaS, aun con los tokens definidos.
 7. Activar la integración tras validar endpoint por endpoint y comprobar que los recuentos de tenants coinciden con los de los superadmin de origen.
 8. Verificar respuesta 401 sin token, 200 con token y paginación; las rutas POST/PATCH/DELETE siguen inexistentes. Verificar que nunca aparecen credenciales en HTML, JSON o logs.
