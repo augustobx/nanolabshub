@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Header } from "@/components/Header";
 import {
   Crown,
@@ -42,6 +42,9 @@ export default function GovernancePage() {
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [activeTenant, setActiveTenant] = useState<UniversalTenant | null>(null);
+  const [tenantTab, setTenantTab] = useState<"status" | "modules" | "access">("status");
+  const tenantDialogRef = useRef<HTMLDivElement>(null);
+
   const [isUpdating, setIsUpdating] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -69,10 +72,55 @@ export default function GovernancePage() {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
+  useEffect(() => {
+    if (!activeTenant) return;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    tenantDialogRef.current?.focus();
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !isUpdating) {
+        setActiveTenant(null);
+      }
+      if (event.key === "Tab") {
+        const dialog = tenantDialogRef.current;
+        if (!dialog) return;
+        const controls = Array.from(dialog.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )).filter((node) => node.getClientRects().length > 0);
+        if (!controls.length) return;
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog)) {
+          event.preventDefault(); last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault(); first.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previouslyFocused?.focus();
+    };
+  }, [activeTenant?.id, isUpdating]);
+
+  const openTenant = (tenant: UniversalTenant) => {
+    setTenantTab("status");
+    setActiveTenant(tenant);
+  };
+
   const handleUpdateStatus = async (
     tenant: UniversalTenant,
     newStatus: "ACTIVE" | "TRIAL" | "SUSPENDED" | "CANCELED"
   ) => {
+    if (tenant.status === newStatus) return;
+    const risky = newStatus === "SUSPENDED" || newStatus === "CANCELED";
+    if (risky && !window.confirm(
+      `Vas a ${newStatus === "SUSPENDED" ? "suspender" : "cancelar"} a ${tenant.name} en ${tenant.saasName}. Esta acción modifica la base productiva. ¿Confirmás?`
+    )) return;
     setIsUpdating(true);
     try {
       const res = await fetch("/api/governance/status", {
@@ -442,7 +490,7 @@ export default function GovernancePage() {
                 {/* Card Actions */}
                 <div className="pt-3 border-t border-white/5 flex items-center gap-2">
                   <button
-                    onClick={() => setActiveTenant(t)}
+                    onClick={() => openTenant(t)}
                     className="flex-1 py-1.5 px-3 rounded-lg bg-surface-100 hover:bg-surface-50 text-gray-200 hover:text-white border border-white/10 text-xs font-mono font-medium flex items-center justify-center gap-1.5 transition-all"
                   >
                     <Settings2 className="w-3.5 h-3.5 text-brand-cyan" />
@@ -520,141 +568,150 @@ export default function GovernancePage() {
         </div>
       </div>
 
-      {/* Tenant Control & Module Slide-over Modal */}
+      {/* Universal tenant control dialog, organized by action category. */}
       {activeTenant && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="hub-card max-w-2xl w-full p-6 space-y-6 max-h-[90vh] overflow-y-auto border-brand-cyan/40 shadow-2xl shadow-cyan-950/50">
-            {/* Header */}
-            <div className="flex items-start justify-between border-b border-white/10 pb-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-mono border flex items-center gap-1 ${getSaasColor(activeTenant.saas)}`}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#060a12]/85 p-3 backdrop-blur-sm sm:p-6"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !isUpdating) setActiveTenant(null);
+          }}>
+          <div ref={tenantDialogRef} role="dialog" aria-modal="true" aria-labelledby="tenant-dialog-title"
+            tabIndex={-1} className="flex w-full max-w-[690px] flex-col overflow-hidden rounded-[20px] border border-white/10 bg-[#172233] shadow-2xl outline-none"
+            style={{ maxHeight: "min(90dvh, 790px)" }}>
+            <div className="flex items-start justify-between gap-3 border-b border-white/[0.08] px-5 py-5 sm:px-6">
+              <div className="min-w-0 space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px] font-medium ${getSaasColor(activeTenant.saas)}`}>
                     {getSaasIcon(activeTenant.saas)}
-                    <span>{activeTenant.saasName}</span>
+                    {activeTenant.saasName}
                   </span>
-                  <span className="text-xs text-gray-400 font-mono">ID: {activeTenant.id}</span>
+                  <span className="text-[11px] text-slate-500">Cliente #{activeTenant.id}</span>
                 </div>
-                <h2 className="text-xl font-bold text-white tracking-tight">{activeTenant.name}</h2>
-                <p className="text-xs font-mono text-brand-cyan">https://{activeTenant.domain}</p>
+                <h2 id="tenant-dialog-title" className="text-xl font-bold tracking-tight text-slate-50">{activeTenant.name}</h2>
+                <p className="truncate text-xs text-slate-400">{activeTenant.domain}</p>
               </div>
-
-              <button
-                onClick={() => setActiveTenant(null)}
-                className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-surface-100 transition-colors"
-              >
-                <X className="w-5 h-5" />
+              <button type="button" aria-label="Cerrar administración de cliente"
+                disabled={isUpdating} onClick={() => setActiveTenant(null)}
+                className="hub-icon-button shrink-0 disabled:opacity-40">
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            {/* 1. Status Controls */}
-            <div className="space-y-3">
-              <h3 className="text-xs font-mono text-gray-300 font-semibold uppercase tracking-wider flex items-center gap-2">
-                <Shield className="w-4 h-4 text-amber-400" />
-                <span>Estado en Base de Datos Productiva</span>
-              </h3>
-              <p className="text-xs text-gray-400">
-                Al hacer clic, se actualiza directamente el registro en la base de datos del SaaS correspondiente:
-              </p>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {[
-                  { id: "ACTIVE", label: "ACTIVO", color: "hover:border-emerald-500 hover:bg-emerald-500/10 text-emerald-400" },
-                  { id: "TRIAL", label: "TRIAL", color: "hover:border-amber-500 hover:bg-amber-500/10 text-amber-400" },
-                  { id: "SUSPENDED", label: "SUSPENDER", color: "hover:border-rose-500 hover:bg-rose-500/10 text-rose-400" },
-                  { id: "CANCELED", label: "CANCELAR", color: "hover:border-gray-500 hover:bg-gray-500/10 text-gray-400" },
-                ].map((s) => (
-                  <button
-                    key={s.id}
-                    disabled={isUpdating}
-                    onClick={() => handleUpdateStatus(activeTenant, s.id as any)}
-                    className={`py-2 px-3 rounded-xl border text-xs font-mono font-semibold transition-all ${
-                      activeTenant.status === s.id
-                        ? "border-brand-cyan bg-brand-cyan/20 text-brand-cyan shadow-sm"
-                        : `border-white/10 bg-surface-100/60 ${s.color}`
-                    }`}
-                  >
-                    {s.label}
-                  </button>
-                ))}
-              </div>
+            <div role="tablist" aria-label="Áreas de administración del cliente"
+              className="flex gap-1 overflow-x-auto border-b border-white/[0.08] px-4 py-3 sm:px-6">
+              {([
+                { id: "status", text: "Estado y plan" },
+                { id: "modules", text: "Funcionalidades" },
+                { id: "access", text: "Acceso" },
+              ] as const).map((tab) => (
+                <button key={tab.id} type="button" role="tab" id={`tenant-tab-${tab.id}`}
+                  aria-controls={`tenant-panel-${tab.id}`}
+                  aria-selected={tenantTab === tab.id}
+                  tabIndex={tenantTab === tab.id ? 0 : -1}
+                  onClick={() => setTenantTab(tab.id)}
+                  className={`whitespace-nowrap rounded-lg px-4 py-2.5 text-xs font-semibold transition-colors ${tenantTab === tab.id
+                    ? "bg-[#304366] text-[#dae4ff]"
+                    : "text-slate-400 hover:bg-white/[0.05] hover:text-white"}`}>
+                  {tab.text}
+                </button>
+              ))}
             </div>
 
-            {/* 2. Feature Modules Toggles */}
-            <div className="space-y-3 pt-3 border-t border-white/5">
-              <h3 className="text-xs font-mono text-gray-300 font-semibold uppercase tracking-wider flex items-center gap-2">
-                <Settings2 className="w-4 h-4 text-brand-cyan" />
-                <span>Módulos y Feature Flags</span>
-              </h3>
-              <p className="text-xs text-gray-400">
-                Habilita o deshabilita funcionalidades específicas para este local/cliente:
-              </p>
-
-              <div className="space-y-2">
-                {Object.entries(activeTenant.modules).map(([key, enabled]) => (
-                  <div
-                    key={key}
-                    className="p-3 rounded-xl bg-surface-100/60 border border-white/5 flex items-center justify-between"
-                  >
-                    <div>
-                      <div className="text-xs font-mono font-semibold text-white capitalize">
-                        {key.replace(/_/g, " ")}
-                      </div>
-                      <div className="text-[11px] text-gray-500 font-mono">
-                        Identificador interno: {key}
-                      </div>
-                    </div>
-
-                    <button
-                      disabled={isUpdating}
-                      onClick={() => handleToggleModule(activeTenant, key, enabled)}
-                      className="transition-transform active:scale-95"
-                    >
-                      {enabled ? (
-                        <ToggleRight className="w-8 h-8 text-brand-cyan" />
-                      ) : (
-                        <ToggleLeft className="w-8 h-8 text-gray-600" />
-                      )}
-                    </button>
+            <div className="min-h-[230px] flex-1 overflow-y-auto px-5 py-6 sm:px-6">
+              {tenantTab === "status" && (
+                <div id="tenant-panel-status" role="tabpanel" aria-labelledby="tenant-tab-status" className="space-y-5">
+                  <div>
+                    <h3 className="text-sm font-semibold text-white">Estado del servicio</h3>
+                    <p className="mt-2 text-xs leading-5 text-slate-400">
+                      Elegí el estado del cliente. Los cambios se guardan directamente en la base productiva
+                      y pueden afectar su acceso al servicio.
+                    </p>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* 3. Impersonation & Direct Access */}
-            <div className="space-y-3 pt-3 border-t border-white/5">
-              <h3 className="text-xs font-mono text-gray-300 font-semibold uppercase tracking-wider flex items-center gap-2">
-                <Key className="w-4 h-4 text-purple-400" />
-                <span>Impersonación & Acceso Supremo</span>
-              </h3>
-              <div className="p-4 rounded-xl bg-purple-950/20 border border-purple-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div className="space-y-0.5">
-                  <div className="text-xs font-semibold text-purple-300 font-mono">
-                    Acceso como SuperAdmin de NanoLabs
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    {([
+                      { id: "ACTIVE", label: "Activo" },
+                      { id: "TRIAL", label: "En prueba" },
+                      { id: "SUSPENDED", label: "Suspendido" },
+                      { id: "CANCELED", label: "Cancelado" },
+                    ] as const).map((option) => (
+                      <button key={option.id} type="button" disabled={isUpdating}
+                        aria-pressed={activeTenant.status === option.id}
+                        onClick={() => handleUpdateStatus(activeTenant, option.id)}
+                        className={`min-h-11 rounded-xl border px-3 py-3 text-xs font-semibold transition-colors disabled:opacity-50 ${activeTenant.status === option.id
+                          ? "border-brand-cyan/50 bg-brand-cyan/15 text-brand-cyan"
+                          : "border-white/10 bg-white/[0.035] text-slate-300 hover:border-white/30 hover:bg-white/[0.06]"}`}>
+                        {option.label}
+                      </button>
+                    ))}
                   </div>
-                  <div className="text-[11px] text-gray-400 font-mono">
-                    Abre el portal del cliente con bypass administrativo y auditoría.
+                  <div className="rounded-xl border border-white/[0.08] bg-white/[0.025] p-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Plan asignado</div>
+                    <div className="mt-1.5 text-sm font-medium text-slate-100">{activeTenant.plan || "Sin plan"}</div>
+                    <p className="mt-2 text-xs text-slate-500">El plan se muestra en modo lectura; esta vista no modifica su facturación.</p>
                   </div>
                 </div>
-
-                <a
-                  href={`https://${activeTenant.domain}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="px-4 py-2 rounded-xl bg-brand-cyan text-black text-xs font-mono font-bold flex items-center gap-1.5 hover:bg-cyan-300 transition-all shadow-md"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>ENTRAR AL PORTAL</span>
-                </a>
-              </div>
+              )}
+              {tenantTab === "modules" && (
+                <div id="tenant-panel-modules" role="tabpanel" aria-labelledby="tenant-tab-modules" className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-semibold text-white">Funcionalidades contratadas</h3>
+                    <p className="mt-2 text-xs leading-5 text-slate-400">
+                      Activá o desactivá funciones para este cliente. Cada cambio se guarda en su base productiva.
+                    </p>
+                  </div>
+                  {Object.keys(activeTenant.modules).length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-center text-xs text-slate-400">
+                      No hay módulos configurables para este cliente.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {Object.entries(activeTenant.modules).map(([key, enabled]) => (
+                        <div key={key} className="flex min-h-[66px] items-center justify-between gap-4 rounded-xl border border-white/[0.08] bg-white/[0.025] px-4 py-3">
+                          <div className="min-w-0">
+                            <div className="text-xs font-semibold capitalize text-slate-100">{key.replace(/_/g, " ")}</div>
+                            <div className="mt-1 truncate text-[11px] text-slate-500" title={key}>{key}</div>
+                          </div>
+                          <button type="button" role="switch" aria-checked={enabled}
+                            aria-label={`${key.replace(/_/g, " ")}: ${enabled ? "activado" : "desactivado"}`}
+                            disabled={isUpdating}
+                            onClick={() => handleToggleModule(activeTenant, key, enabled)}
+                            className={`relative h-7 w-12 shrink-0 rounded-full border transition-colors disabled:opacity-50 ${enabled
+                              ? "border-[#9db5ff]/50 bg-[#6c86d7]"
+                              : "border-white/15 bg-[#3b4658]"}`}>
+                            <span aria-hidden="true" className={`absolute top-[3px] h-5 w-5 rounded-full bg-white shadow transition-all ${enabled ? "left-[23px]" : "left-[3px]"}`} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              {tenantTab === "access" && (
+                <div id="tenant-panel-access" role="tabpanel" aria-labelledby="tenant-tab-access" className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-semibold text-white">Portal del cliente</h3>
+                    <p className="mt-2 text-xs leading-5 text-slate-400">
+                      Abrí el sitio de esta empresa en una pestaña nueva.
+                      Este acceso no inicia sesión automáticamente ni cambia de identidad.
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-white/[0.08] bg-white/[0.025] p-4">
+                    <p className="break-all text-xs text-slate-400">https://{activeTenant.domain}</p>
+                    <a href={`https://${activeTenant.domain}`} target="_blank" rel="noopener noreferrer"
+                      className="mt-4 inline-flex items-center gap-2 rounded-xl bg-brand-cyan px-4 py-2.5 text-xs font-bold text-[#101827] hover:bg-[#bed0ff]">
+                      <ExternalLink className="h-4 w-4" /> Abrir portal
+                    </a>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Footer */}
-            <div className="pt-3 border-t border-white/10 flex justify-end">
-              <button
-                onClick={() => setActiveTenant(null)}
-                className="px-4 py-2 rounded-xl bg-surface-100 hover:bg-surface-50 text-xs font-mono text-gray-300 hover:text-white border border-white/10 transition-all"
-              >
-                Cerrar Ventana
+            <div className="flex items-center justify-between gap-3 border-t border-white/[0.08] px-5 py-3 sm:px-6">
+              <span role="status" aria-live="polite" className="text-[11px] text-slate-500">
+                {isUpdating ? "Guardando cambios…" : "Datos de la plataforma"}
+              </span>
+              <button type="button" disabled={isUpdating} onClick={() => setActiveTenant(null)}
+                className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-semibold text-slate-200 hover:bg-white/[0.08] disabled:opacity-50">
+                Cerrar
               </button>
             </div>
           </div>
