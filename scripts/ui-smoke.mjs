@@ -127,7 +127,7 @@ try {
         await dialog.getByRole("heading", { name: /de ejemplo/i }).waitFor();
         await page.getByRole("tab", { name: "Funcionalidades" }).click();
         await page.getByRole("switch", { name: /pedidos/i }).waitFor();
-        await page.screenshot({ path: `ui-screenshots/${device.name}-tenant-dialog.png`, fullPage: false });
+        await page.waitForTimeout(250); // Wait for the tab transition before snapshot.\n        await page.screenshot({ path: `ui-screenshots/${device.name}-tenant-dialog.png`, fullPage: false });
         await page.keyboard.press("Escape");
         await page.getByRole("dialog").waitFor({ state: "hidden" });
       }
@@ -136,7 +136,7 @@ try {
       await page.goto(origin, { waitUntil: "domcontentloaded" });
       await page.getByRole("button", { name: "Abrir navegación" }).click();
       await page.getByRole("navigation", { name: "Espacio de trabajo" }).getByRole("link", { name: /Clientes y SaaS/ }).waitFor();
-      await page.screenshot({ path: "ui-screenshots/mobile-navigation.png", fullPage: false });
+      await page.waitForTimeout(250); // Wait until the sidebar finishes sliding in.\n      await page.screenshot({ path: "ui-screenshots/mobile-navigation.png", fullPage: false });
     }
     if (errors.length) throw new Error(`${device.name} browser errors: ${errors.join("; ")}`);
     await context.close();
