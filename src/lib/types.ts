@@ -47,6 +47,8 @@ export interface ContainerInfo {
   memoryUsage?: string;
   deployedRevision?: string | null;
   imageId?: string | null;
+  exitCode?: number | null;
+  isJob?: boolean;
 }
 
 export interface AppInfo {
@@ -66,6 +68,8 @@ export interface AppInfo {
     remoteCommit?: string | null;
     remoteStatus?: "synced" | "different" | "unavailable" | "not_repo";
     remoteCheckedAt?: string | null;
+    remoteRef?: string | null;
+    localError?: string | null;
     remoteAhead?: number;
     remoteBehind?: number;
   };
@@ -79,9 +83,9 @@ export interface AppInfo {
     backupStatus?: "success" | "warning" | "error";
   };
   deployment?: { revision: string | null; imageId: string | null; status: "identified" | "unidentified" | "not_running" };
-  web?: { status: "online" | "restricted" | "offline" | "unknown"; httpStatus: number | null; latencyMs: number | null; checkedAt: string | null };
+  web?: { status: "online" | "restricted" | "http_error" | "offline" | "unknown"; httpStatus: number | null; latencyMs: number | null; checkedAt: string | null };
   hasDockerCompose: boolean;
-  status: "operational" | "degraded" | "down" | "deploying";
+  status: "operational" | "degraded" | "down" | "deploying" | "not_deployed";
 }
 
 export interface BackupRecord {
