@@ -16,6 +16,11 @@ import {
   Cloud,
   Clock,
   Sparkles,
+  Search,
+  ArrowRight,
+  X,
+  LoaderCircle,
+  CalendarClock,
 } from "lucide-react";
 import { BackupRecord } from "@/lib/types";
 import { KNOWN_APPS } from "@/lib/apps-registry";
@@ -30,6 +35,9 @@ export default function BackupsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedApp, setSelectedApp] = useState<string>("all");
   const [isTriggering, setIsTriggering] = useState<string | null>(null);
+  const [manualAppSlug, setManualAppSlug] = useState("nanolabshub");
+  const [manualSearch, setManualSearch] = useState("");
+  const [confirmBackupSlug, setConfirmBackupSlug] = useState<string | null>(null);
 
   // Terminal modal
   const [terminalOpen, setTerminalOpen] = useState(false);
@@ -59,13 +67,11 @@ export default function BackupsPage() {
 
   const handleTriggerBackup = async (slug: string) => {
     const appDef = KNOWN_APPS.find((a) => a.slug === slug);
-    if (!appDef) return;
-
-    if (!confirm(`¿Generar backup de ${appDef.name}? Se guardará una copia local y se verificará su integridad.`)) return;
-
+    if (!appDef || isTriggering) return;
+    setConfirmBackupSlug(null);
     setIsTriggering(slug);
     setTerminalTitle(`Generando Backup: ${appDef.name}`);
-    setTerminalOutput(`Ejecutando volcado consistente de base de datos (${appDef.dbType})...\nGenerando archivo comprimido .sql.gz en /opt/backups/${slug}...`);
+    setTerminalOutput(`Iniciando respaldo de ${appDef.name} (${appDef.dbType}).\nGenerando ${appDef.dbType === "sqlite" ? ".sqlite.gz" : ".sql.gz"} en /opt/backups/${slug}/...\nNo cierres la operación mientras se genera el archivo.`);
     setTerminalLoading(true);
     setTerminalOpen(true);
 
@@ -76,9 +82,9 @@ export default function BackupsPage() {
         body: JSON.stringify({ slug }),
       });
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success) {
         setTerminalOutput(`Backup creado y validado (gzip + SHA-256).\n\nArchivo: ${data.data.filename}\n\nSHA-256: ${data.data.checksum}\n\nNota: todavía no se probó una restauración en un entorno aislado.`);
-        fetchBackups();
+        void fetchBackups();
       } else {
         setTerminalOutput(`❌ Error generando backup:\n\n${data.error}`);
       }
@@ -107,6 +113,16 @@ export default function BackupsPage() {
       setScheduleSaving(null);
     }
   };
+
+  const manualApps = KNOWN_APPS.filter((app) =>
+    app.dbType !== "none" &&
+    (app.name.toLowerCase().includes(manualSearch.trim().toLowerCase()) ||
+     app.slug.toLowerCase().includes(manualSearch.trim().toLowerCase()))
+  );
+  const selectedManualApp = KNOWN_APPS.find((app) => app.slug === manualAppSlug && app.dbType !== "none");
+  const lastBackupFor = (slug: string) => backups
+    .filter((backup) => backup.appSlug === slug && backup.status === "verified")
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
 
   const filteredBackups = backups.filter(
     (b) => selectedApp === "all" || b.appSlug === selectedApp
@@ -179,34 +195,160 @@ export default function BackupsPage() {
           </div>
         </div>
 
-        {/* Manual Trigger Panel */}
-        <div className="hub-card p-4 space-y-3">
-          <div className="flex items-center justify-between border-b border-white/5 pb-2">
-            <h3 className="text-xs font-mono text-gray-300 font-semibold flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-brand-cyan" />
-              DISPARADOR MANUAL DE BACKUP POR APLICACIÓN
-            </h3>
-            <span className="text-[10px] text-gray-500 font-mono">
-              Verificación de archivo y hash · no implica restauración probada
+        {/* A single primary manual action: select an application, review it, then confirm. */}
+        <section aria-labelledby="manual-backup-title" className="hub-card overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.07] px-5 py-5 sm:px-6">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-brand-cyan/20 bg-brand-cyan/10">
+                <Database className="h-5 w-5 text-brand-cyan" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-cyan">Respaldo bajo demanda</p>
+                <h2 id="manual-backup-title" className="text-base font-bold tracking-tight text-white sm:text-lg">Generar backup manual</h2>
+                <p className="text-xs leading-5 text-slate-400">Elegí una aplicación, revisá sus datos y ejecutá una copia segura.</p>
+              </div>
+            </div>
+            <span className="rounded-lg border border-white/10 bg-white/[0.035] px-3 py-1.5 text-[11px] font-medium text-slate-300">
+              {KNOWN_APPS.filter((app) => app.dbType !== "none").length} bases configuradas
             </span>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            {KNOWN_APPS.filter((a) => a.dbType !== "none").map((app) => (
-              <button
-                key={app.slug}
-                onClick={() => handleTriggerBackup(app.slug)}
-                disabled={isTriggering === app.slug}
-                className="px-3 py-1.5 rounded-lg bg-surface-100/80 hover:bg-brand-cyan/15 hover:text-brand-cyan border border-white/10 hover:border-brand-cyan/30 text-xs font-mono text-gray-300 flex items-center gap-2 transition-all disabled:opacity-50"
-              >
-                <Play className="w-3 h-3 fill-current text-brand-cyan" />
-                <span>{app.name}</span>
-                <span className="text-[10px] text-gray-500 uppercase">({app.dbType})</span>
-              </button>
-            ))}
-          </div>
-        </div>
+          <div className="grid gap-0 xl:grid-cols-[minmax(0,1.55fr)_minmax(290px,1fr)]">
+            <div className="space-y-4 p-4 sm:p-6">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-xs font-semibold text-white"><span className="mr-2 text-brand-cyan">01</span>Seleccionar aplicación</p>
+                  <p className="mt-1 text-[11px] text-slate-500">Cada tarjeta identifica la base y el último respaldo íntegro.</p>
+                </div>
+                <label className="relative w-full sm:w-52">
+                  <span className="sr-only">Buscar aplicación para backup</span>
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                  <input type="search" value={manualSearch} onChange={(e) => setManualSearch(e.target.value)}
+                    placeholder="Buscar aplicación"
+                    className="w-full rounded-xl border border-white/10 bg-[#101b2b] py-2.5 pl-9 pr-3 text-xs text-white placeholder:text-slate-500 focus:border-brand-cyan/60 focus:outline-none"
+                  />
+                </label>
+              </div>
+              <div role="group" aria-label="Aplicaciones con base de datos" className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                {manualApps.map((app) => {
+                  const latest = lastBackupFor(app.slug);
+                  const active = manualAppSlug === app.slug;
+                  return (
+                    <button key={app.slug} type="button" aria-pressed={active}
+                      aria-label={\`Seleccionar \${app.name} para backup\`}
+                      onClick={() => setManualAppSlug(app.slug)}
+                      disabled={isTriggering !== null}
+                      className={\`group min-w-0 rounded-xl border p-3.5 text-left transition-all duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-cyan disabled:cursor-wait disabled:opacity-60 \${active
+                        ? "border-brand-cyan/60 bg-brand-cyan/[0.09] ring-1 ring-brand-cyan/20"
+                        : "border-white/[0.09] bg-white/[0.025] hover:border-white/25 hover:bg-white/[0.06]"}\`}>
+                      <span className="flex items-start justify-between gap-2">
+                        <span className={\`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg \${active ? "bg-brand-cyan/15 text-brand-cyan" : "bg-white/[0.06] text-slate-400"}\`}>
+                          <Database className="h-[18px] w-[18px]" />
+                        </span>
+                        <span aria-hidden="true" className={\`flex h-[18px] w-[18px] items-center justify-center rounded-full border \${active ? "border-brand-cyan bg-brand-cyan text-[#101827]" : "border-slate-600"}\`}>
+                          {active && <CheckCircle2 className="h-3.5 w-3.5" />}
+                        </span>
+                      </span>
+                      <span className="mt-3 block truncate text-[13px] font-semibold text-white">{app.name}</span>
+                      <span className="mt-1 flex flex-wrap items-center gap-2 text-[10px]">
+                        <span className="rounded-md border border-white/10 bg-white/[0.04] px-1.5 py-0.5 font-mono uppercase text-slate-300">{app.dbType}</span>
+                        <span className={latest ? "text-emerald-300" : "text-slate-500"}>{latest ? "Copia íntegra registrada" : "Sin copia verificada"}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+                {manualApps.length === 0 && (
+                  <p className="col-span-full rounded-xl border border-dashed border-white/15 p-6 text-center text-xs text-slate-400">
+                    No encontramos aplicaciones con ese nombre.
+                  </p>
+                )}
+              </div>
+            </div>
 
+            <aside className="flex min-w-0 flex-col justify-between gap-6 border-t border-white/[0.07] bg-[#111e30]/60 p-4 sm:p-6 xl:border-l xl:border-t-0">
+              <div className="space-y-5">
+                <div>
+                  <p className="text-xs font-semibold text-white"><span className="mr-2 text-brand-cyan">02</span>Confirmar respaldo</p>
+                  <p className="mt-1 text-[11px] text-slate-500">Solo se crea una copia; no se modifica la base original.</p>
+                </div>
+                {selectedManualApp && (
+                  <div className="space-y-4">
+                    <div className="rounded-xl border border-white/[0.09] bg-white/[0.035] p-4">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Aplicación seleccionada</p>
+                      <p className="mt-2 break-words text-lg font-bold tracking-tight text-white">{selectedManualApp.name}</p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <span className="rounded-md bg-brand-cyan/10 px-2 py-1 text-[11px] font-medium uppercase text-brand-cyan">{selectedManualApp.dbType}</span>
+                        <span className="rounded-md border border-white/10 px-2 py-1 text-[11px] text-slate-300">
+                          {selectedManualApp.dbType === "sqlite" ? "Archivo .sqlite.gz" : "Archivo .sql.gz"}
+                        </span>
+                      </div>
+                      <div className="mt-4 border-t border-white/[0.08] pt-3">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Último respaldo con integridad OK</p>
+                        {lastBackupFor(selectedManualApp.slug) ? (
+                          <p className="mt-1 text-xs font-medium text-emerald-300">{lastBackupFor(selectedManualApp.slug)?.createdAt}</p>
+                        ) : (
+                          <p className="mt-1 text-xs text-amber-200">Todavía no hay uno registrado.</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2.5 text-xs leading-5 text-slate-400">
+                      <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-brand-cyan" />
+                      <p>El Hub comprueba gzip y SHA-256. Para garantizar recuperación aún se necesita una restauración de prueba.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <button type="button" disabled={!selectedManualApp || isTriggering !== null || isLoading || !!pageError}
+                onClick={() => setConfirmBackupSlug(selectedManualApp?.slug || null)}
+                className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border border-brand-cyan/30 bg-brand-cyan px-4 py-3 text-sm font-bold text-[#0b1b2d] shadow-lg shadow-cyan-900/10 transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-cyan disabled:cursor-not-allowed disabled:opacity-40">
+                {isTriggering ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4 fill-current" />}
+                {isTriggering ? "Generando respaldo…" : "Generar backup ahora"}
+                {!isTriggering && <ArrowRight className="ml-auto h-4 w-4" />}
+              </button>
+            </aside>
+          </div>
+        </section>
+
+        {confirmBackupSlug && (() => {
+          const app = KNOWN_APPS.find((item) => item.slug === confirmBackupSlug);
+          if (!app) return null;
+          return (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4" role="dialog"
+              aria-modal="true" aria-labelledby="backup-confirm-title"
+              onKeyDown={(e) => { if (e.key === "Escape") setConfirmBackupSlug(null); }}>
+              <div className="w-full max-w-md space-y-4 rounded-2xl border border-white/15 bg-[#172235] p-5 shadow-2xl sm:p-6">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-xl bg-brand-cyan/15 p-2.5"><Database className="h-5 w-5 text-brand-cyan" /></div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-slate-400">Backup manual</p>
+                      <h3 id="backup-confirm-title" className="text-base font-bold text-white">Confirmar respaldo</h3>
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => setConfirmBackupSlug(null)} aria-label="Cerrar confirmación"
+                    className="rounded-lg p-1.5 text-slate-400 hover:bg-white/5 hover:text-white">
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-slate-950/25 p-4">
+                  <p className="font-semibold text-white">{app.name}</p>
+                  <p className="mt-1 text-xs text-slate-400">Motor: {app.dbType.toUpperCase()} · Destino: /opt/backups/{app.slug}/</p>
+                </div>
+                <p className="text-xs leading-5 text-slate-300">Se generará un nuevo archivo comprimido y se verificará su integridad. No se detendrá el servicio ni se restaurará información.</p>
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <button type="button" onClick={() => setConfirmBackupSlug(null)}
+                    className="min-h-11 rounded-xl border border-white/15 px-4 text-sm font-semibold text-slate-200 hover:bg-white/5">
+                    Cancelar
+                  </button>
+                  <button type="button" onClick={() => void handleTriggerBackup(app.slug)}
+                    className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-brand-cyan px-4 text-sm font-bold text-[#0b1b2d] hover:brightness-110">
+                    <Play className="h-4 w-4 fill-current" /> Sí, generar backup
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
         {pageError && (
           <div role="alert" className="rounded-lg border border-rose-400/30 bg-rose-400/10 p-3 text-sm text-rose-200">{pageError}</div>
         )}
