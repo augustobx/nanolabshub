@@ -1,19 +1,23 @@
 import { updateTenantStatusInDB } from "@/lib/saas-bridge";
 import { getDatabase } from "@/lib/db";
+import { requireMutatingSession } from "@/lib/action-security";
+import { SAAS_PRODUCTS } from "@/lib/product-taxonomy";
 import { SaaSSlug } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+  let actor: string;
+  try { actor = await requireMutatingSession(req); }
+  catch { return Response.json({ success: false, error: "Sesión o origen no autorizado" }, { status: 403 }); }
   try {
     const body = await req.json();
     const { saas, tenantId, status, tenantName } = body;
 
-    if (!saas || !tenantId || !status) {
-      return Response.json(
-        { success: false, error: "saas, tenantId and status are required" },
-        { status: 400 }
-      );
+    if (typeof saas !== "string" || !SAAS_PRODUCTS.some(p => p.slug === saas) ||
+        typeof tenantId !== "string" || !/^[a-zA-Z0-9_-]{1,90}$/.test(tenantId) ||
+        !["ACTIVE", "TRIAL", "SUSPENDED", "CANCELED"].includes(status)) {
+      return Response.json({ success: false, error: "Parámetros o estado de tenant inválidos" }, { status: 400 });
     }
 
     const result = await updateTenantStatusInDB(
@@ -25,7 +29,7 @@ export async function POST(req: Request) {
     // Record audit log
     try {
       getDatabase().logAudit(
-        "augusto",
+        actor,
         "TENANT_STATUS_UPDATE",
         `${saas.toUpperCase()}:${tenantName || tenantId}`,
         `Estado actualizado a ${status} en base de datos productiva`
