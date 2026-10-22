@@ -131,6 +131,12 @@ export function AppLifecycleControls({ app, onChanged }: { app: AppInfo; onChang
             <div className="flex items-center gap-2 text-amber-200"><ShieldAlert className="h-5 w-5" /><h3 className="text-base font-semibold">{selectedChoice.title}</h3></div>
             <p className="text-sm text-slate-300">{selectedChoice.help}</p>
             <p className="text-xs leading-5 text-slate-400">Aplicación: <strong className="text-white">{app.name}</strong>. Esta acción afecta producción. No elimina archivos, volúmenes Docker ni bases de datos. No modifica DNS ni Nginx Proxy Manager.</p>
+            <div className="rounded-lg border border-white/10 bg-slate-950/30 p-3 text-xs leading-5 text-slate-300">
+              <p className="font-semibold text-white">Contenedores afectados ({app.containers.length})</p>
+              {app.containers.length ? <p className="mt-1 break-words font-mono">{app.containers.map((c) => c.name).join(", ")}</p> :
+                <p className="mt-1 text-amber-200">No hay contenedores detectados; solo se registrará el estado administrativo.</p>}
+              {app.database?.type && app.database.type !== "none" && <p className="mt-1 text-amber-200">Motor de datos: {app.database.type}. La base no se elimina.</p>}
+            </div>
             {selected === "archive" && (
               <label className="flex items-start gap-3 rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 text-xs leading-5 text-amber-100">
                 <input type="checkbox" checked={backupAck} onChange={(e) => setBackupAck(e.target.checked)} className="mt-1" />
