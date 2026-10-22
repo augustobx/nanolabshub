@@ -236,39 +236,22 @@ export default function GovernancePage() {
         </div>
       )}
 
-      <div className="px-6 py-6 max-w-7xl w-full mx-auto space-y-6">
-        {/* Supreme Governance Banner */}
-        <div className="p-6 rounded-2xl bg-gradient-to-r from-purple-950/40 via-blue-950/30 to-brand-cyan/10 border border-purple-500/20 relative overflow-hidden shadow-lg">
-          <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <Crown className="w-6 h-6 text-amber-400" />
-                <h1 className="text-xl font-bold text-white tracking-tight">
-                  Supreme Governance · NanoLabsHUB
-                </h1>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-400/10 text-amber-300 border border-amber-400/20 font-semibold">
-                  CENTRALIZACIÓN SUPREMA
-                </span>
-              </div>
-              <p className="text-xs text-gray-300 max-w-3xl leading-relaxed">
-                Centro de mando supremo unificado. Conectado en tiempo real a las bases de datos productivas de
-                OnlyFood, OnlyPadel, OnlyCars, OnlyGym, OnlyTurn y OnlyERP. Los paneles individuales de administración
-                han sido absorbidos de forma definitiva en esta consola.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                onClick={fetchGovernance}
-                disabled={isLoading}
-                className="px-3.5 py-2 rounded-xl bg-surface-100 hover:bg-surface-50 text-gray-300 hover:text-white border border-white/10 text-xs font-mono font-medium flex items-center gap-2 transition-all"
-              >
-                <RotateCw className={`w-3.5 h-3.5 text-brand-cyan ${isLoading ? "animate-spin" : ""}`} />
-                <span>SINCRONIZAR DBs</span>
-              </button>
-            </div>
+      <div className="hub-content space-y-7">
+        <section className="hub-hero flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-3">
+            <p className="hub-eyebrow">Negocio / Clientes y SaaS</p>
+            <h1 className="hub-hero-title">Gestioná todo tu ecosistema SaaS.</h1>
+            <p className="hub-description">
+              Empresas, planes, estados, métricas y módulos de cada producto.
+              Todo conectado a una misma experiencia de administración.
+            </p>
           </div>
-        </div>
+          <button type="button" onClick={fetchGovernance} disabled={isLoading}
+            className="inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-xl border border-white/15 bg-white/[0.06] px-4 py-3 text-xs font-semibold text-slate-100 transition-colors hover:bg-white/10 disabled:opacity-50">
+            <RotateCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+            Sincronizar datos
+          </button>
+        </section>
 
         {/* Global KPIs */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -277,7 +260,7 @@ export default function GovernancePage() {
               <Building2 className="w-3.5 h-3.5 text-brand-cyan" />
               SaaS Conectados
             </span>
-            <div className="text-2xl font-bold text-white font-mono">{data ? data.saasCount : 6}</div>
+            <div className="text-2xl font-bold text-white font-mono">{data ? data.saasCount : "—"}</div>
             <div className="text-[10px] text-gray-500 font-mono">Bases de datos vivas</div>
           </div>
 
@@ -379,7 +362,7 @@ export default function GovernancePage() {
         </div>
 
         {/* Universal Tenants Fleet Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filteredTenants.length === 0 ? (
             <div className="col-span-full hub-card p-12 text-center space-y-3">
               <Building2 className="w-10 h-10 text-gray-600 mx-auto" />
@@ -495,19 +478,19 @@ export default function GovernancePage() {
         </div>
 
         {/* Phase 6: Legacy Standalone Panels Sunset Architecture */}
-        <div className="hub-card p-6 space-y-4 border-amber-500/20 bg-surface-50/40">
+        <div className="hub-card p-6 space-y-4">
           <div className="flex items-center justify-between border-b border-white/5 pb-3">
             <div>
               <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
                 <Shield className="w-5 h-5 text-amber-400" />
-                <span>Fase 6: Consolidación Definitiva & Sunset de Paneles Legacy</span>
+                <span>Consolidación de paneles anteriores</span>
               </h2>
               <p className="text-xs text-gray-400 font-mono mt-0.5">
                 Redirección de accesos /admin y /superadmin hacia la consola central NanoLabsHUB
               </p>
             </div>
             <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">
-              GOBERNANZA SUPREMA ACTIVA
+              Vista de migración
             </span>
           </div>
 
@@ -516,9 +499,9 @@ export default function GovernancePage() {
               <thead className="bg-surface-100/60 text-gray-400 uppercase text-[10px] tracking-wider border-b border-white/5">
                 <tr>
                   <th className="py-2.5 px-3">SaaS Plataforma</th>
-                  <th className="py-2.5 px-3">Ruta Legacy Desmantelada</th>
+                  <th className="py-2.5 px-3">Panel anterior</th>
                   <th className="py-2.5 px-3">Estado de Migración</th>
-                  <th className="py-2.5 px-3">Destino Central NanoLabsHUB</th>
+                  <th className="py-2.5 px-3">Destino en NanoLabs Hub</th>
                   <th className="py-2.5 px-3">Alcance Operativo</th>
                 </tr>
               </thead>
@@ -534,7 +517,7 @@ export default function GovernancePage() {
                     </td>
                     <td className="py-3 px-3">
                       <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                        ABSORBIDO EN HUB
+                        {panel.sunsetStatus === "redirected_to_hub" ? "Redirigido" : panel.sunsetStatus === "active_deprecated" ? "En transición" : "Planificado"}
                       </span>
                     </td>
                     <td className="py-3 px-3 text-brand-cyan">
