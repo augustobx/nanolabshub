@@ -24,7 +24,7 @@ export const NAV_GROUPS = [
   ] },
   { title: "Plataforma", items: [
     { name: "Operación técnica", href: "/operations", icon: Activity, description: "Docker, Git y acciones avanzadas" },
-    { name: "Infraestructura", href: "/hardware", icon: ServerCog, description: "Servidor y recursos" },
+    { name: "Infraestructura", href: "/infrastructure", icon: ServerCog, description: "Host y componentes clasificados" },
     { name: "Backups", href: "/backups", icon: DatabaseBackup, description: "Protección de datos" },
     { name: "Red y dominios", href: "/networking", icon: Globe2, description: "Red y certificados" },
   ] },
