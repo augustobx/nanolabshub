@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Header } from "@/components/Header";
 import { TerminalModal } from "@/components/TerminalModal";
 import {
@@ -31,6 +31,8 @@ export default function SoftwarePage() {
   const [terminalTitle, setTerminalTitle] = useState("");
   const [terminalOutput, setTerminalOutput] = useState("");
   const [terminalLoading, setTerminalLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchApps = async () => {
     setIsLoading(true);
@@ -49,22 +51,52 @@ export default function SoftwarePage() {
     fetchApps();
   }, []);
 
-  const handleOpenLogs = async (containerName: string) => {
-    setTerminalTitle(`Logs de contenedor: ${containerName}`);
-    setTerminalOutput("Cargando logs...");
+  const handleStopStream = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsStreaming(false);
+    setTerminalLoading(false);
+  };
+
+  const handleOpenStreamingLogs = async (containerName: string) => {
+    handleStopStream();
+    setTerminalTitle(`Logs en Vivo: ${containerName}`);
+    setTerminalOutput(`Conectando con contenedor ${containerName}...\n`);
     setTerminalLoading(true);
+    setIsStreaming(true);
     setTerminalOpen(true);
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
-      const res = await fetch(`/api/apps/logs?container=${encodeURIComponent(containerName)}&lines=200`);
-      const data = await res.json();
-      if (data.success) {
-        setTerminalOutput(data.data.logs);
-      } else {
-        setTerminalOutput(`Error: ${data.error}`);
+      const res = await fetch(`/api/apps/logs/stream?container=${encodeURIComponent(containerName)}&lines=150`, {
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      setTerminalLoading(false);
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          setTerminalOutput((prev) => prev + decoder.decode(value, { stream: true }));
+        }
       }
     } catch (err: any) {
-      setTerminalOutput(`Error: ${err.message}`);
+      if (err.name !== "AbortError") {
+        setTerminalOutput((prev) => `${prev}\n[ERROR]: ${err.message}`);
+      }
     } finally {
+      setIsStreaming(false);
       setTerminalLoading(false);
     }
   };
@@ -74,6 +106,7 @@ export default function SoftwarePage() {
     setTerminalTitle(`Reiniciando ${containerName}`);
     setTerminalOutput("Enviando orden a Docker...");
     setTerminalLoading(true);
+    setIsStreaming(false);
     setTerminalOpen(true);
     try {
       const res = await fetch("/api/apps/restart", {
@@ -95,28 +128,46 @@ export default function SoftwarePage() {
     }
   };
 
-  const handleDeploy = async (app: AppInfo) => {
+  const handleStreamingDeploy = async (app: AppInfo) => {
     if (!confirm(`¿Desplegar ${app.name}? (git pull && docker compose up -d --build)`)) return;
-    setTerminalTitle(`Desplegando: ${app.name}`);
-    setTerminalOutput(`Iniciando compilación en ${app.path}...\nEspere mientras se completa el build...`);
+
+    handleStopStream();
+    setTerminalTitle(`Desplegando en Vivo: ${app.name}`);
+    setTerminalOutput("");
     setTerminalLoading(true);
+    setIsStreaming(true);
     setTerminalOpen(true);
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
-      const res = await fetch("/api/apps/deploy", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug: app.slug }),
+      const res = await fetch(`/api/apps/deploy/stream?slug=${encodeURIComponent(app.slug)}`, {
+        signal: controller.signal,
       });
-      const data = await res.json();
-      if (data.success) {
-        setTerminalOutput(`🚀 DESPLIEGUE FINALIZADO:\n\n${data.data.output}`);
-        fetchApps();
-      } else {
-        setTerminalOutput(`❌ Error en despliegue:\n\n${data.error}`);
+
+      if (!res.ok) {
+        throw new Error(await res.text());
       }
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      setTerminalLoading(false);
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          setTerminalOutput((prev) => prev + decoder.decode(value, { stream: true }));
+        }
+      }
+      fetchApps();
     } catch (err: any) {
-      setTerminalOutput(`Error: ${err.message}`);
+      if (err.name !== "AbortError") {
+        setTerminalOutput((prev) => `${prev}\n[ERROR]: ${err.message}`);
+      }
     } finally {
+      setIsStreaming(false);
       setTerminalLoading(false);
     }
   };
@@ -228,12 +279,12 @@ export default function SoftwarePage() {
                 <div className="flex items-center gap-2">
                   {app.containers.length > 0 && (
                     <button
-                      onClick={() => handleOpenLogs(app.containers[0].name)}
+                      onClick={() => handleOpenStreamingLogs(app.containers[0].name)}
                       className="px-3 py-1.5 rounded-lg bg-surface-100 hover:bg-surface-50 text-gray-300 hover:text-white border border-white/10 text-xs font-mono flex items-center gap-1.5 transition-colors"
-                      title="Ver logs de contenedor principal"
+                      title="Ver logs en vivo (streaming)"
                     >
                       <Terminal className="w-3.5 h-3.5 text-brand-cyan" />
-                      <span>LOGS</span>
+                      <span>LOGS EN VIVO</span>
                     </button>
                   )}
                   {app.containers[0] && (
@@ -248,11 +299,11 @@ export default function SoftwarePage() {
                   )}
                   {app.hasDockerCompose && (
                     <button
-                      onClick={() => handleDeploy(app)}
+                      onClick={() => handleStreamingDeploy(app)}
                       className="px-3 py-1.5 rounded-lg bg-brand-cyan/15 hover:bg-brand-cyan/25 text-brand-cyan border border-brand-cyan/30 text-xs font-mono font-semibold flex items-center gap-1.5 transition-all shadow-glow"
                     >
                       <Play className="w-3.5 h-3.5 fill-current" />
-                      <span>REBUILD / PULL</span>
+                      <span>STREAM DEPLOY</span>
                     </button>
                   )}
                 </div>
@@ -329,9 +380,9 @@ export default function SoftwarePage() {
                     {app.containers.map((c) => (
                       <button
                         key={c.name}
-                        onClick={() => handleOpenLogs(c.name)}
+                        onClick={() => handleOpenStreamingLogs(c.name)}
                         className="text-[11px] px-2 py-0.5 rounded bg-white/[0.03] hover:bg-brand-cyan/15 hover:text-brand-cyan border border-white/5 text-gray-300 flex items-center gap-1.5 transition-colors"
-                        title={`Click para inspeccionar logs de ${c.name}`}
+                        title={`Click para inspeccionar logs en vivo de ${c.name}`}
                       >
                         <span
                           className={`w-1.5 h-1.5 rounded-full ${
@@ -352,10 +403,15 @@ export default function SoftwarePage() {
 
       <TerminalModal
         isOpen={terminalOpen}
-        onClose={() => setTerminalOpen(false)}
+        onClose={() => {
+          handleStopStream();
+          setTerminalOpen(false);
+        }}
         title={terminalTitle}
         output={terminalOutput}
         isLoading={terminalLoading}
+        isStreaming={isStreaming}
+        onStopStream={handleStopStream}
       />
     </div>
   );

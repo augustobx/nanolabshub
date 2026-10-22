@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Header } from "@/components/Header";
+import { TerminalModal } from "@/components/TerminalModal";
 import {
   Cpu,
   Layers,
@@ -14,22 +15,40 @@ import {
   AlertTriangle,
   RotateCw,
   Terminal,
+  Trash2,
+  TrendingUp,
+  Sparkles,
 } from "lucide-react";
 import { ServerMetrics, ContainerInfo } from "@/lib/types";
 
 export default function HardwarePage() {
   const [metrics, setMetrics] = useState<ServerMetrics | null>(null);
   const [containers, setContainers] = useState<ContainerInfo[]>([]);
+  const [history, setHistory] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Terminal modal for safe prune
+  const [terminalOpen, setTerminalOpen] = useState(false);
+  const [terminalTitle, setTerminalTitle] = useState("");
+  const [terminalOutput, setTerminalOutput] = useState("");
+  const [terminalLoading, setTerminalLoading] = useState(false);
 
   const fetchMetrics = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("/api/telemetry");
-      const data = await res.json();
-      if (data.success) {
-        setMetrics(data.data.telemetry);
-        setContainers(data.data.containers);
+      const [resTelem, resHist] = await Promise.all([
+        fetch("/api/telemetry"),
+        fetch("/api/telemetry/history?limit=30"),
+      ]);
+      const dataTelem = await resTelem.json();
+      const dataHist = await resHist.json();
+
+      if (dataTelem.success) {
+        setMetrics(dataTelem.data.telemetry);
+        setContainers(dataTelem.data.containers);
+      }
+      if (dataHist.success) {
+        setHistory(dataHist.data || []);
       }
     } finally {
       setIsLoading(false);
@@ -38,23 +57,63 @@ export default function HardwarePage() {
 
   useEffect(() => {
     fetchMetrics();
-    const interval = setInterval(fetchMetrics, 15000);
+    const interval = setInterval(fetchMetrics, 20000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleSafePrune = async () => {
+    if (
+      !confirm(
+        "🧹 LIMPIEZA SEGURA DE DOCKER:\n\nSe eliminarán únicamente imágenes huérfanas (<none>) y caché temporal de compilación anterior.\n\n⚠️ Los volúmenes persistentes y datos de bases de datos NO se tocan.\n\n¿Continuar?"
+      )
+    )
+      return;
+
+    setTerminalTitle("Limpieza Segura de Imágenes Docker");
+    setTerminalOutput("Ejecutando limpieza segura de imágenes huérfanas...\nPor favor espere...");
+    setTerminalLoading(true);
+    setTerminalOpen(true);
+
+    try {
+      const res = await fetch("/api/docker/prune", { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        setTerminalOutput(`✅ LIMPIEZA SEGURA FINALIZADA:\n\n${data.data.output}`);
+        fetchMetrics();
+      } else {
+        setTerminalOutput(`❌ Error durante la limpieza:\n\n${data.error}`);
+      }
+    } catch (err: any) {
+      setTerminalOutput(`Error: ${err.message}`);
+    } finally {
+      setTerminalLoading(false);
+    }
+  };
 
   return (
     <div className="flex-1 flex flex-col pb-12">
       <Header onRefresh={fetchMetrics} isRefreshing={isLoading} />
 
       <div className="px-6 py-6 max-w-7xl w-full mx-auto space-y-6">
-        <div>
-          <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-            <Cpu className="w-5 h-5 text-brand-cyan" />
-            <span>Hardware & Infraestructura del Servidor</span>
-          </h1>
-          <p className="text-xs text-gray-400 font-mono mt-0.5">
-            Dedicado Debian GNU/Linux 13 · IP: 149.50.159.163 · DattaWeb Datacenter
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+              <Cpu className="w-5 h-5 text-brand-cyan" />
+              <span>Hardware, Infraestructura & Tendencias</span>
+            </h1>
+            <p className="text-xs text-gray-400 font-mono mt-0.5">
+              Dedicado Debian GNU/Linux 13 · 149.50.159.163 · DattaWeb Datacenter
+            </p>
+          </div>
+
+          <button
+            onClick={handleSafePrune}
+            className="px-3.5 py-2 rounded-xl bg-surface-100 hover:bg-surface-50 text-gray-300 hover:text-white border border-white/10 text-xs font-mono font-medium flex items-center gap-2 transition-all shadow-sm"
+            title="Elimina imágenes huérfanas <none> sin tocar volúmenes de datos"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-amber-400" />
+            <span>LIMPIEZA SEGURA DOCKER</span>
+          </button>
         </div>
 
         {/* Primary Hardware Gauges */}
@@ -95,7 +154,7 @@ export default function HardwarePage() {
                 />
               </div>
               <div className="flex justify-between text-[11px] font-mono text-gray-500 pt-1">
-                <span>Load Avg 1m: {metrics ? metrics.cpu.loadAvg[0] : "---"}</span>
+                <span>Load 1m: {metrics ? metrics.cpu.loadAvg[0] : "---"}</span>
                 <span>5m: {metrics ? metrics.cpu.loadAvg[1] : "---"}</span>
                 <span>15m: {metrics ? metrics.cpu.loadAvg[2] : "---"}</span>
               </div>
@@ -218,6 +277,45 @@ export default function HardwarePage() {
           </div>
         </div>
 
+        {/* Historical Telemetry Snapshot Bars */}
+        <div className="hub-card p-5 space-y-3">
+          <div className="flex items-center justify-between border-b border-white/5 pb-2">
+            <h3 className="text-xs font-mono text-gray-300 font-semibold flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-brand-cyan" />
+              TENDENCIAS HISTÓRICAS DE CONSUMO (ÚLTIMAS LECTURAS)
+            </h3>
+            <span className="text-[10px] text-gray-500 font-mono">
+              Persistido en SQLite /app/data
+            </span>
+          </div>
+
+          <div className="space-y-3 pt-2">
+            <div className="flex items-end gap-1.5 h-20 bg-surface-100/40 p-2 rounded-lg border border-white/5">
+              {history.length === 0 ? (
+                <div className="w-full text-center text-gray-500 text-xs font-mono self-center">
+                  Registrando primeras lecturas de telemetría histórica...
+                </div>
+              ) : (
+                history.map((h, i) => (
+                  <div
+                    key={i}
+                    className="flex-1 bg-gradient-to-t from-brand-cyan/20 to-brand-cyan hover:from-cyan-400 hover:to-brand-cyan rounded-t transition-all group relative"
+                    style={{ height: `${Math.max(8, Math.min(100, h.cpu_usage || 10))}%` }}
+                  >
+                    <div className="opacity-0 group-hover:opacity-100 absolute -top-8 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-black text-[9px] text-brand-cyan font-mono border border-brand-cyan/30 pointer-events-none whitespace-nowrap z-20">
+                      {h.cpu_usage}% CPU · {h.timestamp ? h.timestamp.split("T")[1]?.slice(0, 5) : ""}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="flex justify-between text-[10px] font-mono text-gray-500 px-1">
+              <span>Lecturas iniciales</span>
+              <span>Tiempo real (Momento actual)</span>
+            </div>
+          </div>
+        </div>
+
         {/* Live Docker Containers Fleet Table */}
         <div className="hub-card p-5 space-y-4">
           <div className="flex items-center justify-between border-b border-white/5 pb-3">
@@ -287,6 +385,14 @@ export default function HardwarePage() {
           </div>
         </div>
       </div>
+
+      <TerminalModal
+        isOpen={terminalOpen}
+        onClose={() => setTerminalOpen(false)}
+        title={terminalTitle}
+        output={terminalOutput}
+        isLoading={terminalLoading}
+      />
     </div>
   );
 }

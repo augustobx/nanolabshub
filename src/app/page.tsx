@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Header } from "@/components/Header";
 import { TerminalModal } from "@/components/TerminalModal";
 import {
@@ -21,6 +21,8 @@ import {
   CheckCircle2,
   GitBranch,
   Crown,
+  Trash2,
+  TrendingUp,
 } from "lucide-react";
 import Link from "next/link";
 import { ServerMetrics, ContainerInfo, AppInfo } from "@/lib/types";
@@ -37,6 +39,8 @@ export default function MissionControlPage() {
   const [terminalTitle, setTerminalTitle] = useState("");
   const [terminalOutput, setTerminalOutput] = useState("");
   const [terminalLoading, setTerminalLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchAllData = async () => {
     setIsLoading(true);
@@ -73,22 +77,101 @@ export default function MissionControlPage() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleOpenLogs = async (containerName: string) => {
-    setTerminalTitle(`Logs de contenedor: ${containerName}`);
-    setTerminalOutput("Cargando logs desde el servidor...");
+  const handleStopStream = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsStreaming(false);
+    setTerminalLoading(false);
+  };
+
+  const handleOpenStreamingLogs = async (containerName: string) => {
+    handleStopStream();
+    setTerminalTitle(`Logs en Vivo: ${containerName}`);
+    setTerminalOutput(`Conectando con Docker daemon...\n`);
     setTerminalLoading(true);
+    setIsStreaming(true);
     setTerminalOpen(true);
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
-      const res = await fetch(`/api/apps/logs?container=${encodeURIComponent(containerName)}&lines=150`);
-      const data = await res.json();
-      if (data.success) {
-        setTerminalOutput(data.data.logs);
-      } else {
-        setTerminalOutput(`Error obteniendo logs: ${data.error}`);
+      const res = await fetch(`/api/apps/logs/stream?container=${encodeURIComponent(containerName)}&lines=120`, {
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      setTerminalLoading(false);
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          setTerminalOutput((prev) => prev + decoder.decode(value, { stream: true }));
+        }
       }
     } catch (err: any) {
-      setTerminalOutput(`Error de conexión: ${err.message}`);
+      if (err.name !== "AbortError") {
+        setTerminalOutput((prev) => `${prev}\n[ERROR STREAM]: ${err.message}`);
+      }
     } finally {
+      setIsStreaming(false);
+      setTerminalLoading(false);
+    }
+  };
+
+  const handleStreamingDeploy = async (app: AppInfo) => {
+    if (
+      !confirm(
+        `🚨 ATENCIÓN GOVERNANCE:\n¿Deseas ejecutar git pull y rebuild de "${app.name}" en producción?`
+      )
+    )
+      return;
+
+    handleStopStream();
+    setTerminalTitle(`Desplegando en Vivo: ${app.name}`);
+    setTerminalOutput("");
+    setTerminalLoading(true);
+    setIsStreaming(true);
+    setTerminalOpen(true);
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    try {
+      const res = await fetch(`/api/apps/deploy/stream?slug=${encodeURIComponent(app.slug)}`, {
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      setTerminalLoading(false);
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          setTerminalOutput((prev) => prev + decoder.decode(value, { stream: true }));
+        }
+      }
+      fetchAllData();
+    } catch (err: any) {
+      if (err.name !== "AbortError") {
+        setTerminalOutput((prev) => `${prev}\n[ERROR]: ${err.message}`);
+      }
+    } finally {
+      setIsStreaming(false);
       setTerminalLoading(false);
     }
   };
@@ -98,6 +181,7 @@ export default function MissionControlPage() {
     setTerminalTitle(`Reiniciando: ${containerName}`);
     setTerminalOutput(`Enviando orden de reinicio a Docker...`);
     setTerminalLoading(true);
+    setIsStreaming(false);
     setTerminalOpen(true);
     try {
       const res = await fetch("/api/apps/restart", {
@@ -111,40 +195,6 @@ export default function MissionControlPage() {
         fetchAllData();
       } else {
         setTerminalOutput(`❌ Error reiniciando contenedor:\n\n${data.error}`);
-      }
-    } catch (err: any) {
-      setTerminalOutput(`Error: ${err.message}`);
-    } finally {
-      setTerminalLoading(false);
-    }
-  };
-
-  const handleDeploy = async (app: AppInfo) => {
-    if (
-      !confirm(
-        `🚨 ATENCIÓN GOVERNANCE:\n¿Deseas ejecutar git pull y rebuild de "${app.name}" en producción?`
-      )
-    )
-      return;
-
-    setTerminalTitle(`Desplegando: ${app.name}`);
-    setTerminalOutput(
-      `Iniciando despliegue de ${app.name}...\nEjecutando git pull && docker compose up -d --build...`
-    );
-    setTerminalLoading(true);
-    setTerminalOpen(true);
-    try {
-      const res = await fetch("/api/apps/deploy", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug: app.slug }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setTerminalOutput(`🚀 DESPLIEGUE FINALIZADO EXITOSAMENTE:\n\n${data.data.output}`);
-        fetchAllData();
-      } else {
-        setTerminalOutput(`❌ ERROR EN EL DESPLIEGUE:\n\n${data.error}`);
       }
     } catch (err: any) {
       setTerminalOutput(`Error: ${err.message}`);
@@ -407,9 +457,9 @@ export default function MissionControlPage() {
                           app.containers.map((c) => (
                             <button
                               key={c.name}
-                              onClick={() => handleOpenLogs(c.name)}
+                              onClick={() => handleOpenStreamingLogs(c.name)}
                               className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/[0.04] hover:bg-brand-cyan/10 hover:text-brand-cyan border border-white/5 text-gray-300 transition-colors flex items-center gap-1"
-                              title="Click para ver logs"
+                              title="Click para ver logs en vivo (streaming)"
                             >
                               <span>{c.name}</span>
                               <Terminal className="w-2.5 h-2.5 text-gray-500" />
@@ -449,11 +499,11 @@ export default function MissionControlPage() {
 
                     {app.hasDockerCompose && (
                       <button
-                        onClick={() => handleDeploy(app)}
+                        onClick={() => handleStreamingDeploy(app)}
                         className="px-2.5 py-1 rounded bg-brand-cyan/10 hover:bg-brand-cyan/20 text-brand-cyan border border-brand-cyan/30 text-[10px] font-mono font-medium transition-all flex items-center gap-1 shadow-glow"
                       >
                         <Play className="w-3 h-3 fill-current" />
-                        <span>DEPLOY</span>
+                        <span>STREAM DEPLOY</span>
                       </button>
                     )}
                   </div>
@@ -466,16 +516,15 @@ export default function MissionControlPage() {
 
       <TerminalModal
         isOpen={terminalOpen}
-        onClose={() => setTerminalOpen(false)}
+        onClose={() => {
+          handleStopStream();
+          setTerminalOpen(false);
+        }}
         title={terminalTitle}
         output={terminalOutput}
         isLoading={terminalLoading}
-        onRefresh={() => {
-          if (terminalTitle.includes("Logs de contenedor")) {
-            const containerName = terminalTitle.split(": ")[1];
-            if (containerName) handleOpenLogs(containerName);
-          }
-        }}
+        isStreaming={isStreaming}
+        onStopStream={handleStopStream}
       />
     </div>
   );

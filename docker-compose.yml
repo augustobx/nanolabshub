@@ -15,10 +15,12 @@ services:
       - ADMIN_USER=${ADMIN_USER:-augusto}
       - ADMIN_PASS=${ADMIN_PASS:-Qap.1029Qap.1029}
       - HUB_MASTER_KEY=${HUB_MASTER_KEY:-nanolabs_governance_supreme_2026}
+      - DATA_DIR=/app/data
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/apps:/opt/apps
       - /opt/backups:/opt/backups
+      - /opt/apps/nanolabshub/data:/app/data
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
     networks:
