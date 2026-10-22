@@ -4,6 +4,7 @@ export interface ServerMetrics {
   osInfo: string;
   cpu: {
     cores: number;
+    model?: string | null;
     usagePercent: number;
     loadAvg: [number, number, number];
   };
