@@ -210,10 +210,10 @@ export default function HardwarePage() {
             <div className="space-y-2">
               <div className="text-xs text-gray-400">Modelo:</div>
               <div className="text-sm font-bold text-white font-mono">
-                12th Gen Intel(R) Core(TM) i5-12400
+                {metrics?.cpu.model || "Modelo no disponible"}
               </div>
               <div className="text-xs text-gray-500 font-mono">
-                Arquitectura: x86_64 · 6 Cores / 12 Hilos
+                {metrics?.cpu.cores ? `${metrics.cpu.cores} procesadores lógicos · lectura del host` : "Cantidad de procesadores no disponible"}
               </div>
             </div>
 
@@ -246,7 +246,7 @@ export default function HardwarePage() {
                 MEMORIA RAM & SWAP
               </span>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">
-                DDR4
+                RAM / SWAP
               </span>
             </div>
 
@@ -304,20 +304,20 @@ export default function HardwarePage() {
             <div className="flex items-center justify-between border-b border-white/5 pb-3">
               <span className="text-xs font-mono text-gray-400 flex items-center gap-2">
                 <HardDrive className="w-4 h-4 text-emerald-400" />
-                DISCO NVMe PRODUCTIVO
+                ALMACENAMIENTO DEL HOST
               </span>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                PCIe Gen4
+                Disco
               </span>
             </div>
 
             <div className="space-y-2">
-              <div className="text-xs text-gray-400">Partición Raíz & Docker:</div>
+              <div className="text-xs text-gray-400">Filesystem monitorizado:</div>
               <div className="text-sm font-bold text-white font-mono">
-                /dev/nvme0n1p3 sobre /
+                {metrics?.disks[0]?.filesystem || "No informado"}
               </div>
               <div className="text-xs text-gray-500 font-mono">
-                Montajes compartidos: /opt, /srv, /var/lib/docker
+                {metrics?.disks[0]?.mount ? `Montaje analizado: ${metrics.disks[0].mount}` : "Montaje sin información"}
               </div>
             </div>
 
