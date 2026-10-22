@@ -34,7 +34,10 @@ function WebBadge({ app }: { app: AppInfo }) {
   }
 }
 function GitBadge({ app }: { app: AppInfo }) {
-  if (app.git.remoteStatus === "synced") return <Pill text={app.git.remoteRef === "HEAD" ? "Coincide con HEAD remoto" : "Git sincronizado"} tone="good" />;
+  if (app.git.remoteStatus === "synced" && app.git.dirtyFilesCount > 0) {
+    return <Pill text={`Mismo commit · ${app.git.dirtyFilesCount} cambios locales`} tone="warn" />;
+  }
+  if (app.git.remoteStatus === "synced") return <Pill text={app.git.remoteRef === "HEAD" ? "Coincide con HEAD remoto" : "Mismo commit remoto"} tone="good" />;
   if (app.git.remoteStatus === "different") return <Pill text={app.git.remoteRef === "HEAD" ? "Distinto al HEAD remoto" : "Commits diferentes"} tone="warn" />;
   if (app.git.remoteStatus === "not_repo") return <Pill text="Sin Git local" />;
   return <span title={app.git.remoteError || app.git.localError || "No se pudo confirmar el commit remoto"}><Pill text={app.git.localError ? "Revisar Git local" : app.git.remoteError ? "Remoto no consultable" : "Git remoto no accesible"} /></span>;
@@ -138,21 +141,24 @@ export function OperationsDashboard() {
   const unhealthy = containers.filter((c) => c.health === "unhealthy" ||
     (c.state === "exited" && !(c.isJob && c.exitCode === 0))).length;
   const gitDiff = apps.filter((a) => a.git.remoteStatus === "different").length;
+  const dirtyGitApps = apps.filter((a) => a.git.isRepo && a.git.dirtyFilesCount > 0).length;
+  const gitReview = apps.filter((a) => a.git.remoteStatus === "different" || a.git.dirtyFilesCount > 0).length;
   const websitesDown = apps.filter((a) => a.web?.status === "offline").length;
   const websitesWithHttpErrors = apps.filter((a) => a.web?.status === "http_error").length;
   const attention = apps.filter((app) =>
-    app.git.remoteStatus === "different" || app.web?.status === "offline" || app.web?.status === "http_error" ||
+    app.git.remoteStatus === "different" || app.git.dirtyFilesCount > 0 || app.web?.status === "offline" || app.web?.status === "http_error" ||
     app.status === "down" || app.status === "degraded"
   ).length;
 
   const filtered = useMemo(() => apps.filter((app) => {
-    if (scope === "attention" && !(app.git.remoteStatus === "different" || app.web?.status === "offline" ||
+    if (scope === "attention" && !(app.git.remoteStatus === "different" || app.git.dirtyFilesCount > 0 || app.web?.status === "offline" ||
       app.web?.status === "http_error" || app.status === "down" || app.status === "degraded")) return false;
     const query = search.trim().toLocaleLowerCase("es");
     return !query || [app.name, app.slug, app.path].some((text) => text.toLocaleLowerCase("es").includes(query));
   }).sort((a, b) => {
     const priority = (app: AppInfo) => Number(app.web?.status === "offline") * 4 + Number(app.web?.status === "http_error") * 2 +
-      Number(app.status === "down") * 3 + Number(app.git.remoteStatus === "different") * 2;
+      Number(app.status === "down") * 3 + Number(app.git.remoteStatus === "different") * 2 +
+      Number(app.git.dirtyFilesCount > 0);
     return priority(b) - priority(a) || a.name.localeCompare(b.name, "es");
   }), [apps, search, scope]);
 
@@ -213,8 +219,8 @@ export function OperationsDashboard() {
             detail={snapshot ? `${apps.filter((a) => a.status === "operational").length} con contenedores operativos` : "Consultando inventario"} />
           <Metric label="Contenedores activos" icon={Server} value={snapshot ? `${running} / ${containers.length}` : "—"}
             detail={snapshot ? `${unhealthy} detenidos o no saludables` : "Consultando Docker"} warning={unhealthy > 0} />
-          <Metric label="Diferencias Git" icon={GitBranch} value={snapshot ? String(gitDiff) : "—"}
-            detail="Solo repositorios con remoto consultado" warning={gitDiff > 0} />
+          <Metric label="Git por revisar" icon={GitBranch} value={snapshot ? String(gitReview) : "—"}
+            detail={`${gitDiff} commits distintos · ${dirtyGitApps} con cambios locales`} warning={gitReview > 0} />
           <Metric label="Webs sin respuesta" icon={Wifi} value={snapshot ? String(websitesDown) : "—"}
             detail={`Fallos de conexión · ${websitesWithHttpErrors} respuestas HTTP anómalas`} warning={websitesDown > 0 || websitesWithHttpErrors > 0} />
         </section>
