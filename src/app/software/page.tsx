@@ -341,20 +341,54 @@ export default function SoftwarePage() {
               </div>
 
               {/* Git & Stack Status Bar */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-3 border-t border-white/5 font-mono text-xs">
+              <div className="grid grid-cols-1 gap-3 border-t border-white/5 pt-3 text-xs sm:grid-cols-2 xl:grid-cols-3">
                 {/* Git Branch & Commit */}
                 <div className="p-2.5 rounded-lg bg-surface-100/50 border border-white/5 space-y-1">
                   <div className="text-[10px] text-gray-500 uppercase flex items-center gap-1">
                     <FolderGit2 className="w-3 h-3 text-brand-cyan" />
-                    Rama & Commit
+                    Servidor · Rama y commit
                   </div>
                   <div className="flex items-center justify-between text-gray-200 font-semibold">
                     <span>{app.git.branch || "no-git"}</span>
-                    <span className="text-brand-cyan">{app.git.commitHash || "---"}</span>
+                    <span className="text-brand-cyan">{app.git.commitHash?.slice(0, 8) || "—"}</span>
                   </div>
                   <div className="text-[10px] text-gray-400 truncate" title={app.git.commitMessage}>
                     {app.git.commitMessage || "Sin cambios registrados"}
                   </div>
+                </div>
+
+                <div className="min-w-0 rounded-lg border border-white/5 bg-surface-100/50 p-3 space-y-2">
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">GitHub / Git remoto</div>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-mono text-sm font-semibold text-white" title={app.git.remoteCommit || undefined}>
+                      {app.git.remoteCommit?.slice(0, 8) || "—"}
+                    </span>
+                    <span className={`text-[11px] font-medium ${app.git.remoteStatus === "synced" ? "text-emerald-300" : app.git.remoteStatus === "different" ? "text-amber-300" : "text-slate-400"}`}>
+                      {app.git.remoteStatus === "synced" ? "Sin diferencias" : app.git.remoteStatus === "different" ? "Versiones distintas" : "Remoto no comprobado"}
+                    </span>
+                  </div>
+                  <p className="text-[11px] leading-5 text-slate-500">Comparación de commits; no implica que el servidor haya desplegado la nueva versión.</p>
+                </div>
+
+                <div className="min-w-0 rounded-lg border border-white/5 bg-surface-100/50 p-3 space-y-2">
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Imagen realmente ejecutada</div>
+                  <p className="font-mono text-sm font-semibold text-white" title={app.deployment?.revision || app.deployment?.imageId || undefined}>
+                    {app.deployment?.revision?.slice(0, 8) || (app.deployment?.imageId ? app.deployment.imageId.slice(7, 19) : "—")}
+                  </p>
+                  <p className="text-[11px] leading-5 text-slate-500">
+                    {app.deployment?.status === "identified" ? "SHA registrado en la imagen Docker" : app.deployment?.imageId ? "ID Docker (sin commit registrado)" : "No se detectó imagen activa"}
+                  </p>
+                </div>
+
+                <div className="min-w-0 rounded-lg border border-white/5 bg-surface-100/50 p-3 space-y-2">
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Sitio público</div>
+                  <p className={`text-sm font-semibold ${app.web?.status === "online" ? "text-emerald-300" : app.web?.status === "offline" ? "text-rose-300" : "text-amber-200"}`}>
+                    {app.web?.status === "online" ? "Responde" : app.web?.status === "restricted" ? "Acceso restringido" : app.web?.status === "offline" ? "Sin respuesta correcta" : "Sin comprobación"}
+                  </p>
+                  <p className="text-[11px] text-slate-500">
+                    {app.web?.httpStatus ? `HTTP ${app.web.httpStatus}` : "HTTP no disponible"}
+                    {app.web?.latencyMs != null ? ` · ${app.web.latencyMs} ms` : ""}
+                  </p>
                 </div>
 
                 {/* Author & Date */}
