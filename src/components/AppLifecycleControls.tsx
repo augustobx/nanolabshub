@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Archive, History, PauseCircle, PlayCircle, ShieldAlert, Clock3 } from "lucide-react";
 import type { AppInfo } from "@/lib/types";
 
@@ -31,6 +32,21 @@ export function AppLifecycleControls({ app, onChanged }: { app: AppInfo; onChang
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [history, setHistory] = useState<Event[] | null>(null);
+  const [backupInfo, setBackupInfo] = useState<{ status: "ready" | "missing" | "loading" | "error"; at?: string }>({ status: "loading" });
+  useEffect(() => {
+    if (selected !== "archive") return;
+    let cancelled = false;
+    setBackupInfo({ status: "loading" });
+    fetch("/api/backups", { cache: "no-store" }).then(async (response) => {
+      const result = await response.json();
+      if (!response.ok || !result.success) throw Error("Historial de respaldos no disponible");
+      const found = (result.data as Array<{ appSlug: string; status: string; createdAt: string }>).find((backup) =>
+        backup.appSlug === app.slug && backup.status === "verified");
+      if (!cancelled) setBackupInfo(found ? { status: "ready", at: found.createdAt } : { status: "missing" });
+    }).catch(() => { if (!cancelled) setBackupInfo({ status: "error" }); });
+    return () => { cancelled = true; };
+  }, [selected, app.slug]);
+
   const [loadingHistory, setLoadingHistory] = useState(false);
   const selectedChoice = choices.find((choice) => choice.action === selected);
   const transitions = state === "archived" ? ["resume"] :
@@ -137,6 +153,15 @@ export function AppLifecycleControls({ app, onChanged }: { app: AppInfo; onChang
                 <p className="mt-1 text-amber-200">No hay contenedores detectados; solo se registrará el estado administrativo.</p>}
               {app.database?.type && app.database.type !== "none" && <p className="mt-1 text-amber-200">Motor de datos: {app.database.type}. La base no se elimina.</p>}
             </div>
+            {selected === "archive" && (
+              <p className="rounded-lg border border-white/10 p-3 text-xs leading-5 text-slate-300">
+                {backupInfo.status === "loading" ? "Consultando último backup…" :
+                 backupInfo.status === "ready" ? "Último backup con integridad comprobada: " + backupInfo.at + ". No existe restauración probada." :
+                 backupInfo.status === "missing" ? "No hay backups de esta aplicación con integridad comprobada." :
+                 "No fue posible comprobar el historial de backups."}
+                {" "}<Link href="/backups" className="font-semibold text-brand-cyan underline">Ir al centro de backups</Link>
+              </p>
+            )}
             {selected === "archive" && (
               <label className="flex items-start gap-3 rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 text-xs leading-5 text-amber-100">
                 <input type="checkbox" checked={backupAck} onChange={(e) => setBackupAck(e.target.checked)} className="mt-1" />
