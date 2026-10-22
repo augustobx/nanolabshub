@@ -7,6 +7,7 @@ interface VersionProbe {
   remoteCommit: string | null;
   checkedAt: string | null;
   remoteRef: string | null;
+  remoteError: string | null;
 }
 interface ImageProbe {
   revision: string | null;
@@ -33,13 +34,25 @@ async function probeGitRemote(apps: AppInfo[]): Promise<Map<string, VersionProbe
       await Promise.all(candidates.slice(i, i + 5).map(async (app) => {
         const namedBranch = app.git.branch !== "detached" && isSafeBranch(app.git.branch);
         const remoteRef = namedBranch ? "refs/heads/" + app.git.branch : "HEAD";
-        const cmd = `timeout 4 git -C ${shellQuote(app.path)} ls-remote origin ${shellQuote(remoteRef)}`;
+        // The host directories are a fixed allowlist; trust ownership only for this command.
+        // Disable interactive Git prompts so private repositories fail quickly and explicitly.
+        const cmd = `timeout 6 env GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND=${shellQuote("ssh -o BatchMode=yes -o ConnectTimeout=3")} git -c ${shellQuote("safe.directory=" + app.path)} -C ${shellQuote(app.path)} ls-remote origin ${shellQuote(remoteRef)}`;
         const result = await executeRemoteCommand(cmd);
         const commit = result.code === 0 ? result.stdout.split(/\s/)[0] : "";
+        const stderr = result.stderr.toLowerCase();
+        const remoteError = validCommit(commit) ? null
+          : result.code === 124 ? "Se agotó el tiempo de consulta (6 s)"
+          : /could not read username|authentication failed|terminal prompts disabled/.test(stderr) ? "El repositorio requiere autenticación HTTPS"
+          : /permission denied \(publickey\)|host key verification failed/.test(stderr) ? "El contenedor no tiene acceso SSH autorizado"
+          : /could not resolve host|name or service not known|temporary failure in name resolution/.test(stderr) ? "No se puede resolver el servidor Git"
+          : /not a git repository/.test(stderr) ? "Directorio Git inaccesible"
+          : /no such remote|remote origin does not exist|not found/.test(stderr) ? "No se encontró origin o la referencia remota"
+          : "No se pudo consultar la referencia remota";
         map.set(app.slug, {
           remoteCommit: validCommit(commit) ? commit : null,
           checkedAt: new Date().toISOString(),
           remoteRef,
+          remoteError,
         });
       }));
     }
@@ -127,6 +140,7 @@ export async function getOperationalApps(containersInput?: ContainerInfo[]): Pro
       git: {
         ...app.git, remoteCommit, remoteCheckedAt: source?.checkedAt ?? null,
         remoteRef: source?.remoteRef ?? null,
+        remoteError: source?.remoteError ?? null,
         remoteStatus: !app.git.isRepo ? "not_repo"
           : !remoteCommit || !validCommit(localCommit) ? "unavailable"
           : remoteCommit === localCommit ? "synced" : "different",
