@@ -1,4 +1,5 @@
 import { executeRemoteCommand } from "./ssh";
+import { appLifecycle, getLifecycleRecords } from "./app-lifecycle";
 import { KNOWN_APPS } from "./apps-registry";
 import { getAppsStatus, getContainers, getServerTelemetry } from "./server-api";
 import type { AppInfo, ContainerInfo, ServerMetrics } from "./types";
@@ -120,12 +121,16 @@ async function probeWebsite(url: string | undefined): Promise<AppInfo["web"]> {
 export async function getOperationalApps(containersInput?: ContainerInfo[]): Promise<AppInfo[]> {
   const containers = containersInput ?? await getContainers();
   const apps = await getAppsStatus(containers);
+  const lifecycleRecords = getLifecycleRecords();
+  const enriched = apps.map((app) => ({ ...app, lifecycle: appLifecycle(app.slug, lifecycleRecords) }));
   const [remotes, images, sites] = await Promise.all([
-    probeGitRemote(apps),
+    probeGitRemote(enriched.filter((app) => app.lifecycle.state !== "archived")),
     readDeployedRevisions(containers),
-    Promise.all(apps.map((app) => probeWebsite(app.url))),
+    Promise.all(enriched.map((app) => app.lifecycle.state === "active"
+      ? probeWebsite(app.url)
+      : Promise.resolve({ status: "unknown" as const, httpStatus: null, latencyMs: null, checkedAt: null }))),
   ]);
-  return apps.map((app, index) => {
+  return enriched.map((app, index) => {
     const source = remotes.get(app.slug);
     const localCommit = app.git.commitHash;
     const remoteCommit = source?.remoteCommit ?? null;
