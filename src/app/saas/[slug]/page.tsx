@@ -90,7 +90,7 @@ export default function SaaSWorkspacePage() {
       {tab==="overview"&&<div className="space-y-5">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <DataCell label="Tenants reportados" value={sourceAvailable?tenants.length:"—"}/>
-          <DataCell label="Tenants activos" value={connected?tenants.filter(t=>t.status==="ACTIVE").length:"—"}/>
+          <DataCell label="Tenants activos" value={sourceAvailable?tenants.filter(t=>t.status==="ACTIVE").length:"—"}/>
           <DataCell label="Contenedores en ejecución" value={app?containers.filter(c=>c.state==="running").length+" de "+containers.length:"—"}/>
           <DataCell label="Último backup íntegro" value={backups?last?formatDate(last.createdAt):"Sin registro":"—"}/>
         </div>
