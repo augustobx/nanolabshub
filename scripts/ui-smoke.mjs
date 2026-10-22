@@ -114,7 +114,17 @@ try {
         const button = page.getByRole("button", { name: "Administrar módulos" }).first();
         await button.waitFor({ timeout: 10000 });
         await button.click();
-        await page.getByRole("dialog", { name: /Restaurante de ejemplo/ }).waitFor();
+        const dialog = page.locator('[role="dialog"]');
+        try {
+          await dialog.waitFor({ timeout: 7000 });
+        } catch (error) {
+          await page.screenshot({ path: `ui-screenshots/${device.name}-tenant-dialog-debug.png`, fullPage: true });
+          console.error("Missing tenant dialog. Clicked button:", await button.count(),
+            "visible dialogs:", await page.locator('[role="dialog"]').count(),
+            "page headings:", await page.locator("h1,h2,h3").allTextContents());
+          throw error;
+        }
+        await dialog.getByRole("heading", { name: "Restaurante de ejemplo" }).waitFor();
         await page.getByRole("tab", { name: "Funcionalidades" }).click();
         await page.getByRole("switch", { name: /pedidos/i }).waitFor();
         await page.screenshot({ path: `ui-screenshots/${device.name}-tenant-dialog.png`, fullPage: false });
