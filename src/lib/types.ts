@@ -76,6 +76,12 @@ export interface AppInfo {
     remoteBehind?: number;
   };
   containers: ContainerInfo[];
+  lifecycle?: {
+    state: "active" | "suspended" | "pending_retirement" | "archived";
+    updatedAt: string | null;
+    updatedBy: string | null;
+    note: string;
+  };
   database?: {
     type: "postgres" | "mysql" | "mariadb" | "sqlite" | "none";
     host?: string;
