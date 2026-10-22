@@ -7,7 +7,7 @@ import { LayoutDashboard, Building2, Boxes, Server, DatabaseBackup, Globe2, Menu
 
 const NAV_GROUPS = [
   { title: "Espacio de trabajo", items: [
-    { name: "Resumen ejecutivo", href: "/", icon: LayoutDashboard, description: "Todo NanoLabs en un lugar" },
+    { name: "Centro de control", href: "/", icon: LayoutDashboard, description: "Operación en vivo del servidor" },
     { name: "Clientes y SaaS", href: "/governance", icon: Building2, description: "Empresas, planes y módulos" },
     { name: "Productos y versiones", href: "/software", icon: Boxes, description: "Aplicaciones y despliegues" },
   ] },
