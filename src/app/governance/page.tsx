@@ -304,6 +304,16 @@ export default function GovernancePage() {
           </div>
         )}
 
+        {(data?.sources?.some(source => source.status === "unavailable") ?? false) && (
+          <div role="status" className="rounded-xl border border-amber-400/25 bg-amber-400/[0.06] p-4 text-xs leading-5 text-amber-100">
+            Hay conectores de SaaS sin respuesta. Los totales reflejan únicamente los productos disponibles.
+            No se interpreta un error de lectura como cero clientes.
+            <div className="mt-2 flex flex-wrap gap-2">
+              {data?.sources?.filter(source => source.status === "unavailable").map(source =>
+                <span key={source.saas} className="rounded-md border border-amber-400/20 px-2 py-1">{source.saas} · sin datos</span>)}
+            </div>
+          </div>
+        )}
         {/* Global KPIs */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
           <div className="hub-card p-4 space-y-1">
@@ -487,7 +497,7 @@ export default function GovernancePage() {
                     <div className="flex justify-between text-xs font-mono">
                       <span className="text-gray-400">Volumen en DB:</span>
                       <span className="text-emerald-400 font-bold">
-                        {t.metrics.totalRecords.toLocaleString()} {t.metrics.recordLabel}
+                        {t.metrics.available === false ? "Sin medición conectada" : t.metrics.totalRecords.toLocaleString() + " " + t.metrics.recordLabel}
                       </span>
                     </div>
                     {t.metrics.secondaryMetric && (
@@ -669,8 +679,8 @@ export default function GovernancePage() {
                   <div>
                     <h3 className="text-sm font-semibold text-white">Estado del servicio</h3>
                     <p className="mt-2 text-xs leading-5 text-slate-400">
-                      Elegí el estado del cliente. Los cambios se guardan directamente en la base productiva
-                      y pueden afectar su acceso al servicio.
+                      El estado actual se consulta sin modificar datos. Las acciones de cambio están protegidas
+                      hasta integrar una API autenticada y auditada en cada SaaS.
                     </p>
                   </div>
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -680,7 +690,8 @@ export default function GovernancePage() {
                       { id: "SUSPENDED", label: "Suspendido" },
                       { id: "CANCELED", label: "Cancelado" },
                     ] as const).map((option) => (
-                      <button key={option.id} type="button" disabled={isUpdating}
+                      <button key={option.id} type="button" disabled
+                        title="Protegido: edición de tenants pendiente de integración segura"
                         aria-pressed={activeTenant.status === option.id}
                         onClick={() => handleUpdateStatus(activeTenant, option.id)}
                         className={`min-h-11 rounded-xl border px-3 py-3 text-xs font-semibold transition-colors disabled:opacity-50 ${activeTenant.status === option.id
@@ -705,9 +716,9 @@ export default function GovernancePage() {
                       Los módulos se muestran en todas las SaaS con el mismo formato. El cambio solo está disponible cuando existe integración real; los demás se presentan en modo consulta.
                     </p>
                   </div>
-                  {activeTenant.saas !== "onlygym" && (
+                  {true && (
                     <p className="rounded-lg border border-amber-300/20 bg-amber-300/[0.045] p-3 text-xs text-amber-100">
-                      Lectura de módulos disponible. La edición central aún no está conectada: los controles están deshabilitados para evitar falsos éxitos.
+                      Los módulos existentes se muestran en modo consulta. La edición central permanece bloqueada para proteger las bases productivas.
                     </p>
                   )}
                   {Object.keys(activeTenant.modules).length === 0 ? (
@@ -724,8 +735,8 @@ export default function GovernancePage() {
                           </div>
                           <button type="button" role="switch" aria-checked={enabled}
                             aria-label={`${key.replace(/_/g, " ")}: ${enabled ? "activado" : "desactivado"}`}
-                            disabled={isUpdating || activeTenant.saas !== "onlygym"}
-                            title={activeTenant.saas !== "onlygym" ? "Integración de escritura pendiente para esta SaaS" : "Modificar módulo de OnlyGym"}
+                            disabled
+                            title="Edición deshabilitada hasta completar la integración segura del Superadmin"
                             onClick={() => handleToggleModule(activeTenant, key, enabled)}
                             className={`relative h-7 w-12 shrink-0 rounded-full border transition-colors disabled:opacity-50 ${enabled
                               ? "border-[#9db5ff]/50 bg-[#6c86d7]"
