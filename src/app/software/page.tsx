@@ -349,11 +349,11 @@ export default function SoftwarePage() {
                     Servidor · Rama y commit
                   </div>
                   <div className="flex items-center justify-between text-gray-200 font-semibold">
-                    <span>{app.git.branch || "no-git"}</span>
+                    <span>{app.git.branch || (app.git.isRepo ? "Git inaccesible" : "Sin repositorio")}</span>
                     <span className="text-brand-cyan">{app.git.commitHash?.slice(0, 8) || "—"}</span>
                   </div>
                   <div className="text-[10px] text-gray-400 truncate" title={app.git.commitMessage}>
-                    {app.git.commitMessage || "Sin cambios registrados"}
+                    {app.git.localError || app.git.commitMessage || (app.git.isRepo ? "Sin mensaje de commit" : "No hay repositorio Git local")}
                   </div>
                 </div>
 
@@ -368,7 +368,7 @@ export default function SoftwarePage() {
                     </span>
                   </div>
                   <p className="text-[11px] leading-5 text-slate-500">
-                    {app.git.remoteRef === "HEAD" ? "Comparado con HEAD de la rama remota predeterminada (checkout detached)." : "Comparación de commits; no implica que el servidor haya desplegado la nueva versión."}
+                    {app.git.remoteError || (app.git.remoteRef === "HEAD" ? "Comparado con HEAD de la rama remota predeterminada (checkout detached)." : "Comparación de commits; no implica que el servidor haya desplegado la nueva versión.")}
                   </p>
                 </div>
 
@@ -414,7 +414,7 @@ export default function SoftwarePage() {
                   <div className="flex items-center gap-1.5">
                     {app.git.localError ? (
                       <span className="text-amber-300 flex items-center gap-1" title={app.git.localError}>
-                        <AlertTriangle className="w-3.5 h-3.5" /> Git no verificable
+                        <AlertTriangle className="w-3.5 h-3.5" /> {app.git.localError}
                       </span>
                     ) : app.git.dirtyFilesCount === 0 ? (
                       <span className="text-emerald-400 flex items-center gap-1">
