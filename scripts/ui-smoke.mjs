@@ -162,6 +162,23 @@ try {
         }
       }
       if (path === "/backups") {
+        await page.getByRole("heading", { name: "Generar backup manual" }).waitFor();
+        await page.getByRole("button", { name: "Seleccionar OnlyPadel SaaS para backup" }).click();
+        const appCard = page.getByRole("button", { name: "Seleccionar OnlyPadel SaaS para backup" });
+        if (await appCard.getAttribute("aria-pressed") !== "true") throw new Error("Manual backup card selection was not reflected");
+        await page.getByRole("button", { name: "Generar backup ahora" }).click();
+        const confirm = page.getByRole("dialog", { name: "Confirmar respaldo" });
+        await confirm.waitFor();
+        await confirm.getByText("OnlyPadel SaaS").waitFor();
+        await confirm.getByRole("button", { name: "Cancelar" }).click();
+        await confirm.waitFor({ state: "hidden" });
+        await page.getByRole("searchbox", { name: "Buscar aplicación para backup" }).fill("nanolabs hub");
+        await page.getByRole("button", { name: "Seleccionar NanoLabs Hub para backup" }).waitFor();
+        if (await page.getByRole("button", { name: "Seleccionar OnlyPadel SaaS para backup" }).count() !== 0) {
+          throw new Error("Manual backup search did not filter app cards");
+        }
+        await page.getByRole("searchbox", { name: "Buscar aplicación para backup" }).fill("");
+        await page.screenshot({ path: `ui-screenshots/${device.name}-backups-manual.png`, fullPage: true, animations: "disabled" });
         await page.getByText("Backups programados").waitFor();
         const selector = page.getByRole("combobox", { name: "Hora de OnlyFood" });
         await selector.selectOption("5");
