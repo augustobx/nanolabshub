@@ -128,6 +128,8 @@ export async function getContainers(): Promise<ContainerInfo[]> {
       ports: ports || "",
       created: created ? created.split(" ")[0] : "",
       ...stats.get(name || ""),
+      isJob: /(?:^|[-_])(migrate|database-init)(?:[-_]\d+)?$/i.test(name || ""),
+      exitCode: /Exited \((\d+)\)/i.test(status) ? Number(status.match(/Exited \((\d+)\)/i)?.[1]) : null,
     };
   });
 }
@@ -138,50 +140,56 @@ export async function getContainers(): Promise<ContainerInfo[]> {
 export async function getAppsStatus(containersInput?: ContainerInfo[]): Promise<AppInfo[]> {
   const containers = containersInput ?? await getContainers();
 
-  // Run a unified shell script to collect git status for all known apps
-  const pathsToCheck = KNOWN_APPS.map((a) => `${a.slug}:::${a.path}`).join(" ");
-  const gitScript = `
-    for item in ${pathsToCheck}; do
-      slug=$(echo $item | cut -d: -f1)
-      p=$(echo $item | cut -d: -f4-)
-      if [ -d "$p/.git" ]; then
-        branch=$(git -C "$p" branch --show-current 2>/dev/null || echo "detached")
-        commit=$(git -C "$p" log -1 --format="%H;;;%s;;;%an;;;%ad" --date=short 2>/dev/null || echo "none;;;none;;;none;;;none")
-        dirty=$(git -C "$p" status --porcelain 2>/dev/null | wc -l)
-        has_compose="false"
-        if [ -f "$p/compose.yml" ] || [ -f "$p/docker-compose.yml" ] || [ -f "$p/docker-compose.yaml" ]; then
-          has_compose="true"
-        fi
-        echo "$slug|||true|||$branch|||$commit|||$dirty|||$has_compose"
-      else
-        has_compose="false"
-        if [ -f "$p/compose.yml" ] || [ -f "$p/docker-compose.yml" ] || [ -f "$p/docker-compose.yaml" ]; then
-          has_compose="true"
-        fi
-        echo "$slug|||false|||none|||none;;;none;;;none;;;none|||0|||$has_compose"
-      fi
-    done
-  `;
-
-  const { stdout: gitRaw } = await executeRemoteCommand(gitScript);
-  const gitMap = new Map<string, any>();
-
-  if (gitRaw) {
-    for (const line of gitRaw.split("\n").filter(Boolean)) {
-      const [slug, isRepo, branch, commitRaw, dirty, hasCompose] = line.split("|||");
-      const [commitHash, commitMessage, commitAuthor, commitDate] = (commitRaw || "").split(";;;");
-      gitMap.set(slug, {
-        isRepo: isRepo === "true",
-        branch: branch || "unknown",
-        commitHash: commitHash || "",
-        commitMessage: commitMessage || "",
-        commitAuthor: commitAuthor || "",
-        commitDate: commitDate || "",
-        dirtyFilesCount: parseInt(dirty || "0", 10),
-        hasCompose: hasCompose === "true",
-      });
-    }
-  }
+  // Read the checkout HEAD even when detached, preserving errors rather than faking "clean".
+  const appPaths = Buffer.from(JSON.stringify(KNOWN_APPS.map(({ slug, path }) => ({ slug, path })))).toString("base64");
+  const gitScript = `python3 - <<'PY'
+import os, json, base64, subprocess
+apps = json.loads(base64.b64decode("${appPaths}").decode())
+def git(p, *args):
+    try:
+        r = subprocess.run(["git", "-C", p, *args], text=True, capture_output=True, timeout=4)
+        return r.stdout.strip(), r.stderr.strip(), r.returncode
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return "", str(e), 1
+results = []
+for app in apps:
+    p = app["path"]
+    has_compose = any(os.path.isfile(os.path.join(p, filename))
+                      for filename in ("compose.yml", "docker-compose.yml", "docker-compose.yaml"))
+    is_repo = os.path.exists(os.path.join(p, ".git"))
+    record = {"slug": app["slug"], "isRepo": is_repo, "branch": "",
+              "commitHash": "", "commitMessage": "", "commitAuthor": "",
+              "commitDate": "", "dirtyFilesCount": 0, "hasCompose": has_compose,
+              "localError": None}
+    if is_repo:
+        head, err, code = git(p, "rev-parse", "--verify", "HEAD")
+        if code or len(head) != 40:
+            record["localError"] = (err or "No se pudo leer HEAD")[:180]
+        else:
+            record["commitHash"] = head
+            branch, _, branch_code = git(p, "symbolic-ref", "--quiet", "--short", "HEAD")
+            record["branch"] = branch if branch_code == 0 and branch else "detached"
+            details, _, detail_code = git(p, "log", "-1", "--format=%s%x1f%an%x1f%ad", "--date=short")
+            if detail_code == 0:
+                fields = details.split(chr(31))
+                if len(fields) == 3:
+                    record["commitMessage"], record["commitAuthor"], record["commitDate"] = fields
+            dirty, stderr, status_code = git(p, "status", "--porcelain")
+            if status_code:
+                record["localError"] = (stderr or "No se pudo consultar Git status")[:180]
+            else:
+                record["dirtyFilesCount"] = len(dirty.splitlines()) if dirty else 0
+    results.append(record)
+print(json.dumps(results))
+PY`;
+  const { stdout: gitRaw, stderr: gitError, code: gitCode } = await executeRemoteCommand(gitScript);
+  if (gitCode !== 0) throw new Error(`No se pudo consultar el inventario Git: ${gitError || "sin salida"}`);
+  const gitRecords = JSON.parse(gitRaw) as Array<{
+    slug: string; isRepo: boolean; branch: string; commitHash: string;
+    commitMessage: string; commitAuthor: string; commitDate: string;
+    dirtyFilesCount: number; hasCompose: boolean; localError: string | null;
+  }>;
+  const gitMap = new Map(gitRecords.map((record) => [record.slug, record]));
 
   return KNOWN_APPS.map((app) => {
     const gitData = gitMap.get(app.slug) || {
@@ -203,7 +211,7 @@ export async function getAppsStatus(containersInput?: ContainerInfo[]): Promise<
     // Compute health
     let status: AppInfo["status"] = "operational";
     if (appContainers.length === 0) {
-      status = "down";
+      status = "not_deployed";
     } else if (appContainers.some((c) => c.state !== "running" || c.health === "unhealthy")) {
       status = "degraded";
     }
@@ -222,6 +230,7 @@ export async function getAppsStatus(containersInput?: ContainerInfo[]): Promise<
         commitDate: gitData.commitDate,
         commitAuthor: gitData.commitAuthor,
         dirtyFilesCount: gitData.dirtyFilesCount,
+        localError: gitData.localError || null,
       },
       containers: appContainers,
       database: {
