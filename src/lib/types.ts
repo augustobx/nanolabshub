@@ -133,6 +133,7 @@ export interface UniversalTenant {
   metrics: {
     totalRecords: number;
     recordLabel: string;
+    available?: boolean;
     secondaryMetric?: {
       label: string;
       value: number;
@@ -149,6 +150,13 @@ export interface GovernanceOverview {
   saasCount: number;
   totalRecordsManaged: number;
   tenants: UniversalTenant[];
+  sources?: Array<{
+    saas: SaaSSlug;
+    status: "available" | "unavailable";
+    count: number | null;
+    checkedAt: string;
+    message: string | null;
+  }>;
   legacyPanels: Array<{
     saas: string;
     legacyAdminUrl: string;
