@@ -22,6 +22,11 @@ import { KNOWN_APPS } from "@/lib/apps-registry";
 
 export default function BackupsPage() {
   const [backups, setBackups] = useState<BackupRecord[]>([]);
+  const [schedules, setSchedules] = useState<Array<{
+    slug: string; name: string; enabled: boolean; hourLocal: number; weekdays: string; lastRunDay: string | null;
+  }>>([]);
+  const [scheduleSaving, setScheduleSaving] = useState<string | null>(null);
+  const [pageError, setPageError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedApp, setSelectedApp] = useState<string>("all");
   const [isTriggering, setIsTriggering] = useState<string | null>(null);
@@ -34,12 +39,15 @@ export default function BackupsPage() {
 
   const fetchBackups = async () => {
     setIsLoading(true);
+    setPageError(null);
     try {
-      const res = await fetch("/api/backups");
+      const res = await fetch("/api/backups", { cache: "no-store" });
       const data = await res.json();
-      if (data.success) {
-        setBackups(data.data);
-      }
+      if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cargar el historial");
+      setBackups(data.data);
+      setSchedules(data.schedules || []);
+    } catch (error) {
+      setPageError(error instanceof Error ? error.message : "Error al consultar backups");
     } finally {
       setIsLoading(false);
     }
@@ -53,7 +61,7 @@ export default function BackupsPage() {
     const appDef = KNOWN_APPS.find((a) => a.slug === slug);
     if (!appDef) return;
 
-    if (!confirm(`¿Iniciar volcado/backup inmediato de ${appDef.name}?`)) return;
+    if (!confirm(`¿Generar backup de ${appDef.name}? Se guardará una copia local y se verificará su integridad.`)) return;
 
     setIsTriggering(slug);
     setTerminalTitle(`Generando Backup: ${appDef.name}`);
@@ -69,7 +77,7 @@ export default function BackupsPage() {
       });
       const data = await res.json();
       if (data.success) {
-        setTerminalOutput(`✅ BACKUP GENERADO EXITOSAMENTE:\n\n${data.data.output}\n\nUbicación: /opt/backups/${slug}/`);
+        setTerminalOutput(`Backup creado y validado (gzip + SHA-256).\n\nArchivo: ${data.data.filename}\n\nSHA-256: ${data.data.checksum}\n\nNota: todavía no se probó una restauración en un entorno aislado.`);
         fetchBackups();
       } else {
         setTerminalOutput(`❌ Error generando backup:\n\n${data.error}`);
@@ -79,6 +87,24 @@ export default function BackupsPage() {
     } finally {
       setIsTriggering(null);
       setTerminalLoading(false);
+    }
+  };
+
+  const handleSchedule = async (slug: string, enabled: boolean, hourLocal: number, weekdays: string) => {
+    setScheduleSaving(slug);
+    setPageError(null);
+    try {
+      const res = await fetch("/api/backups/schedule", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug, config: { enabled, hourLocal, weekdays } }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || "Error al guardar programación");
+      setSchedules(data.data);
+    } catch (error) {
+      setPageError(error instanceof Error ? error.message : "Error de programación");
+    } finally {
+      setScheduleSaving(null);
     }
   };
 
@@ -98,8 +124,8 @@ export default function BackupsPage() {
           <p className="hub-eyebrow">Operación / Respaldo</p>
           <h1 className="hub-hero-title">Copias de seguridad y recuperación.</h1>
           <p className="hub-description">
-            Visualizá los respaldos registrados y ejecutá copias manuales por aplicación.
-            La disponibilidad real de una copia depende de su última verificación.
+            Copias reales por aplicación, respaldo manual o programado, comprobación gzip/SHA-256
+            y descarga privada. La integridad de un archivo no garantiza una restauración probada.
           </p>
         </section>
 
@@ -145,10 +171,10 @@ export default function BackupsPage() {
             </div>
             <div className="text-2xl font-bold font-mono text-emerald-400 flex items-center gap-2">
               <CheckCircle2 className="w-6 h-6" />
-              <span>Declarada</span>
+              <span>Sin verificar</span>
             </div>
             <div className="text-[11px] text-gray-500 font-mono">
-              Confirmar ejecución en el destino
+              No hay copia externa verificada por el Hub
             </div>
           </div>
         </div>
@@ -161,7 +187,7 @@ export default function BackupsPage() {
               DISPARADOR MANUAL DE BACKUP POR APLICACIÓN
             </h3>
             <span className="text-[10px] text-gray-500 font-mono">
-              Dump atómico en caliente sin downtime
+              Verificación de archivo y hash · no implica restauración probada
             </span>
           </div>
 
@@ -180,6 +206,57 @@ export default function BackupsPage() {
             ))}
           </div>
         </div>
+
+        {pageError && (
+          <div role="alert" className="rounded-lg border border-rose-400/30 bg-rose-400/10 p-3 text-sm text-rose-200">{pageError}</div>
+        )}
+
+        <section aria-label="Programación de respaldos" className="hub-card space-y-4 p-5">
+          <div>
+            <h2 className="text-base font-semibold text-white">Backups programados</h2>
+            <p className="mt-1 text-xs text-slate-400">
+              Horario argentino (UTC−3). Requiere el servicio adicional de programación activo.
+              La programación no elimina automáticamente copias anteriores.
+            </p>
+          </div>
+          <div className="space-y-2">
+            {schedules.map((schedule) => (
+              <div key={schedule.slug} className="flex flex-wrap items-center gap-3 rounded-lg border border-white/10 p-3">
+                <span className="min-w-[155px] flex-1 text-xs font-semibold text-white">{schedule.name}</span>
+                <label className="flex items-center gap-2 text-xs text-slate-300">
+                  Hora
+                  <select aria-label={`Hora de ${schedule.name}`} value={schedule.hourLocal}
+                    onChange={(e) => setSchedules((prev) => prev.map((s) => s.slug === schedule.slug ? { ...s, hourLocal: Number(e.target.value) } : s))}
+                    className="rounded-lg border border-white/15 bg-surface-100 px-2 py-2 text-white">
+                    {Array.from({ length: 24 }, (_, hour) => <option key={hour} value={hour}>{String(hour).padStart(2, "0")}:00</option>)}
+                  </select>
+                </label>
+                <label className="flex items-center gap-2 text-xs text-slate-300">
+                  Frecuencia
+                  <select aria-label={`Frecuencia de ${schedule.name}`}
+                    value={schedule.weekdays === "0,1,2,3,4,5,6" ? "daily" : "weekly"}
+                    onChange={(e) => setSchedules((prev) => prev.map((s) => s.slug === schedule.slug ?
+                      { ...s, weekdays: e.target.value === "daily" ? "0,1,2,3,4,5,6" : "0" } : s))}
+                    className="rounded-lg border border-white/15 bg-surface-100 px-2 py-2 text-white">
+                    <option value="daily">Diaria</option>
+                    <option value="weekly">Domingos</option>
+                  </select>
+                </label>
+                <label className="flex items-center gap-2 text-xs text-slate-200">
+                  <input type="checkbox" checked={schedule.enabled}
+                    onChange={(e) => setSchedules((prev) => prev.map((s) => s.slug === schedule.slug ? { ...s, enabled: e.target.checked } : s))} />
+                  Activa
+                </label>
+                <button type="button" disabled={scheduleSaving === schedule.slug}
+                  onClick={() => void handleSchedule(schedule.slug, schedule.enabled, schedule.hourLocal, schedule.weekdays)}
+                  className="rounded-lg border border-brand-cyan/40 px-3 py-2 text-xs font-semibold text-brand-cyan disabled:opacity-50">
+                  {scheduleSaving === schedule.slug ? "Guardando…" : "Guardar"}
+                </button>
+                {schedule.lastRunDay && <span className="text-[11px] text-slate-500">Última ejecución: {schedule.lastRunDay}</span>}
+              </div>
+            ))}
+          </div>
+        </section>
 
         {/* Backups Inventory Table */}
         <div className="hub-card p-5 space-y-4">
@@ -225,8 +302,13 @@ export default function BackupsPage() {
                   <span className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-semibold ${backup.status === "verified"
                     ? "bg-emerald-400/10 text-emerald-300"
                     : backup.status === "failed" ? "bg-rose-400/10 text-rose-300" : "bg-amber-400/10 text-amber-200"}`}>
-                    {backup.status === "verified" ? "Verificado" : backup.status === "failed" ? "Fallido" : "No verificado"}
+                    {backup.status === "verified" ? "Integridad OK" : backup.status === "failed" ? "Fallido" : "No verificado"}
                   </span>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
+                  {backup.status === "verified" && <a href={`/api/backups/download?id=${encodeURIComponent(backup.id)}`}
+                    className="rounded-lg border border-brand-cyan/30 px-3 py-2 text-brand-cyan">Descargar backup</a>}
+                  <span className="text-slate-500">{backup.trigger === "scheduled" ? "Programado" : "Manual"} · {backup.restoreTested ? "Restauración probada" : "Restauración no probada"}</span>
                 </div>
                 <div className="mt-3 flex flex-wrap justify-between gap-2 border-t border-white/[0.07] pt-3 text-[11px]">
                   <span className="text-slate-400">{backup.dbType.toUpperCase()} · {backup.sizeFormatted}</span>
@@ -268,10 +350,17 @@ export default function BackupsPage() {
                         : b.status === "failed"
                         ? "border-rose-400/20 bg-rose-400/10 text-rose-300"
                         : "border-amber-400/20 bg-amber-400/10 text-amber-200"}`}>
-                        {b.status === "verified" ? "Verificado" : b.status === "failed" ? "Fallido" : "No verificado"}
+                        {b.status === "verified" ? "Integridad OK" : b.status === "failed" ? "Fallido" : "No verificado"}
                       </span>
                     </td>
-                    <td className="py-2.5 px-3 text-right text-gray-400">{b.createdAt}</td>
+                    <td className="py-2.5 px-3 text-right text-gray-400">
+                      <span>{b.createdAt}</span>
+                      {b.status === "verified" && <a href={`/api/backups/download?id=${encodeURIComponent(b.id)}`}
+                        className="ml-2 inline-flex items-center gap-1 text-brand-cyan hover:underline">
+                        <Download className="h-3.5 w-3.5" /> Descargar
+                      </a>}
+                      <span className="mt-1 block text-[10px] text-slate-500">Restauración no probada</span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
