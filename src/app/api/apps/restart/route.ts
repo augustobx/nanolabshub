@@ -1,10 +1,13 @@
 import { restartContainer } from "@/lib/server-api";
+import { requireMutatingSession } from "@/lib/action-security";
+import { assertContainerAppActive } from "@/lib/app-lifecycle";
 import { getDatabase } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   try {
+    const actor = await requireMutatingSession(req);
     const body = await req.json();
     const { containerName } = body;
 
@@ -12,10 +15,11 @@ export async function POST(req: Request) {
       return Response.json({ success: false, error: "containerName is required" }, { status: 400 });
     }
 
+    assertContainerAppActive(containerName);
     const output = await restartContainer(containerName);
 
     try {
-      getDatabase().logAudit("augusto", "CONTAINER_RESTART", containerName, `Reinicio exitoso de contenedor ${containerName}`);
+      getDatabase().logAudit(actor, "CONTAINER_RESTART", containerName, `Reinicio exitoso de contenedor ${containerName}`);
     } catch {}
 
     return Response.json({
