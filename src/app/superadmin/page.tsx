@@ -43,7 +43,7 @@ export default function SuperadminPage() {
       <section aria-label="Cobertura de gobierno" className="grid gap-4 sm:grid-cols-3">
         <div className="hub-card p-5"><div className="flex items-center gap-2 text-xs text-slate-400"><Layers3 className="h-4 w-4 text-[#abc2fa]"/> SaaS registradas</div><p className="mt-2 text-3xl font-semibold text-white">{SAAS_PRODUCTS.length}</p><p className="mt-1 text-xs text-slate-400">Todas con ficha estándar</p></div>
         <div className="hub-card p-5"><div className="flex items-center gap-2 text-xs text-slate-400"><Users className="h-4 w-4 text-[#abc2fa]"/> Tenants reportados</div><p className="mt-2 text-3xl font-semibold text-white">{overview?.sources?.some(x=>x.status==="available")?overview.totalTenants:"—"}</p><p className="mt-1 text-xs text-slate-400">Según conectores actuales</p></div>
-        <div className="hub-card p-5"><div className="flex items-center gap-2 text-xs text-slate-400"><ShieldCheck className="h-4 w-4 text-[#abc2fa]"/> Superadmin integrado por completo</div><p className="mt-2 text-3xl font-semibold text-white">0 / 6</p><p className="mt-1 text-xs text-slate-400">Falta completar contratos autenticados por SaaS</p></div>
+        <div className="hub-card p-5"><div className="flex items-center gap-2 text-xs text-slate-400"><ShieldCheck className="h-4 w-4 text-[#abc2fa]"/> Superadmin integrado por completo</div><p className="mt-2 text-3xl font-semibold text-white">0 / {SAAS_PRODUCTS.length}</p><p className="mt-1 text-xs text-slate-400">Falta completar contratos autenticados por SaaS</p></div>
       </section>
       <section className="hub-card overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.08] p-5 sm:p-6">
