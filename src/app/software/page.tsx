@@ -24,6 +24,8 @@ export default function SoftwarePage() {
   const [apps, setApps] = useState<AppInfo[]>([]);
   const [filterType, setFilterType] = useState<string>("all");
   const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState<"name" | "status">("name");
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Terminal modal state
@@ -36,12 +38,15 @@ export default function SoftwarePage() {
 
   const fetchApps = async () => {
     setIsLoading(true);
+    setLoadError(null);
     try {
       const res = await fetch("/api/apps");
+      if (!res.ok) throw new Error("No se pudo conectar con el inventario de productos");
       const data = await res.json();
-      if (data.success) {
-        setApps(data.data);
-      }
+      if (!data.success || !Array.isArray(data.data)) throw new Error(data.error || "Inventario no disponible");
+      setApps(data.data);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "No se pudieron cargar los productos");
     } finally {
       setIsLoading(false);
     }
@@ -179,7 +184,10 @@ export default function SoftwarePage() {
       app.slug.toLowerCase().includes(search.toLowerCase()) ||
       app.path.toLowerCase().includes(search.toLowerCase());
     return matchesFilter && matchesSearch;
-  });
+  }).sort((a, b) =>
+    sortBy === "status" ? a.status.localeCompare(b.status) || a.name.localeCompare(b.name, "es")
+    : a.name.localeCompare(b.name, "es")
+  );
 
   return (
     <div className="flex-1 flex flex-col pb-12">
@@ -196,9 +204,9 @@ export default function SoftwarePage() {
         </section>
 
         {/* Filters and Search Bar */}
-        <div className="hub-card p-3 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <div className="relative w-full sm:w-72">
+        <div className="hub-card p-4 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+          <div className="flex items-center gap-2 w-full xl:w-auto">
+            <div className="relative w-full xl:w-72">
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
@@ -210,7 +218,7 @@ export default function SoftwarePage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto">
+          <div className="flex max-w-full items-center gap-1.5 overflow-x-auto pb-1">
             {[
               { id: "all", label: "Todos" },
               { id: "saas", label: "SaaS Core" },
@@ -233,8 +241,32 @@ export default function SoftwarePage() {
           </div>
         </div>
 
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div role="status" className="text-xs text-slate-400">
+            {isLoading ? "Cargando productos…" : loadError ? "Inventario no disponible" : `${filteredApps.length} de ${apps.length} productos`}
+          </div>
+          <label className="flex items-center gap-2 text-xs text-slate-400">
+            Ordenar por
+            <select value={sortBy} onChange={(event) => setSortBy(event.target.value as typeof sortBy)}
+              className="rounded-lg border border-white/10 bg-surface-100 px-3 py-2 text-xs text-white">
+              <option value="name">Nombre</option>
+              <option value="status">Estado</option>
+            </select>
+          </label>
+        </div>
+        {loadError && (
+          <div role="alert" className="rounded-xl border border-rose-400/20 bg-rose-400/[0.07] p-4 text-xs text-rose-200">
+            {loadError}. <button type="button" onClick={fetchApps} className="ml-2 font-semibold underline">Reintentar</button>
+          </div>
+        )}
+
         {/* Apps Matrix Table */}
         <div className="space-y-4">
+          {!isLoading && !loadError && filteredApps.length === 0 && (
+            <div className="hub-card px-6 py-10 text-center text-sm text-slate-400">
+              No hay productos que coincidan con la búsqueda o los filtros.
+            </div>
+          )}
           {filteredApps.map((app) => (
             <div
               key={app.slug}
@@ -244,7 +276,7 @@ export default function SoftwarePage() {
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                 {/* App Title & Path */}
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-bold text-white text-sm">{app.name}</h3>
                     <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/[0.04] text-gray-400 border border-white/5 uppercase">
                       {app.type}
@@ -256,10 +288,10 @@ export default function SoftwarePage() {
                           : "text-amber-400 bg-amber-500/10 border border-amber-500/20"
                       }`}
                     >
-                      {app.status.toUpperCase()}
+                      {app.status === "operational" ? "Operativa" : app.status === "degraded" ? "Degradada" : app.status === "deploying" ? "Desplegando" : "Caída"}
                     </span>
                   </div>
-                  <div className="text-xs text-gray-500 font-mono flex items-center gap-3 mt-1">
+                  <div className="mt-2 flex min-w-0 flex-wrap items-center gap-3 break-all text-xs text-gray-500 font-mono">
                     <span>{app.path}</span>
                     {app.url && (
                       <a
@@ -275,7 +307,7 @@ export default function SoftwarePage() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {app.containers.length > 0 && (
                     <button
                       onClick={() => handleOpenStreamingLogs(app.containers[0].name)}
@@ -283,7 +315,7 @@ export default function SoftwarePage() {
                       title="Ver logs en vivo (streaming)"
                     >
                       <Terminal className="w-3.5 h-3.5 text-brand-cyan" />
-                      <span>LOGS EN VIVO</span>
+                      <span>Ver logs</span>
                     </button>
                   )}
                   {app.containers[0] && (
@@ -293,7 +325,7 @@ export default function SoftwarePage() {
                       title="Reiniciar contenedor principal"
                     >
                       <RotateCw className="w-3.5 h-3.5" />
-                      <span>REINICIAR</span>
+                      <span>Reiniciar</span>
                     </button>
                   )}
                   {app.hasDockerCompose && (
@@ -302,7 +334,7 @@ export default function SoftwarePage() {
                       className="px-3 py-1.5 rounded-lg bg-brand-cyan/15 hover:bg-brand-cyan/25 text-brand-cyan border border-brand-cyan/30 text-xs font-mono font-semibold flex items-center gap-1.5 transition-all shadow-glow"
                     >
                       <Play className="w-3.5 h-3.5 fill-current" />
-                      <span>STREAM DEPLOY</span>
+                      <span>Desplegar</span>
                     </button>
                   )}
                 </div>
