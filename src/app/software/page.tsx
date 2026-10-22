@@ -20,10 +20,11 @@ import {
   User,
 } from "lucide-react";
 import { AppInfo } from "@/lib/types";
+import { portfolioSegment, type PortfolioSegment } from "@/lib/product-taxonomy";
 
 export default function SoftwarePage() {
   const [apps, setApps] = useState<AppInfo[]>([]);
-  const [filterType, setFilterType] = useState<string>("all");
+  const [filterType, setFilterType] = useState<PortfolioSegment | "all">("internal");
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<"name" | "status">("name");
   const [showArchived, setShowArchived] = useState(false);
@@ -55,7 +56,12 @@ export default function SoftwarePage() {
   };
 
   useEffect(() => {
-    setShowArchived(new URLSearchParams(window.location.search).get("archived") === "1");
+    const query = new URLSearchParams(window.location.search);
+    const segment = query.get("segment");
+    const show = query.get("archived") === "1";
+    setShowArchived(show);
+    setFilterType(show ? "all" :
+      segment === "saas" || segment === "internal" || segment === "dedicated" || segment === "infrastructure" ? segment : "internal");
     fetchApps();
   }, []);
 
@@ -182,7 +188,7 @@ export default function SoftwarePage() {
 
   const filteredApps = apps.filter((app) => {
     if (!showArchived && app.lifecycle?.state === "archived") return false;
-    const matchesFilter = filterType === "all" || app.type === filterType;
+    const matchesFilter = filterType === "all" || portfolioSegment(app) === filterType;
     const matchesSearch =
       app.name.toLowerCase().includes(search.toLowerCase()) ||
       app.slug.toLowerCase().includes(search.toLowerCase()) ||
@@ -199,11 +205,11 @@ export default function SoftwarePage() {
 
       <div className="hub-content space-y-7">
         <section className="hub-hero space-y-3">
-          <p className="hub-eyebrow">Productos / Aplicaciones</p>
-          <h1 className="hub-hero-title">Tus productos, bajo control.</h1>
+          <p className="hub-eyebrow">Portafolio / Inventario</p>
+          <h1 className="hub-hero-title">Aplicaciones, por categoría.</h1>
           <p className="hub-description">
-            Estado de aplicaciones, repositorios y despliegues de NanoLabs.
-            Encontrá cada producto y sus acciones sin navegar por diferentes consolas.
+            Cada instancia está en su grupo correcto: productos SaaS, herramientas internas,
+            clientes dedicados e infraestructura. Las acciones Docker y Git siguen disponibles aquí.
           </p>
         </section>
 
@@ -224,15 +230,15 @@ export default function SoftwarePage() {
 
           <div className="flex max-w-full items-center gap-1.5 overflow-x-auto pb-1">
             {[
-              { id: "all", label: "Todos" },
-              { id: "saas", label: "SaaS Core" },
-              { id: "client", label: "Clientes" },
-              { id: "internal", label: "Internos" },
-              { id: "infrastructure", label: "Infra" },
+              { id: "internal", label: "Apps internas" },
+              { id: "dedicated", label: "Clientes dedicados" },
+              { id: "saas", label: "SaaS" },
+              { id: "infrastructure", label: "Infraestructura" },
+              { id: "all", label: "Vista completa" },
             ].map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setFilterType(tab.id)}
+                onClick={() => setFilterType(tab.id as PortfolioSegment | "all")}
                 className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-all ${
                   filterType === tab.id
                     ? "bg-brand-cyan/15 text-brand-cyan border border-brand-cyan/30 font-semibold"
