@@ -1,700 +1,118 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { UniversalTenant, SaaSSlug, GovernanceOverview } from "./types";
 import { executeRemoteCommand } from "./ssh";
-
-const execFileAsync = promisify(execFile);
-
-/**
- * Universal Docker DB runner that handles execution inside the Docker container
- * or via SSH fallback when running elsewhere.
- */
-async function queryDockerDB(container: string, cmdArgs: string[]): Promise<string> {
+import type { GovernanceOverview, SaaSSlug, UniversalTenant } from "./types";
+import { SAAS_PRODUCTS } from "./product-taxonomy";
+const run = promisify(execFile);
+const quote = (s: string) => "'" + s.replace(/'/g, "'\\''") + "'";
+type DbTarget = {container:string; engine:"mysql"|"postgres"; database:string};
+const TARGETS: Record<SaaSSlug, DbTarget> = {
+  onlyfood:{container:"onlyfood-db-1",engine:"mysql",database:"onlyfood"},
+  onlypadel:{container:"onlypadel-db",engine:"mysql",database:"onlypadel"},
+  onlycars:{container:"onlycars-db-1",engine:"mysql",database:"onlycars"},
+  onlyerp:{container:"onlyerp-db",engine:"mysql",database:"onlyerp_db"},
+  onlygym:{container:"onlygym-db",engine:"postgres",database:"onlygym"},
+  onlyturn:{container:"onlyturn-db",engine:"postgres",database:"onlyturn"}
+};
+const QUERIES: Record<SaaSSlug,string> = {
+  onlyfood:"SELECT id,slug,name,status,createdAt FROM Tenant ORDER BY createdAt DESC LIMIT 2000;",
+  onlypadel:"SELECT id,slug,name,status,createdAt FROM tenant ORDER BY createdAt DESC LIMIT 2000;",
+  onlycars:"SELECT id,slug,name,status,createdAt FROM Tenant ORDER BY createdAt DESC LIMIT 2000;",
+  onlyerp:"SELECT id,slug,nombre,estado,fecha_alta,planId FROM Tenant ORDER BY fecha_alta DESC LIMIT 2000;",
+  onlygym:"SELECT id,slug,nombre,estado,creado_en,COALESCE(modulos::text, '{}'),plan FROM tenants ORDER BY creado_en DESC LIMIT 2000;",
+  onlyturn:'SELECT id,slug,name,status,"createdAt" FROM "Tenant" ORDER BY "createdAt" DESC LIMIT 2000;'
+};
+// Never copy passwords into the Hub repository, command-line arguments or audit logs.
+// Credentials are read in the target DB container from its pre-existing environment.
+// Operators should provision a least-privileged read-only user in a separate change window.
+const MYSQL_SCRIPT = [
+  'user="$MARIADB_USER"; test -n "$user" || user="$MYSQL_USER"',
+  'export MYSQL_PWD="$MARIADB_PASSWORD"; test -n "$MYSQL_PWD" || export MYSQL_PWD="$MYSQL_PASSWORD"',
+  'test -n "$user" && test -n "$MYSQL_PWD" || exit 3',
+  'if command -v mariadb >/dev/null 2>&1; then dbclient=mariadb; else dbclient=mysql; fi',
+  'exec "$dbclient" -u "$user" -D "$1" -N -B --raw -e "$2"',
+].join("; ");
+const PG_SCRIPT = [
+  'export PGPASSWORD="$POSTGRES_PASSWORD"',
+  'exec psql -U "$POSTGRES_USER" -d "$1" -t -A -F "$(printf \'\\t\')" -c "$2"',
+].join("; ");
+async function selectOnly(saas: SaaSSlug): Promise<string> {
+  const sql=QUERIES[saas], target=TARGETS[saas];
+  if (!/^SELECT /i.test(sql) || /;\s*\S/.test(sql) || /--|\/\*/.test(sql)) throw Error("Consulta fuera del contrato de solo lectura");
+  const argv=["exec",target.container,"sh","-ec",target.engine==="mysql"?MYSQL_SCRIPT:PG_SCRIPT,
+    "hub-ro",target.database,sql];
   if (process.env.DOCKER_HOST_MODE === "internal") {
-    try {
-      const { stdout } = await execFileAsync("docker", ["exec", container, ...cmdArgs]);
-      return stdout.trim();
-    } catch (err: any) {
-      console.error("queryDockerDB error", container, err instanceof Error ? err.message.slice(0,120) : "unknown");
-      throw new Error("Error consultando el conector " + container);
+    try {return (await run("docker",argv,{timeout:10000,maxBuffer:4*1024*1024})).stdout.trim();}
+    catch {throw Error("Conector de solo lectura sin respuesta");}
+  }
+  const result=await executeRemoteCommand("timeout 12 docker " + argv.map(quote).join(" "));
+  if (result.code!==0) throw Error("Conector de solo lectura sin respuesta");
+  return result.stdout.trim();
+}
+export function normalizeTenantStatus(raw:string):UniversalTenant["status"] {
+  const status=raw.toUpperCase().trim();
+  if (["ACTIVE","ACTIVO"].includes(status))return "ACTIVE";
+  if (["TRIAL","PRUEBA","TRIALING"].includes(status))return "TRIAL";
+  if (["SUSPENDED","SUSPENDIDO"].includes(status))return "SUSPENDED";
+  if (["CANCELED","CANCELLED","CANCELADO","INACTIVO","INACTIVE"].includes(status))return "CANCELED";
+  throw Error("Estado no reconocido; se detuvo la lectura para evitar normalizaciones falsas");
+}
+function dateOrBlank(v:string):string {
+  if(!v||v==="NULL")return "";
+  const parsed=new Date(v);
+  return Number.isFinite(parsed.getTime())?parsed.toISOString():"";
+}
+function mapRows(saas:SaaSSlug,raw:string):UniversalTenant[] {
+  if (!raw) return [];
+  const product=SAAS_PRODUCTS.find(p=>p.slug===saas)!;
+  return raw.split("\n").filter(Boolean).map(line=>{
+    const fields=line.replace(/\r$/,"").split("\t");
+    const [id,slug,name,status,date]=fields;
+    if(!id||!slug||!name)throw Error("Fila incompleta; el conector " + saas + " no se considera saludable");
+    let modules:Record<string,boolean>={};
+    if(saas==="onlygym"&&fields[5]&&fields[5]!=="NULL") {
+      const parsed:unknown=JSON.parse(fields[5]);
+      if(parsed && typeof parsed==="object"&&!Array.isArray(parsed))
+        modules=Object.fromEntries(Object.entries(parsed).filter(([key,value])=>/^[a-z0-9_]+$/i.test(key)&&typeof value==="boolean")) as Record<string,boolean>;
     }
-  }
-
-  // Fallback via SSH
-  const escapedArgs = cmdArgs.map((a) => `'${a.replace(/'/g, "'\\''")}'`).join(" ");
-  const remoteCmd = `docker exec ${container} ${escapedArgs}`;
-  const res = await executeRemoteCommand(remoteCmd);
-  if (res.code !== 0) throw new Error("El conector Docker no pudo ejecutar la consulta");
-  return res.stdout || "";
+    return {
+      id:String(id),saas,saasName:product.name,slug:String(slug),name:String(name),
+      status:normalizeTenantStatus(status),rawStatus:status,
+      plan:saas==="onlygym" ? fields[6]||"Sin informar" :
+        saas==="onlyerp"?"Plan #" + (fields[5]||"—"):"Sin plan conectado",
+      createdAt:dateOrBlank(date),domain:"",
+      metrics:{totalRecords:0,recordLabel:"Métricas no conectadas",available:false},modules
+    };
+  });
 }
-
-/**
- * Normalizes status strings across different DB standards to Universal status
- */
-function normalizeStatus(raw: string): "ACTIVE" | "TRIAL" | "SUSPENDED" | "CANCELED" {
-  const s = (raw || "").toUpperCase().trim();
-  if (s === "ACTIVE" || s === "ACTIVO") return "ACTIVE";
-  if (s === "TRIAL" || s === "PRUEBA") return "TRIAL";
-  if (s === "SUSPENDED" || s === "SUSPENDIDO") return "SUSPENDED";
-  if (s === "CANCELED" || s === "CANCELADO" || s === "INACTIVE" || s === "INACTIVO") return "CANCELED";
-  return "ACTIVE";
-}
-
-/**
- * ONLYFOOD DB CONNECTOR
- */
-async function getOnlyFoodTenants(): Promise<UniversalTenant[]> {
-  try {
-    const rawTenants = await queryDockerDB("onlyfood-db-1", [
-      "mariadb",
-      "-u",
-      "onlyfood",
-      "-p42da82eca286a3086723f3f1e4e9ec7cee875e00c7b81e50d8b9fcf2ae87392f",
-      "onlyfood",
-      "-N",
-      "-e",
-      "SELECT id, slug, name, status, createdAt FROM Tenant;",
-    ]);
-
-    if (!rawTenants) return [];
-
-    // Metrics: orders count per tenant
-    const rawOrders = await queryDockerDB("onlyfood-db-1", [
-      "mariadb",
-      "-u",
-      "onlyfood",
-      "-p42da82eca286a3086723f3f1e4e9ec7cee875e00c7b81e50d8b9fcf2ae87392f",
-      "onlyfood",
-      "-N",
-      "-e",
-      "SELECT tenantId, COUNT(*) FROM `Order` GROUP BY tenantId;",
-    ]);
-    const ordersMap = new Map<string, number>();
-    rawOrders.split("\n").forEach((line) => {
-      const [tId, cnt] = line.trim().split("\t");
-      if (tId) ordersMap.set(tId, Number(cnt) || 0);
-    });
-
-    const lines = rawTenants.split("\n").filter(Boolean);
-    return lines.map((line) => {
-      const [id, slug, name, status, createdAt] = line.trim().split("\t");
-      return {
-        id,
-        saas: "onlyfood",
-        saasName: "OnlyFood SaaS",
-        slug,
-        name: name || slug,
-        status: normalizeStatus(status),
-        rawStatus: status,
-        plan: "Gastronómico Pro",
-        createdAt: createdAt ? createdAt.split(".")[0] : new Date().toISOString(),
-        domain: `${slug}.nanoapps.ar`,
-        metrics: {
-          totalRecords: ordersMap.get(id) || 0,
-          recordLabel: "Pedidos",
-          secondaryMetric: {
-            label: "Menú Digital",
-            value: 1,
-          },
-        },
-        modules: {
-          delivery: true,
-          kitchen_display: true,
-          whatsapp_alerts: true,
-          kiosco: false,
-        },
-      };
-    });
-  } catch (err) {
-    console.error("Error fetching OnlyFood tenants:", err);
-    return [];
-  }
-}
-
-/**
- * ONLYPADEL DB CONNECTOR
- */
-async function getOnlyPadelTenants(): Promise<UniversalTenant[]> {
-  try {
-    const rawTenants = await queryDockerDB("onlypadel-db", [
-      "mariadb",
-      "-u",
-      "onlypadel",
-      "-p8NfSlMUnJ7gxH7qMbvzUz8zHqsK3esUCxx6O3GeB2+GdAT3O",
-      "onlypadel",
-      "-N",
-      "-e",
-      "SELECT id, slug, name, status, createdAt FROM tenant;",
-    ]);
-
-    if (!rawTenants) return [];
-
-    // Metrics: bookings count per tenant
-    const rawBookings = await queryDockerDB("onlypadel-db", [
-      "mariadb",
-      "-u",
-      "onlypadel",
-      "-p8NfSlMUnJ7gxH7qMbvzUz8zHqsK3esUCxx6O3GeB2+GdAT3O",
-      "onlypadel",
-      "-N",
-      "-e",
-      "SELECT tenantId, COUNT(*) FROM booking GROUP BY tenantId;",
-    ]);
-    const bookingsMap = new Map<string, number>();
-    rawBookings.split("\n").forEach((line) => {
-      const [tId, cnt] = line.trim().split("\t");
-      if (tId) bookingsMap.set(tId, Number(cnt) || 0);
-    });
-
-    const lines = rawTenants.split("\n").filter(Boolean);
-    return lines.map((line) => {
-      const [id, slug, name, status, createdAt] = line.trim().split("\t");
-      return {
-        id,
-        saas: "onlypadel",
-        saasName: "OnlyPadel SaaS",
-        slug,
-        name: name || slug,
-        status: normalizeStatus(status),
-        rawStatus: status,
-        plan: "Club Platinum",
-        createdAt: createdAt ? createdAt.split(".")[0] : new Date().toISOString(),
-        domain: `${slug}.nanoapps.ar`,
-        metrics: {
-          totalRecords: bookingsMap.get(id) || 0,
-          recordLabel: "Reservas",
-          secondaryMetric: {
-            label: "Canchas",
-            value: 4,
-          },
-        },
-        modules: {
-          turnos_online: true,
-          torneos: true,
-          ranking_jugadores: true,
-          passkeys: true,
-        },
-      };
-    });
-  } catch (err) {
-    console.error("Error fetching OnlyPadel tenants:", err);
-    return [];
-  }
-}
-
-/**
- * ONLYCARS DB CONNECTOR
- */
-async function getOnlyCarsTenants(): Promise<UniversalTenant[]> {
-  try {
-    const rawTenants = await queryDockerDB("onlycars-db-1", [
-      "mariadb",
-      "-u",
-      "onlycars",
-      "-p303ee52464e099ccdcaf0fc2254cd9f9",
-      "onlycars",
-      "-N",
-      "-e",
-      "SELECT id, slug, name, status, createdAt FROM Tenant;",
-    ]);
-
-    if (!rawTenants) return [];
-
-    // Metrics: vehicles count per tenant
-    const rawVehicles = await queryDockerDB("onlycars-db-1", [
-      "mariadb",
-      "-u",
-      "onlycars",
-      "-p303ee52464e099ccdcaf0fc2254cd9f9",
-      "onlycars",
-      "-N",
-      "-e",
-      "SELECT tenantId, COUNT(*) FROM Vehiculo GROUP BY tenantId;",
-    ]);
-    const vehiclesMap = new Map<string, number>();
-    rawVehicles.split("\n").forEach((line) => {
-      const [tId, cnt] = line.trim().split("\t");
-      if (tId) vehiclesMap.set(tId, Number(cnt) || 0);
-    });
-
-    const lines = rawTenants.split("\n").filter(Boolean);
-    return lines.map((line) => {
-      const [id, slug, name, status, createdAt] = line.trim().split("\t");
-      return {
-        id,
-        saas: "onlycars",
-        saasName: "OnlyCars SaaS",
-        slug,
-        name: name || slug,
-        status: normalizeStatus(status),
-        rawStatus: status,
-        plan: "Dealership Enterprise",
-        createdAt: createdAt ? createdAt.split(".")[0] : new Date().toISOString(),
-        domain: `${slug}.nanoapps.ar`,
-        metrics: {
-          totalRecords: vehiclesMap.get(id) || 0,
-          recordLabel: "Vehículos",
-          secondaryMetric: {
-            label: "Publicaciones",
-            value: 12,
-          },
-        },
-        modules: {
-          stock_multisede: true,
-          cotizador_creditos: true,
-          crm_prospectos: true,
-          firma_digital: false,
-        },
-      };
-    });
-  } catch (err) {
-    console.error("Error fetching OnlyCars tenants:", err);
-    return [];
-  }
-}
-
-/**
- * ONLYGYM DB CONNECTOR
- */
-async function getOnlyGymTenants(): Promise<UniversalTenant[]> {
-  try {
-    const rawTenants = await queryDockerDB("onlygym-db", [
-      "psql",
-      "-U",
-      "onlygym",
-      "-d",
-      "onlygym",
-      "-t",
-      "-A",
-      "-F",
-      "\t",
-      "-c",
-      "SELECT id, slug, nombre, estado, plan, COALESCE(modulos::text, '{}'), creado_en FROM tenants;",
-    ]);
-
-    if (!rawTenants) return [];
-
-    // Metrics: clientes count per tenant
-    const rawClientes = await queryDockerDB("onlygym-db", [
-      "psql",
-      "-U",
-      "onlygym",
-      "-d",
-      "onlygym",
-      "-t",
-      "-A",
-      "-F",
-      "\t",
-      "-c",
-      "SELECT tenant_id, COUNT(*) FROM clientes GROUP BY tenant_id;",
-    ]);
-    const clientesMap = new Map<string, number>();
-    rawClientes.split("\n").forEach((line) => {
-      const [tId, cnt] = line.trim().split("\t");
-      if (tId) clientesMap.set(tId, Number(cnt) || 0);
-    });
-
-    const lines = rawTenants.split("\n").filter(Boolean);
-    return lines.map((line) => {
-      const [id, slug, name, status, plan, modulosJson, createdAt] = line.trim().split("\t");
-      let mods: Record<string, boolean> = {
-        clases: true,
-        puntos: true,
-        progreso: true,
-        entrenamiento: true,
-      };
-      try {
-        if (modulosJson) mods = { ...mods, ...JSON.parse(modulosJson) };
-      } catch {}
-
-      return {
-        id,
-        saas: "onlygym",
-        saasName: "OnlyGym SaaS",
-        slug,
-        name: name || slug,
-        status: normalizeStatus(status),
-        rawStatus: status,
-        plan: plan ? `Gimnasio ${plan.toUpperCase()}` : "Gimnasio Profesional",
-        createdAt: createdAt ? createdAt.split(".")[0] : new Date().toISOString(),
-        domain: `${slug}.nanoapps.ar`,
-        metrics: {
-          totalRecords: clientesMap.get(id) || 0,
-          recordLabel: "Socios",
-          secondaryMetric: {
-            label: "Rutinas",
-            value: 8,
-          },
-        },
-        modules: mods,
-      };
-    });
-  } catch (err) {
-    console.error("Error fetching OnlyGym tenants:", err);
-    return [];
-  }
-}
-
-/**
- * ONLYTURN DB CONNECTOR
- */
-async function getOnlyTurnTenants(): Promise<UniversalTenant[]> {
-  try {
-    const rawTenants = await queryDockerDB("onlyturn-db", [
-      "psql",
-      "-U",
-      "onlyturn",
-      "-d",
-      "onlyturn",
-      "-t",
-      "-A",
-      "-F",
-      "\t",
-      "-c",
-      'SELECT id, slug, name, status, "createdAt" FROM "Tenant";',
-    ]);
-
-    if (!rawTenants) return [];
-
-    // Metrics: bookings count
-    const rawBookings = await queryDockerDB("onlyturn-db", [
-      "psql",
-      "-U",
-      "onlyturn",
-      "-d",
-      "onlyturn",
-      "-t",
-      "-A",
-      "-F",
-      "\t",
-      "-c",
-      'SELECT "tenantId", COUNT(*) FROM "Booking" GROUP BY "tenantId";',
-    ]);
-    const bookingsMap = new Map<string, number>();
-    rawBookings.split("\n").forEach((line) => {
-      const [tId, cnt] = line.trim().split("\t");
-      if (tId) bookingsMap.set(tId, Number(cnt) || 0);
-    });
-
-    const lines = rawTenants.split("\n").filter(Boolean);
-    return lines.map((line) => {
-      const [id, slug, name, status, createdAt] = line.trim().split("\t");
-      return {
-        id,
-        saas: "onlyturn",
-        saasName: "OnlyTurn SaaS",
-        slug,
-        name: name || slug,
-        status: normalizeStatus(status),
-        rawStatus: status,
-        plan: "Turnos Inteligente Pro",
-        createdAt: createdAt ? createdAt.split(".")[0] : new Date().toISOString(),
-        domain: `${slug}.nanoapps.ar`,
-        metrics: {
-          totalRecords: bookingsMap.get(id) || 0,
-          recordLabel: "Citas / Turnos",
-          secondaryMetric: {
-            label: "Profesionales",
-            value: 3,
-          },
-        },
-        modules: {
-          agenda_online: true,
-          recordatorios_whatsapp: true,
-          cobros_señas: true,
-          multi_profesional: true,
-        },
-      };
-    });
-  } catch (err) {
-    console.error("Error fetching OnlyTurn tenants:", err);
-    return [];
-  }
-}
-
-/**
- * ONLYERP DB CONNECTOR
- */
-async function getOnlyERPTenants(): Promise<UniversalTenant[]> {
-  try {
-    const rawTenants = await queryDockerDB("onlyerp-db", [
-      "mysql",
-      "-u",
-      "onlyerp_app",
-      "-pb46f852abfc4a5124253ba8ff7b52563",
-      "onlyerp_db",
-      "-N",
-      "-e",
-      "SELECT id, slug, nombre, estado, createdAt FROM Tenant;",
-    ]);
-
-    if (!rawTenants) return [];
-
-    // Metrics: Products count
-    const rawProducts = await queryDockerDB("onlyerp-db", [
-      "mysql",
-      "-u",
-      "onlyerp_app",
-      "-pb46f852abfc4a5124253ba8ff7b52563",
-      "onlyerp_db",
-      "-N",
-      "-e",
-      "SELECT tenantId, COUNT(*) FROM Producto GROUP BY tenantId;",
-    ]);
-    const productsMap = new Map<string, number>();
-    rawProducts.split("\n").forEach((line) => {
-      const [tId, cnt] = line.trim().split("\t");
-      if (tId) productsMap.set(tId, Number(cnt) || 0);
-    });
-
-    const lines = rawTenants.split("\n").filter(Boolean);
-    return lines.map((line) => {
-      const [id, slug, name, status, createdAt] = line.trim().split("\t");
-      return {
-        id,
-        saas: "onlyerp",
-        saasName: "OnlyERP · Tommasi",
-        slug,
-        name: name || slug,
-        status: normalizeStatus(status),
-        rawStatus: status,
-        plan: "Distribución Mayorista",
-        createdAt: createdAt ? createdAt.split(".")[0] : new Date().toISOString(),
-        domain: `onlyerp.nanoapps.ar`,
-        metrics: {
-          totalRecords: productsMap.get(id) || 0,
-          recordLabel: "Artículos Stock",
-          secondaryMetric: {
-            label: "Depósitos",
-            value: 2,
-          },
-        },
-        modules: {
-          facturacion_afip: true,
-          cuentas_corrientes: true,
-          repartos_hojas_ruta: true,
-          listas_precios_multiples: true,
-        },
-      };
-    });
-  } catch (err) {
-    console.error("Error fetching OnlyERP tenants:", err);
-    return [];
-  }
-}
-
-/**
- * Returns all tenants unified across the 6 SaaS platforms
- */
-export async function getUniversalGovernanceOverview(): Promise<GovernanceOverview> {
-  const [food, padel, cars, gym, turn, erp] = await Promise.all([
-    getOnlyFoodTenants(),
-    getOnlyPadelTenants(),
-    getOnlyCarsTenants(),
-    getOnlyGymTenants(),
-    getOnlyTurnTenants(),
-    getOnlyERPTenants(),
-  ]);
-
-  const allTenants = [...food, ...padel, ...cars, ...gym, ...turn, ...erp];
-
-  const totalTenants = allTenants.length;
-  const activeTenants = allTenants.filter((t) => t.status === "ACTIVE").length;
-  const trialTenants = allTenants.filter((t) => t.status === "TRIAL").length;
-  const suspendedTenants = allTenants.filter((t) => t.status === "SUSPENDED" || t.status === "CANCELED").length;
-  const totalRecordsManaged = allTenants.reduce((acc, t) => acc + t.metrics.totalRecords, 0);
-
-  const legacyPanels = [
-    {
-      saas: "OnlyFood",
-      legacyAdminUrl: "https://onlyfood.nanoapps.ar/admin",
-      sunsetStatus: "active_deprecated" as const,
-      replacementUrl: "https://hub.nanoapps.ar/governance?saas=onlyfood",
-      notes: "Panel anterior: migración de funciones administrativas por verificar.",
-    },
-    {
-      saas: "OnlyPadel",
-      legacyAdminUrl: "https://onlypadel.nanoapps.ar/admin",
-      sunsetStatus: "active_deprecated" as const,
-      replacementUrl: "https://hub.nanoapps.ar/governance?saas=onlypadel",
-      notes: "Panel anterior: migración de funciones administrativas por verificar.",
-    },
-    {
-      saas: "OnlyCars",
-      legacyAdminUrl: "https://onlycars.nanoapps.ar/admin",
-      sunsetStatus: "active_deprecated" as const,
-      replacementUrl: "https://hub.nanoapps.ar/governance?saas=onlycars",
-      notes: "Panel anterior: migración de funciones administrativas por verificar.",
-    },
-    {
-      saas: "OnlyGym",
-      legacyAdminUrl: "https://onlygym.nanoapps.ar/admin",
-      sunsetStatus: "active_deprecated" as const,
-      replacementUrl: "https://hub.nanoapps.ar/governance?saas=onlygym",
-      notes: "Panel anterior: migración de funciones administrativas por verificar.",
-    },
-    {
-      saas: "OnlyTurn",
-      legacyAdminUrl: "https://onlyturn.nanoapps.ar/admin",
-      sunsetStatus: "active_deprecated" as const,
-      replacementUrl: "https://hub.nanoapps.ar/governance?saas=onlyturn",
-      notes: "Panel anterior: migración de funciones administrativas por verificar.",
-    },
-    {
-      saas: "OnlyERP · Tommasi",
-      legacyAdminUrl: "https://onlyerp.nanoapps.ar/superadmin",
-      sunsetStatus: "active_deprecated" as const,
-      replacementUrl: "https://hub.nanoapps.ar/governance?saas=onlyerp",
-      notes: "Panel anterior: migración de funciones administrativas por verificar.",
-    },
-  ];
-
+export async function getUniversalGovernanceOverview():Promise<GovernanceOverview>{
+  const outcomes=await Promise.allSettled(SAAS_PRODUCTS.map(p=>selectOnly(p.slug).then(raw=>mapRows(p.slug,raw))));
+  const tenants=outcomes.flatMap(outcome=>outcome.status==="fulfilled"?outcome.value:[]);
+  const sources:NonNullable<GovernanceOverview["sources"]>=outcomes.map((outcome,index)=>({
+    saas:SAAS_PRODUCTS[index].slug,
+    status:outcome.status==="fulfilled"?"available":"unavailable",
+    count:outcome.status==="fulfilled"?outcome.value.length:null,
+    checkedAt:new Date().toISOString(),
+    message:outcome.status==="rejected"?"Consulta fallida: no equivale a cero clientes":null
+  }));
   return {
-    totalTenants,
-    activeTenants,
-    trialTenants,
-    suspendedTenants,
-    saasCount: 6,
-    totalRecordsManaged,
-    tenants: allTenants,
-    legacyPanels,
+    tenants,sources,saasCount:SAAS_PRODUCTS.length,
+    totalTenants:tenants.length,
+    activeTenants:tenants.filter(t=>t.status==="ACTIVE").length,
+    trialTenants:tenants.filter(t=>t.status==="TRIAL").length,
+    suspendedTenants:tenants.filter(t=>t.status==="SUSPENDED"||t.status==="CANCELED").length,
+    totalRecordsManaged:0,
+    legacyPanels:SAAS_PRODUCTS.map(p=>({
+      saas:p.name,legacyAdminUrl:"https://"+p.domain+"/superadmin",
+      sunsetStatus:"active_deprecated",replacementUrl:"https://hub.nanoapps.ar/saas/"+p.slug,
+      notes:"El panel anterior sigue siendo necesario para las acciones todavía no integradas."
+    }))
   };
 }
-
-/**
- * Updates a tenant status directly in its dedicated database
- */
-export async function updateTenantStatusInDB(
-  saas: SaaSSlug,
-  tenantId: string,
-  newStatus: "ACTIVE" | "TRIAL" | "SUSPENDED" | "CANCELED"
-): Promise<{ success: boolean; output: string }> {
-  let output = "";
-
-  switch (saas) {
-    case "onlyfood": {
-      output = await queryDockerDB("onlyfood-db-1", [
-        "mariadb",
-        "-u",
-        "onlyfood",
-        "-p42da82eca286a3086723f3f1e4e9ec7cee875e00c7b81e50d8b9fcf2ae87392f",
-        "onlyfood",
-        "-e",
-        `UPDATE Tenant SET status = '${newStatus}' WHERE id = '${tenantId}';`,
-      ]);
-      break;
-    }
-    case "onlypadel": {
-      output = await queryDockerDB("onlypadel-db", [
-        "mariadb",
-        "-u",
-        "onlypadel",
-        "-p8NfSlMUnJ7gxH7qMbvzUz8zHqsK3esUCxx6O3GeB2+GdAT3O",
-        "onlypadel",
-        "-e",
-        `UPDATE tenant SET status = '${newStatus}' WHERE id = '${tenantId}';`,
-      ]);
-      break;
-    }
-    case "onlycars": {
-      output = await queryDockerDB("onlycars-db-1", [
-        "mariadb",
-        "-u",
-        "onlycars",
-        "-p303ee52464e099ccdcaf0fc2254cd9f9",
-        "onlycars",
-        "-e",
-        `UPDATE Tenant SET status = '${newStatus}' WHERE id = '${tenantId}';`,
-      ]);
-      break;
-    }
-    case "onlygym": {
-      const gymStatus = newStatus === "ACTIVE" ? "activo" : newStatus === "TRIAL" ? "prueba" : "suspendido";
-      output = await queryDockerDB("onlygym-db", [
-        "psql",
-        "-U",
-        "onlygym",
-        "-d",
-        "onlygym",
-        "-c",
-        `UPDATE tenants SET estado = '${gymStatus}' WHERE id = ${Number(tenantId) || 0};`,
-      ]);
-      break;
-    }
-    case "onlyturn": {
-      output = await queryDockerDB("onlyturn-db", [
-        "psql",
-        "-U",
-        "onlyturn",
-        "-d",
-        "onlyturn",
-        "-c",
-        `UPDATE "Tenant" SET status = '${newStatus}' WHERE id = '${tenantId}';`,
-      ]);
-      break;
-    }
-    case "onlyerp": {
-      const erpStatus = newStatus === "ACTIVE" ? "ACTIVO" : newStatus === "TRIAL" ? "PRUEBA" : "SUSPENDIDO";
-      output = await queryDockerDB("onlyerp-db", [
-        "mysql",
-        "-u",
-        "onlyerp_app",
-        "-pb46f852abfc4a5124253ba8ff7b52563",
-        "onlyerp_db",
-        "-e",
-        `UPDATE Tenant SET estado = '${erpStatus}' WHERE id = ${Number(tenantId) || 0};`,
-      ]);
-      break;
-    }
-  }
-
-  return { success: true, output: output || "Actualización de estado exitosa" };
+// No writes to any SaaS production database. Unsafe legacy SQL and credential literals removed.
+export async function updateTenantStatusInDB():Promise<never> {
+  throw Error("Cambios de estado deshabilitados: requiere adaptador API autenticado, auditado y probado.");
 }
-
-/**
- * Toggles a feature module in the tenant's database
- */
-export async function toggleTenantModuleInDB(
-  saas: SaaSSlug,
-  tenantId: string,
-  moduleKey: string,
-  enabled: boolean
-): Promise<{ success: boolean; output: string }> {
-  let output = "";
-
-  if (saas === "onlygym") {
-    // OnlyGym stores modules in JSONB
-    const current = await queryDockerDB("onlygym-db", [
-      "psql",
-      "-U",
-      "onlygym",
-      "-d",
-      "onlygym",
-      "-t",
-      "-A",
-      "-c",
-      `SELECT COALESCE(modulos::text, '{}') FROM tenants WHERE id = ${Number(tenantId) || 0};`,
-    ]);
-    let modsObj: Record<string, boolean> = {};
-    try {
-      modsObj = JSON.parse(current || "{}");
-    } catch {}
-    modsObj[moduleKey] = enabled;
-
-    output = await queryDockerDB("onlygym-db", [
-      "psql",
-      "-U",
-      "onlygym",
-      "-d",
-      "onlygym",
-      "-c",
-      `UPDATE tenants SET modulos = '${JSON.stringify(modsObj)}'::jsonb WHERE id = ${Number(tenantId) || 0};`,
-    ]);
-  } else {
-    // No production connector exists for these SaaS: never report a fake success.
-    throw new Error("La edición de módulos todavía no está integrada para esta SaaS");
-  }
-
-  return { success: true, output };
+export async function toggleTenantModuleInDB():Promise<never> {
+  throw Error("Edición de módulos deshabilitada: requiere adaptador API autenticado, auditado y probado.");
 }
-
