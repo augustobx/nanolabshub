@@ -77,10 +77,17 @@ async function probeWebsite(url: string | undefined): Promise<AppInfo["web"]> {
   }
   const started = Date.now();
   try {
-    const response = await fetch(url, {
+    let response = await fetch(url, {
       method: "HEAD", signal: AbortSignal.timeout(4500),
       cache: "no-store", redirect: "follow",
     });
+    if (response.status === 405 || response.status === 501) {
+      response = await fetch(url, {
+        method: "GET", signal: AbortSignal.timeout(4500),
+        cache: "no-store", redirect: "follow",
+      });
+      void response.body?.cancel();
+    }
     return {
       status: response.status === 401 || response.status === 403 ? "restricted"
         : response.ok ? "online" : "offline",
