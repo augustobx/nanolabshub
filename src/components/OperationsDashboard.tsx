@@ -134,14 +134,20 @@ export function OperationsDashboard() {
   const archivedCount = allApps.filter((app) => app.lifecycle?.state === "archived").length;
   const apps = allApps.filter((app) => app.lifecycle?.state !== "archived");
   const containers = snapshot?.containers ?? [];
+  const archivedContainers = new Set(allApps.filter((app) => app.lifecycle?.state === "archived")
+    .flatMap((app) => app.containers.map((container) => container.name)));
+  const intentionallyStopped = new Set(allApps.filter((app) =>
+    app.lifecycle?.state === "archived" || app.lifecycle?.state === "suspended")
+    .flatMap((app) => app.containers.map((container) => container.name)));
   const metrics = snapshot?.telemetry;
   const running = containers.filter((c) => c.state === "running").length;
   const finishedTasks = containers.filter((c) => c.isJob && c.state === "exited" && c.exitCode === 0);
   const visibleContainers = containers.filter((c) =>
-    showFinishedTasks || !(c.isJob && c.state === "exited" && c.exitCode === 0)
+    !archivedContainers.has(c.name) &&
+    (showFinishedTasks || !(c.isJob && c.state === "exited" && c.exitCode === 0))
   );
-  const unhealthy = containers.filter((c) => c.health === "unhealthy" ||
-    (c.state === "exited" && !(c.isJob && c.exitCode === 0))).length;
+  const unhealthy = containers.filter((c) => !intentionallyStopped.has(c.name) &&
+    (c.health === "unhealthy" || (c.state === "exited" && !(c.isJob && c.exitCode === 0)))).length;
   const gitDiff = apps.filter((a) => a.git.remoteStatus === "different").length;
   const dirtyGitApps = apps.filter((a) => a.git.isRepo && a.git.dirtyFilesCount > 0).length;
   const gitReview = apps.filter((a) => a.git.remoteStatus === "different" || a.git.dirtyFilesCount > 0).length;
