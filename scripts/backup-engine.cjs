@@ -29,8 +29,13 @@ async function createBackup(apps,slug,trigger="manual",actor="admin"){
  const app=appOf(apps,slug);await fsp.mkdir(DATA,{recursive:true});const lock=path.join(DATA,"backup-"+slug+".lock");
  let h;try{h=await fsp.open(lock,"wx",0o600);}catch(e){throw Error(e.code==="EEXIST"?"Backup en curso o lock pendiente de revisión":e.message);}
  try{
-  await fsp.mkdir(ROOT,{recursive:true,mode:0o700});const disk=await fsp.statfs(ROOT);if(disk.bavail*disk.bsize<1024**3)throw Error("Menos de 1 GB libre");
+  await fsp.mkdir(ROOT,{recursive:true,mode:0o700});
+  const rootStat=await fsp.lstat(ROOT);
+  if(!rootStat.isDirectory() || rootStat.isSymbolicLink())throw Error("Directorio de backups inválido");
+  const disk=await fsp.statfs(ROOT);if(disk.bavail*disk.bsize<1024**3)throw Error("Menos de 1 GB libre");
   const dir=path.join(ROOT,slug);await fsp.mkdir(dir,{recursive:true,mode:0o700});
+  const directoryStat=await fsp.lstat(dir);
+  if(!directoryStat.isDirectory() || directoryStat.isSymbolicLink())throw Error("Ruta de backup insegura");
   const id=crypto.randomUUID(),filename=slug+"_"+new Date().toISOString().replace(/\D/g,"").slice(0,14)+"_"+id.slice(0,8)+(app.dbType==="sqlite"?".sqlite.gz":".sql.gz");
   const tmp=path.join(dir,"."+filename+".part"),dst=path.join(dir,filename),d=db();
   try{
