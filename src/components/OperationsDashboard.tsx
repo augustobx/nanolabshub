@@ -301,6 +301,7 @@ export function OperationsDashboard() {
                           {shortSha(app.deployment?.revision)}
                         </div>
                         <div className="mt-1 text-[11px] text-slate-400">{app.deployment?.status === "identified" ? "Commit de build" : app.deployment?.imageId ? `Imagen ${app.deployment.imageId.slice(7, 19)}` : "Sin identificar"}</div>
+                        {app.deployment?.imageTag && <div className="mt-1 max-w-[180px] truncate text-[11px] text-slate-500" title={app.deployment.imageTag}>{app.deployment.imageTag}</div>}
                       </td>
                       <td className="px-3">
                         <Pill text={app.status === "not_deployed" ? "No desplegada" : `${app.containers.filter(c => c.state === "running").length}/${app.containers.length} activos`}
