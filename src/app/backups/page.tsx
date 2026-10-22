@@ -235,17 +235,17 @@ export default function BackupsPage() {
                   const active = manualAppSlug === app.slug;
                   return (
                     <button key={app.slug} type="button" aria-pressed={active}
-                      aria-label={\`Seleccionar \${app.name} para backup\`}
+                      aria-label={`Seleccionar ${app.name} para backup`}
                       onClick={() => setManualAppSlug(app.slug)}
                       disabled={isTriggering !== null}
-                      className={\`group min-w-0 rounded-xl border p-3.5 text-left transition-all duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-cyan disabled:cursor-wait disabled:opacity-60 \${active
+                      className={`group min-w-0 rounded-xl border p-3.5 text-left transition-all duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-cyan disabled:cursor-wait disabled:opacity-60 ${active
                         ? "border-brand-cyan/60 bg-brand-cyan/[0.09] ring-1 ring-brand-cyan/20"
-                        : "border-white/[0.09] bg-white/[0.025] hover:border-white/25 hover:bg-white/[0.06]"}\`}>
+                        : "border-white/[0.09] bg-white/[0.025] hover:border-white/25 hover:bg-white/[0.06]"}`}>
                       <span className="flex items-start justify-between gap-2">
-                        <span className={\`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg \${active ? "bg-brand-cyan/15 text-brand-cyan" : "bg-white/[0.06] text-slate-400"}\`}>
+                        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${active ? "bg-brand-cyan/15 text-brand-cyan" : "bg-white/[0.06] text-slate-400"}`}>
                           <Database className="h-[18px] w-[18px]" />
                         </span>
-                        <span aria-hidden="true" className={\`flex h-[18px] w-[18px] items-center justify-center rounded-full border \${active ? "border-brand-cyan bg-brand-cyan text-[#101827]" : "border-slate-600"}\`}>
+                        <span aria-hidden="true" className={`flex h-[18px] w-[18px] items-center justify-center rounded-full border ${active ? "border-brand-cyan bg-brand-cyan text-[#101827]" : "border-slate-600"}`}>
                           {active && <CheckCircle2 className="h-3.5 w-3.5" />}
                         </span>
                       </span>
