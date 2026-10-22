@@ -330,11 +330,19 @@ export default function SoftwarePage() {
                   )}
                   {app.hasDockerCompose && (
                     <button
+                      type="button"
+                      disabled={!app.git.isRepo || !!app.git.localError || !app.git.branch ||
+                        app.git.branch === "detached" || app.git.dirtyFilesCount > 0}
                       onClick={() => handleStreamingDeploy(app)}
-                      className="px-3 py-1.5 rounded-lg bg-brand-cyan/15 hover:bg-brand-cyan/25 text-brand-cyan border border-brand-cyan/30 text-xs font-mono font-semibold flex items-center gap-1.5 transition-all shadow-glow"
+                      title={!app.git.isRepo ? "La aplicación no tiene un repositorio Git local" :
+                        app.git.localError ? app.git.localError :
+                        app.git.branch === "detached" ? "Checkout detached: seleccioná una rama válida en el servidor antes de desplegar" :
+                        app.git.dirtyFilesCount > 0 ? "Hay cambios locales. Revisalos antes de desplegar" : "Desplegar con Git pull --ff-only"}
+                      className="px-3 py-1.5 rounded-lg bg-brand-cyan/15 hover:bg-brand-cyan/25 text-brand-cyan border border-brand-cyan/30 text-xs font-mono font-semibold flex items-center gap-1.5 transition-all shadow-glow disabled:cursor-not-allowed disabled:border-slate-700 disabled:bg-slate-700/20 disabled:text-slate-400 disabled:shadow-none"
                     >
                       <Play className="w-3.5 h-3.5 fill-current" />
-                      <span>Desplegar</span>
+                      <span>{!app.git.isRepo || !!app.git.localError || !app.git.branch ||
+                        app.git.branch === "detached" || app.git.dirtyFilesCount > 0 ? "Deploy bloqueado" : "Desplegar"}</span>
                     </button>
                   )}
                 </div>
@@ -427,7 +435,7 @@ export default function SoftwarePage() {
                     )}
                   </div>
                   <div className="text-[10px] text-gray-500">
-                    {app.hasDockerCompose ? "Compose detectado" : "Sin compose"}
+                    {app.hasDockerCompose ? "Compose detectado" : "Sin Compose predeterminado"}
                   </div>
                 </div>
 
