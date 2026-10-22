@@ -306,7 +306,7 @@ export default function GovernancePage() {
           <div className="hub-card p-4 space-y-1">
             <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
               <Building2 className="w-3.5 h-3.5 text-brand-cyan" />
-              SaaS Conectados
+              Productos SaaS
             </span>
             <div className="text-2xl font-bold text-white font-mono">{data ? data.saasCount : "—"}</div>
             <div className="text-[10px] text-gray-500 font-mono">Bases de datos vivas</div>
@@ -315,7 +315,7 @@ export default function GovernancePage() {
           <div className="hub-card p-4 space-y-1">
             <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
               <Users className="w-3.5 h-3.5 text-purple-400" />
-              Total Tenants
+              Clientes registrados
             </span>
             <div className="text-2xl font-bold text-white font-mono">{data ? data.totalTenants : "---"}</div>
             <div className="text-[10px] text-gray-500 font-mono">Empresas / Locales</div>
@@ -324,7 +324,7 @@ export default function GovernancePage() {
           <div className="hub-card p-4 space-y-1">
             <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-              Tenants Activos
+              Clientes activos
             </span>
             <div className="text-2xl font-bold text-emerald-400 font-mono">
               {data ? data.activeTenants : "---"}
@@ -335,7 +335,7 @@ export default function GovernancePage() {
           <div className="hub-card p-4 space-y-1">
             <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
               <Clock className="w-3.5 h-3.5 text-amber-400" />
-              Trials / Pruebas
+              En período de prueba
             </span>
             <div className="text-2xl font-bold text-amber-400 font-mono">
               {data ? data.trialTenants : "---"}
@@ -343,10 +343,10 @@ export default function GovernancePage() {
             <div className="text-[10px] text-gray-500 font-mono">En período de prueba</div>
           </div>
 
-          <div className="hub-card p-4 space-y-1">
+          <div className="hub-card col-span-2 p-4 space-y-1 sm:col-span-1">
             <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
               <Layers className="w-3.5 h-3.5 text-blue-400" />
-              Registros Gestionados
+              Registros gestionados
             </span>
             <div className="text-2xl font-bold text-brand-cyan font-mono">
               {data ? data.totalRecordsManaged.toLocaleString() : "---"}
