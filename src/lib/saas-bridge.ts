@@ -1,6 +1,7 @@
 import { SAAS_PRODUCTS } from "./product-taxonomy";
 import { isSaaSIntegrationEnabled } from "./integration-settings";
-import { isManagementEnabled } from "./saas-management";
+import { isManagementEnabled, callSaaSManagement } from "./saas-management";
+import { liveValue } from "./live-cache";
 import type { GovernanceOverview, SaaSSlug, UniversalTenant } from "./types";
 
 type WireTenant = {
@@ -41,12 +42,13 @@ async function readProduct(saas: SaaSSlug, name: string, domain: string): Promis
   const token = process.env["HUB_INTEGRATION_" + saas.toUpperCase() + "_TOKEN"] || "";
   if (Buffer.byteLength(token) < 32) throw new Error("Token de servicio no configurado");
   const all: UniversalTenant[] = [];
+  const ids = new Set<string>();
   let offset = 0;
   // Bound pagination and network work. We will not claim complete data past this limit.
   for (let i = 0; i < 20; i++) {
     const url = "https://" + domain + "/api/integrations/nanolabs/tenants?offset=" + offset;
     const response = await fetch(url, {
-      headers: { Authorization: "Bearer " + token, Accept: "application/json" },
+    headers: { Authorization: "Bearer " + token, Accept: "application/json", "User-Agent": "NanoLabsHub/2" },
       redirect: "error", cache: "no-store",
       signal: AbortSignal.timeout(7000),
     });
@@ -57,7 +59,11 @@ async function readProduct(saas: SaaSSlug, name: string, domain: string): Promis
         wire.capabilities?.tenantsRead !== true ||
         wire.capabilities?.tenantWrite !== false ||
         wire.capabilities?.moduleWrite !== false) throw new Error("Contrato de integración no válido");
-    all.push(...wire.tenants.map(tenant => adaptTenant(saas, name, tenant)));
+    for (const raw of wire.tenants) {
+      const tenant = adaptTenant(saas, name, raw);
+      if (ids.has(tenant.id)) throw new Error("La fuente repitió un tenant");
+      ids.add(tenant.id); all.push(tenant);
+    }
     if (wire.nextOffset === null) return all;
     if (!Number.isInteger(wire.nextOffset) || wire.nextOffset <= offset ||
         wire.nextOffset > 100000 || wire.tenants.length === 0) throw new Error("Paginación inválida");
@@ -66,15 +72,27 @@ async function readProduct(saas: SaaSSlug, name: string, domain: string): Promis
   throw new Error("La fuente superó el límite seguro de paginación; datos no contabilizados");
 }
 export async function getUniversalGovernanceOverview(): Promise<GovernanceOverview> {
+  return liveValue("governance", readGovernanceOverview);
+}
+async function readGovernanceOverview(): Promise<GovernanceOverview> {
   const results = await Promise.allSettled(SAAS_PRODUCTS.map(p => readProduct(p.slug, p.name, p.domain)));
+  const managementSources = await Promise.all(SAAS_PRODUCTS.map(async p => {
+    if (!isManagementEnabled(p.slug)) return { saas:p.slug, status:"disabled" as const, operations:[] as string[] };
+    try {
+      const catalog = await callSaaSManagement(p.slug,"hub-capability-probe",new URLSearchParams({resource:"catalog"}),undefined,7000) as {operations?:unknown};
+      if (!Array.isArray(catalog.operations) || catalog.operations.some(x=>typeof x!=="string")) throw Error("Catálogo inválido");
+      return { saas:p.slug, status:"available" as const, operations:catalog.operations as string[] };
+    } catch { return { saas:p.slug, status:"unavailable" as const, operations:[] as string[] }; }
+  }));
   const tenants = results.flatMap(result => result.status === "fulfilled" ? result.value : []);
   return {
     totalTenants: tenants.length,
-    managementProducts: SAAS_PRODUCTS.filter(p => isManagementEnabled(p.slug)).map(p => p.slug),
+    managementProducts: managementSources.filter(p=>p.status==="available").map(p=>p.saas),
+    managementSources,
     activeTenants: tenants.filter(t => t.status === "ACTIVE").length,
     trialTenants: tenants.filter(t => t.status === "TRIAL").length,
     suspendedTenants: tenants.filter(t => t.status === "SUSPENDED" || t.status === "CANCELED").length,
-    totalRecordsManaged: tenants.reduce((total, t) => total + (t.metrics.available ? t.metrics.totalRecords : 0), 0), saasCount: SAAS_PRODUCTS.length, tenants,
+    totalRecordsManaged: tenants.reduce((total, t) => total + (t.metrics.available ? t.metrics.totalRecords : 0), 0), saasCount: results.filter(r=>r.status==="fulfilled").length, tenants,
     sources: SAAS_PRODUCTS.map((p, i) => ({
       saas: p.slug, status: !isSaaSIntegrationEnabled(p.slug) ? "disabled" :
         results[i].status === "fulfilled" ? "available" : "unavailable",

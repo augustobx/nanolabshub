@@ -544,7 +544,7 @@ export default function GovernancePage() {
                     <span>Administrar módulos</span>
                   </button>
 
-                  <a
+                  {t.domain && <a
                     href={`https://${t.domain}`}
                     target="_blank"
                     rel="noreferrer"
@@ -553,7 +553,7 @@ export default function GovernancePage() {
                   >
                     <Key className="w-3.5 h-3.5" />
                     <span>Portal</span>
-                  </a>
+                  </a>}
                 </div>
               </div>
             ))

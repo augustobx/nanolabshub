@@ -14,7 +14,7 @@ function label(status:string,lifecycle:string) {
 }
 export default function NetworkingPage(){
  const [data,setData]=useState<Inventory|null>(null),[error,setError]=useState<string|null>(null),[loading,setLoading]=useState(true);
- const load=async()=>{setLoading(true);try{const r=await fetch("/api/infrastructure",{cache:"no-store"});const json=await r.json();if(!r.ok||!json.success)throw Error(json.error||"Inventario no disponible");setData(json.data);setError(null);}catch(e){setError(e instanceof Error?e.message:"Error de consulta");}finally{setLoading(false);}};
+ const load=async()=>{setLoading(true);try{const r=await fetch("/api/infrastructure",{cache:"no-store"});const json=await r.json();if(!r.ok||!json.success)throw Error(json.error||"Inventario no disponible");setData(json.data);setError(null);}catch(e){setData(null);setError(e instanceof Error?e.message:"Error de consulta");}finally{setLoading(false);}};
  useEffect(()=>{void load();},[]);
  const domains=data?.domains||[];
  return <div className="min-w-0 flex-1 pb-14"><Header onRefresh={()=>void load()} isRefreshing={loading}/>

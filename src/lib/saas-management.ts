@@ -11,7 +11,7 @@ export function isManagementEnabled(product: string): product is ManagedSaaS {
   return products.has(product) && (process.env.HUB_SAAS_MANAGEMENT_PRODUCTS || "").split(",").map(s => s.trim()).includes(product) &&
     Buffer.byteLength(process.env["HUB_MANAGEMENT_" + product.toUpperCase() + "_TOKEN"] || "") >= 32;
 }
-export async function callSaaSManagement(product: string, actor: string, query: URLSearchParams, command?: ManagementCommand): Promise<unknown> {
+export async function callSaaSManagement(product: string, actor: string, query: URLSearchParams, command?: ManagementCommand, timeoutMs = 25000): Promise<unknown> {
   if (!products.has(product)) throw new SaaSManagementError(403, "PROTECTED_PRODUCT", "La gestión central está limitada a los productos autorizados.");
   if (command?.operation === "payment.status" && product !== "onlyfood") throw new SaaSManagementError(400, "COMMAND", "Operación no disponible para este producto.");
   if (!isManagementEnabled(product)) throw new SaaSManagementError(503, "DISABLED", "Gestión central no configurada para este producto.");
@@ -27,7 +27,7 @@ export async function callSaaSManagement(product: string, actor: string, query: 
   const signature = createHmac("sha256", key).update([timestamp, method, path, actor, body].join("\n")).digest("hex");
   let response: Response;
   try {
-    response = await fetch("https://" + selected.domain + path, { method, headers: { Authorization: "Bearer " + key, "Content-Type": "application/json", Accept: "application/json", "User-Agent": "NanoLabsHub/2", "X-NanoLabs-Timestamp": timestamp, "X-NanoLabs-Actor": actor, "X-NanoLabs-Signature": signature }, ...(command ? { body } : {}), redirect: "error", cache: "no-store", signal: AbortSignal.timeout(25000) });
+    response = await fetch("https://" + selected.domain + path, { method, headers: { Authorization: "Bearer " + key, "Content-Type": "application/json", Accept: "application/json", "User-Agent": "NanoLabsHub/2", "X-NanoLabs-Timestamp": timestamp, "X-NanoLabs-Actor": actor, "X-NanoLabs-Signature": signature }, ...(command ? { body } : {}), redirect: "error", cache: "no-store", signal: AbortSignal.timeout(timeoutMs) });
   } catch { throw new SaaSManagementError(502, "CONNECTION", "No se confirmó la respuesta de la plataforma. Podés reintentar la misma solicitud."); }
   let wire: { success?: boolean; contract?: string; product?: string; data?: unknown; error?: unknown; code?: unknown; requestId?: string };
   try { wire = await response.json(); } catch { throw new SaaSManagementError(502, "CONTRACT", "La plataforma devolvió una respuesta inválida."); }

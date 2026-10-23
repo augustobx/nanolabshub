@@ -3,6 +3,7 @@ import { appLifecycle, getLifecycleRecords } from "./app-lifecycle";
 import { KNOWN_APPS } from "./apps-registry";
 import { getAppsStatus, getContainers, getServerTelemetry } from "./server-api";
 import type { AppInfo, ContainerInfo, ServerMetrics } from "./types";
+import { liveValue } from "./live-cache";
 
 interface VersionProbe {
   remoteCommit: string | null;
@@ -97,11 +98,13 @@ async function probeWebsite(url: string | undefined): Promise<AppInfo["web"]> {
   try {
     let response = await fetch(url, {
       method: "HEAD", signal: AbortSignal.timeout(4500),
+      headers: { "User-Agent": "NanoLabsHub/2" },
       cache: "no-store", redirect: "follow",
     });
     if (response.status === 404 || response.status === 405 || response.status === 501) {
       response = await fetch(url, {
         method: "GET", signal: AbortSignal.timeout(4500),
+        headers: { "User-Agent": "NanoLabsHub/2" },
         cache: "no-store", redirect: "follow",
       });
       void response.body?.cancel();
@@ -168,6 +171,9 @@ export interface OperationsSnapshot {
 }
 
 export async function getOperationsSnapshot(): Promise<OperationsSnapshot> {
+  return liveValue("operations", readOperationsSnapshot);
+}
+async function readOperationsSnapshot(): Promise<OperationsSnapshot> {
   const [telemetry, containers] = await Promise.all([getServerTelemetry(), getContainers()]);
   const apps = await getOperationalApps(containers);
   return { timestamp: new Date().toISOString(), telemetry, containers, apps };

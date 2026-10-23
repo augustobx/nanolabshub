@@ -20,6 +20,7 @@ class ClientError extends Error { constructor(message: string, public uncertain:
 
 export function SaaSManagementPanel({ product, initialTenantId, initialSection = "tenants" }: { product: ManagedSaaS; initialTenantId?: string; initialSection?: "tenants" | "plans" | "audit" }) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const loadGeneration = useRef(0);
   const productName = {onlygym:"OnlyGym",onlyturn:"OnlyTurn",onlyfood:"OnlyFood"}[product];
   const api = "/api/saas-management/" + product;
   const [catalog, setCatalog] = useState<ManagementCatalog | null>(null), [plans, setPlans] = useState<ManagedPlan[]>([]);
@@ -32,14 +33,17 @@ export function SaaSManagementPanel({ product, initialTenantId, initialSection =
     const json = await response.json(); if (!response.ok || !json.success) throw new Error(json.error || "No se pudieron consultar los datos."); return json.data as T;
   }, [api]);
   const reload = useCallback(async () => {
+    const generation = ++loadGeneration.current;
     const [c, firstPlans, overview] = await Promise.all([fetchData<ManagementCatalog>("catalog"), fetchData<{ items: ManagedPlan[]; nextOffset: number | null }>("plans"), fetch("/api/governance", { cache: "no-store" }).then(async r => { const j = await r.json(); if (!r.ok || !j.success) throw Error("No se pudo actualizar el listado de tenants."); return j.data as GovernanceOverview; })]);
     const allPlans = [...firstPlans.items]; let offset = firstPlans.nextOffset;
     for (let i = 0; offset !== null && i < 20; i++) { const page = await fetchData<{ items: ManagedPlan[]; nextOffset: number | null }>("plans", { offset: String(offset) }); allPlans.push(...page.items); if (page.nextOffset !== null && page.nextOffset <= offset) throw Error("Paginación de planes inválida."); offset = page.nextOffset; }
     if (offset !== null) throw Error("El catálogo supera el límite de consulta. No se muestran planes incompletos.");
+    const detail = tenantId ? await fetchData<ManagedTenant>("tenant", { tenantId }) : null;
+    if (generation !== loadGeneration.current) return;
     setCatalog(c); setPlans(allPlans); setTenants(overview.tenants.filter(t => t.saas === product).map(t => ({ id: t.id, name: t.name })));
-    if (tenantId) setTenant(await fetchData<ManagedTenant>("tenant", { tenantId })); else setTenant(null);
+    setTenant(detail);
   }, [fetchData, tenantId, product]);
-  useEffect(() => { let active = true; setBusy(true); setError(""); reload().catch(e => { if (active) setError(e.message); }).finally(() => { if (active) setBusy(false); }); return () => { active = false; }; }, [reload]);
+  useEffect(() => { let active = true; setBusy(true); setError(""); setTenant(null); reload().catch(e => { if (active) { setCatalog(null); setError(e.message); } }).finally(() => { if (active) setBusy(false); }); return () => { active = false; loadGeneration.current++; }; }, [reload]);
   useEffect(() => { if (!busy && !pending) return; const listener = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; }; window.addEventListener("beforeunload", listener); return () => window.removeEventListener("beforeunload", listener); }, [busy, pending]);
   const audit = useCallback(async (offset = 0) => { setBusy(true); setError(""); try { const page = await fetchData<{ items: ManagementAudit[]; nextOffset: number | null }>("audit", { ...(tenantId ? { tenantId } : {}), offset: String(offset) }); setEvents(old => offset ? [...old, ...page.items] : page.items); setNextAudit(page.nextOffset); } catch (e) { setError(e instanceof Error ? e.message : "No se pudo consultar la auditoría."); } finally { setBusy(false); } }, [fetchData, tenantId]);
   const catalogLoaded = !!catalog;

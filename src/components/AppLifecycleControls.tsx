@@ -23,7 +23,7 @@ const choices: { action: Action; title: string; help: string }[] = [
 
 export function AppLifecycleControls({ app, onChanged }: { app: AppInfo; onChanged: () => Promise<void> | void }) {
   const state = app.lifecycle?.state || "active";
-  const protectedApp = app.type === "infrastructure" || app.slug === "nanolabshub";
+  const protectedApp = app.type === "infrastructure" || app.slug === "nanolabshub" || ["onlypadel","onlycars","onlyerp"].includes(app.slug);
   const [selected, setSelected] = useState<Action | null>(null);
   const [confirmation, setConfirmation] = useState("");
   const [backupAck, setBackupAck] = useState(false);
@@ -49,7 +49,7 @@ export function AppLifecycleControls({ app, onChanged }: { app: AppInfo; onChang
 
   const [loadingHistory, setLoadingHistory] = useState(false);
   const selectedChoice = choices.find((choice) => choice.action === selected);
-  const transitions = state === "archived" ? ["resume"] :
+  const transitions = app.lifecycle?.recoveryRequired ? ["resume"] : state === "archived" ? ["resume"] :
     state === "suspended" ? ["pending_retirement", "archive", "resume"] :
     state === "pending_retirement" ? ["suspend", "archive", "resume"] :
     ["suspend", "pending_retirement", "archive"];
@@ -129,7 +129,8 @@ export function AppLifecycleControls({ app, onChanged }: { app: AppInfo; onChang
           })}
         </div>
       </div>
-      {protectedApp && <p className="mt-2 text-xs text-slate-500">Infraestructura protegida: no se permite desactivar desde el Hub.</p>}
+      {protectedApp && <p className="mt-2 text-xs text-slate-500">Aplicación protegida: sus operaciones de ciclo de vida están bloqueadas.</p>}
+      {app.lifecycle?.recoveryRequired && <p role="alert" className="mt-2 text-xs text-amber-200">Operación anterior interrumpida. Reactivá para recuperar los contenedores y sus políticas originales.</p>}
       {success && <p role="status" className="mt-2 text-xs leading-5 text-emerald-300">{success}</p>}
       {error && !selected && <p role="alert" className="mt-2 text-xs leading-5 text-rose-300">{error}</p>}
       {history && <div className="mt-3 space-y-2 border-t border-white/10 pt-3">

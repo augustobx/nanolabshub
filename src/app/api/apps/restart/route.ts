@@ -16,10 +16,12 @@ export async function POST(req: Request) {
     }
 
     assertContainerAppActive(containerName);
+    const db = getDatabase();
+    db.logAudit(actor,"CONTAINER_RESTART_STARTED",containerName,"Reinicio solicitado");
     const output = await restartContainer(containerName);
 
     try {
-      getDatabase().logAudit(actor, "CONTAINER_RESTART", containerName, `Reinicio exitoso de contenedor ${containerName}`);
+      db.logAudit(actor, "CONTAINER_RESTART", containerName, `Reinicio exitoso de contenedor ${containerName}`);
     } catch {}
 
     return Response.json({

@@ -13,7 +13,7 @@ test("backup integrity and safe schedules without touching any production DB",as
  const d=engine.db();
  d.exec("CREATE TABLE IF NOT EXISTS audit_log(id INTEGER PRIMARY KEY AUTOINCREMENT,timestamp TEXT NOT NULL,user TEXT NOT NULL,action TEXT NOT NULL,target TEXT NOT NULL,details TEXT NOT NULL)");
  d.close();
- const apps=[{slug:"onlypadel",name:"OnlyPadel",dbType:"mariadb",dbContainer:"onlypadel-db",containerNames:["onlypadel-web","onlypadel-db"]}];
+ const apps=[{slug:"backup-fixture",name:"Backup fixture",dbType:"mariadb",dbContainer:"backup-fixture-db",containerNames:["backup-fixture-web","backup-fixture-db"]}];
  try{
   const good=path.join(temp,"good.sql.gz");
   const contents=Buffer.from("CREATE TABLE test_backup(id INTEGER);\nINSERT INTO test_backup VALUES (42);\n");
@@ -25,10 +25,10 @@ test("backup integrity and safe schedules without touching any production DB",as
   const invalid=path.join(temp,"broken.sql.gz");
   await fs.writeFile(invalid,Buffer.alloc(120,0x61));
   await assert.rejects(engine.verify(invalid));
-  engine.schedule(apps,"onlypadel",{enabled:true,hourLocal:3,weekdays:"0,1,2,3,4,5,6"},"ci");
+  engine.schedule(apps,"backup-fixture",{enabled:true,hourLocal:3,weekdays:"0,1,2,3,4,5,6"},"ci");
   assert.equal(engine.schedules(apps)[0].enabled,true);
   assert.equal(engine.schedules(apps)[0].hourLocal,3);
-  assert.throws(()=>engine.schedule(apps,"onlypadel",{enabled:true,hourLocal:24,weekdays:"0"},"ci"));
+  assert.throws(()=>engine.schedule(apps,"backup-fixture",{enabled:true,hourLocal:24,weekdays:"0"},"ci"));
   assert.throws(()=>engine.schedule(apps,"unknown",{enabled:true,hourLocal:3,weekdays:"0"},"ci"));
   await assert.rejects(engine.download(apps,"../../etc/passwd"));
   process.env.HUB_BACKUPS_ENABLED="false";

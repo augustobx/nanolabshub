@@ -1,38 +1,7 @@
-import { deployApp } from "@/lib/server-api";
 import { requireMutatingSession } from "@/lib/action-security";
-import { assertAppActive } from "@/lib/app-lifecycle";
-
+import { assertDeploymentAllowed } from "@/lib/operational-policy";
 export const dynamic = "force-dynamic";
-
 export async function POST(req: Request) {
-  try {
-    await requireMutatingSession(req);
-    const body = await req.json();
-    const { slug } = body;
-
-    if (!slug) {
-      return Response.json({ success: false, error: "slug is required" }, { status: 400 });
-    }
-
-    assertAppActive(slug);
-    const output = await deployApp(slug);
-
-    return Response.json({
-      success: true,
-      data: {
-        slug,
-        output,
-        timestamp: new Date().toISOString(),
-      },
-    });
-  } catch (error: any) {
-    console.error("Deploy error:", error);
-    return Response.json(
-      {
-        success: false,
-        error: error.message || "Failed to deploy app",
-      },
-      { status: 500 }
-    );
-  }
+  try { await requireMutatingSession(req); } catch { return Response.json({ success:false,error:"Sesión u origen no autorizado" },{status:403}); }
+  try { assertDeploymentAllowed(); } catch(e) { return Response.json({success:false,error:(e as Error).message},{status:503,headers:{"Cache-Control":"no-store"}}); }
 }

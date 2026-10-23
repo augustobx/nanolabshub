@@ -36,7 +36,7 @@ export async function getInfrastructureInventory() {
       appName: owner?.name || null,
       kind: classifyContainer(container.name, owner),
       state: container.state, health: container.health,
-      expectedStopped: state === "archived" || state === "suspended",
+      expectedStopped: (container.state !== "running" && (state === "archived" || state === "suspended")) || !!(container.isJob && container.state === "exited" && container.exitCode === 0),
       image: container.image, ports: container.ports,
     };
   });
@@ -59,7 +59,7 @@ export async function getInfrastructureInventory() {
     containers, domains,
     totals:{
       running:containers.filter(c=>c.state==="running").length,
-      unhealthy:containers.filter(c=>!c.expectedStopped && (c.health==="unhealthy" || c.state==="exited")).length,
+      unhealthy:containers.filter(c=>!c.expectedStopped && (c.health==="unhealthy" || c.health==="starting" || c.state!=="running")).length,
       unassigned:containers.filter(c=>c.kind==="unassigned").length,
       databases:containers.filter(c=>c.kind==="database").length,
       domains:domains.length,

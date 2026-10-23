@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
+import { parseSession } from "./session-policy";
 
 const SECRET = process.env.HUB_MASTER_KEY || "";
 const ADMIN_USER = process.env.ADMIN_USER || "augusto";
@@ -12,10 +13,10 @@ const secureConfig = () => SECRET.length >= 32 && ADMIN_PASS.length >= 16 &&
  * Creates a signed token for user session
  */
 export function createSessionToken(username: string): string {
-  if (!secureConfig()) throw new Error("Seguridad de acceso Hub no configurada");
+  if (!secureConfig() || username !== ADMIN_USER) throw new Error("Seguridad de acceso Hub no configurada");
   const expiresAt = Date.now() + 1000 * 60 * 60 * 24 * 7; // 7 days
   const payload = `${username}:${expiresAt}`;
-  const signature = createHmac("sha256", SECRET).update(payload).digest("hex");
+  const signature = createHmac("sha256", SECRET + "\n" + ADMIN_PASS).update(payload).digest("hex");
   return `${Buffer.from(payload).toString("base64url")}.${signature}`;
 }
 
@@ -24,20 +25,13 @@ export function createSessionToken(username: string): string {
  */
 export function verifySessionToken(token: string | undefined): { valid: boolean; user?: string } {
   if (!secureConfig()) return { valid: false };
-  if (!token) return { valid: false };
+  const parsed = parseSession(token);
+  if (!parsed) return { valid: false };
 
-  const parts = token.split(".");
-  if (parts.length !== 2) return { valid: false };
-
-  const [encodedPayload, signature] = parts;
   try {
-    const payload = Buffer.from(encodedPayload, "base64url").toString("utf-8");
-    const [username, expiresStr] = payload.split(":");
-    const expiresAt = parseInt(expiresStr, 10);
+    const { payload, username, signature } = parsed;
 
-    if (Date.now() > expiresAt) return { valid: false };
-
-    const expectedSig = createHmac("sha256", SECRET).update(payload).digest("hex");
+    const expectedSig = createHmac("sha256", SECRET + "\n" + ADMIN_PASS).update(payload).digest("hex");
     const valid = timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSig));
     if (valid) {
       return { valid: true, user: username };
@@ -53,14 +47,16 @@ export function verifySessionToken(token: string | undefined): { valid: boolean;
  * Validates master login credentials
  */
 export function validateCredentials(user: string, pass: string): boolean {
-  return secureConfig() && user.trim() === ADMIN_USER && pass.trim() === ADMIN_PASS;
+  if (!secureConfig() || typeof user !== "string" || typeof pass !== "string") return false;
+  const a = Buffer.from(pass), b = Buffer.from(ADMIN_PASS);
+  return user.trim() === ADMIN_USER && a.length === b.length && timingSafeEqual(a, b);
 }
 
 /**
  * Gets current authenticated user from cookies (for Server Components/APIs)
  */
 export async function getSessionUser(): Promise<string | null> {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
   const result = verifySessionToken(token);
   return result.valid && result.user ? result.user : null;

@@ -12,13 +12,11 @@ export async function GET() {
   }
   try {
     const alerts = await evaluateSystemAlerts();
-    const auditLogs = getDatabase().getAuditLogs(10);
 
     return Response.json({
       success: true,
       data: {
         alerts,
-        auditLogs,
       },
     }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error: any) {

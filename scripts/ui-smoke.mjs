@@ -1,7 +1,10 @@
-import { chromium } from "playwright";
+import { createRequire } from "node:module";
+import assert from "node:assert/strict";
+const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_PACKAGE || "playwright");
 import { mkdir } from "node:fs/promises";
 
 const origin = process.env.UI_BASE_URL || "http://127.0.0.1:3005";
+assert.ok(["127.0.0.1","localhost"].includes(new URL(origin).hostname),"Fixtures cannot run against a public deployment");
 await mkdir("ui-screenshots", { recursive: true });
 
 const tenant = (id, saas, saasName, name, status, records) => ({
@@ -104,7 +107,7 @@ const responses = {
 
 let browser;
 try {
-  browser = await chromium.launch({ headless: true });
+  browser = await chromium.launch({ headless: true, executablePath:process.env.PLAYWRIGHT_BROWSER_EXECUTABLE||undefined });
   for (const device of [
     { name: "desktop", viewport: { width: 1440, height: 900 } },
     { name: "mobile", viewport: { width: 390, height: 844 } },
@@ -237,18 +240,18 @@ try {
       }
       if (path === "/backups") {
         await page.getByRole("heading", { name: "Generar backup manual" }).waitFor();
-        await page.getByRole("button", { name: "Seleccionar OnlyPadel SaaS para backup" }).click();
-        const appCard = page.getByRole("button", { name: "Seleccionar OnlyPadel SaaS para backup" });
+        await page.getByRole("button", { name: "Seleccionar OnlyFood SaaS para backup" }).click();
+        const appCard = page.getByRole("button", { name: "Seleccionar OnlyFood SaaS para backup" });
         if (await appCard.getAttribute("aria-pressed") !== "true") throw new Error("Manual backup card selection was not reflected");
         await page.getByRole("button", { name: "Generar backup ahora" }).click();
         const confirm = page.getByRole("dialog", { name: "Confirmar respaldo" });
         await confirm.waitFor();
-        await confirm.getByText("OnlyPadel SaaS").waitFor();
+        await confirm.getByText("OnlyFood SaaS").waitFor();
         await confirm.getByRole("button", { name: "Cancelar" }).click();
         await confirm.waitFor({ state: "hidden" });
         await page.getByRole("searchbox", { name: "Buscar aplicación para backup" }).fill("nanolabs hub");
         await page.getByRole("button", { name: "Seleccionar NanoLabs Hub para backup" }).waitFor();
-        if (await page.getByRole("button", { name: "Seleccionar OnlyPadel SaaS para backup" }).count() !== 0) {
+        if (await page.getByRole("button", { name: "Seleccionar OnlyFood SaaS para backup" }).count() !== 0) {
           throw new Error("Manual backup search did not filter app cards");
         }
         await page.getByRole("searchbox", { name: "Buscar aplicación para backup" }).fill("");

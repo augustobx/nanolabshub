@@ -15,7 +15,7 @@ function bridge(env = {}, fetch = () => { throw Error('Unexpected request'); }) 
       compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
     }).outputText;
     vm.runInNewContext(code, {
-      module, exports: module.exports, process: { env }, fetch, Buffer, AbortSignal,
+      module, exports: module.exports, process: { env }, fetch, Buffer, AbortSignal, URLSearchParams,
       require: name => name.startsWith('.') ? load(path.resolve(path.dirname(file), name + '.ts')) : require(name),
     }, { filename: file });
     return module.exports;
@@ -98,4 +98,21 @@ test('writes remain blocked', async () => {
   const api = bridge(configured);
   await assert.rejects(api.updateTenantStatusInDB(), /Edición bloqueada/);
   await assert.rejects(api.toggleTenantModuleInDB(), /Edición bloqueada/);
+});
+test('connected product count excludes disabled and unavailable sources',async()=>{
+ const result=await bridge(configured,async url=>{if(url.includes('onlyturn'))throw Error('unavailable');return response('onlygym');}).getUniversalGovernanceOverview();
+ assert.equal(result.saasCount,1);assert.equal(result.sources.filter(s=>s.status==='available').length,1);
+});
+test('repeated tenant IDs invalidate a paginated source',async()=>{
+ let n=0;const result=await bridge({...configured,HUB_SAAS_INTEGRATION_PRODUCTS:'onlygym'},async()=>{
+  const j=await response('onlygym').json();j.nextOffset=n++===0?100:null;return Response.json(j);
+ }).getUniversalGovernanceOverview();assert.equal(result.totalTenants,0);assert.equal(result.saasCount,0);
+});
+test('management readiness requires an authenticated catalog, not only configured keys',async()=>{
+ const env={...configured,HUB_SAAS_INTEGRATION_PRODUCTS:'onlygym',HUB_SAAS_MANAGEMENT_PRODUCTS:'onlygym',HUB_MANAGEMENT_ONLYGYM_TOKEN:'m'.repeat(64)};
+ for(const valid of [true,false]){
+  const result=await bridge(env,async url=>url.includes('/management')?Response.json(valid?{success:true,contract:'nanolabs.saas.management.v1',product:'onlygym',data:{operations:['tenant.update']}}:{success:false},{status:valid?200:401}):response('onlygym')).getUniversalGovernanceOverview();
+  assert.equal(result.managementProducts.includes('onlygym'),valid);
+  assert.equal(result.managementSources.find(s=>s.saas==='onlygym').status,valid?'available':'unavailable');
+ }
 });

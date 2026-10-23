@@ -20,8 +20,8 @@ export default function SaaSCatalogPage() {
       fetch("/api/governance", {cache:"no-store"}).then(async r => {const j=await r.json();if(!r.ok||!j.success)throw Error();return j.data as GovernanceOverview;}),
     ]);
     setErrors(resources.flatMap((r,i) => r.status === "rejected" ? [i === 0 ? "Operación" : "Tenants"] : []));
-    if(resources[0].status === "fulfilled") setOperations(resources[0].value);
-    if(resources[1].status === "fulfilled") setGovernance(resources[1].value);
+    if(resources[0].status === "fulfilled") setOperations(resources[0].value); else setOperations(null);
+    if(resources[1].status === "fulfilled") setGovernance(resources[1].value); else setGovernance(null);
     setLoading(false);
   };
   useEffect(() => { void load(); }, []);

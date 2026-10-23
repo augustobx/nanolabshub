@@ -34,6 +34,7 @@ export default function BackupsPage() {
   const [pageError, setPageError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedApp, setSelectedApp] = useState<string>("all");
+  const [externalCopies,setExternalCopies]=useState<Array<{slug:string;count:number|null}>>([]);
   const [isTriggering, setIsTriggering] = useState<string | null>(null);
   const [manualAppSlug, setManualAppSlug] = useState("nanolabshub");
   const [manualSearch, setManualSearch] = useState("");
@@ -53,6 +54,7 @@ export default function BackupsPage() {
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cargar el historial");
       setBackups(data.data);
+      setExternalCopies(data.externalCopies || []);
       setSchedules(data.schedules || []);
     } catch (error) {
       setPageError(error instanceof Error ? error.message : "Error al consultar backups");
@@ -115,7 +117,7 @@ export default function BackupsPage() {
   };
 
   const manualApps = KNOWN_APPS.filter((app) =>
-    app.dbType !== "none" &&
+    app.dbType !== "none" && !["onlypadel","onlycars","onlyerp"].includes(app.slug) &&
     (app.name.toLowerCase().includes(manualSearch.trim().toLowerCase()) ||
      app.slug.toLowerCase().includes(manualSearch.trim().toLowerCase()))
   );
@@ -136,6 +138,7 @@ export default function BackupsPage() {
       <Header onRefresh={fetchBackups} isRefreshing={isLoading} />
 
       <div className="hub-content space-y-7">
+        <p className="rounded-xl border border-white/10 p-3 text-xs text-slate-300">Este historial contiene copias creadas por el Hub. {externalCopies.reduce((n,x)=>n+(x.count||0),0)} archivos adicionales fueron detectados fuera de su registro; solo se consultaron metadatos y su integridad está pendiente de verificación. Las aplicaciones protegidas no admiten nuevas operaciones.</p>
         <section className="hub-hero space-y-3">
           <p className="hub-eyebrow">Operación / Respaldo</p>
           <h1 className="hub-hero-title">Copias de seguridad y recuperación.</h1>
@@ -155,7 +158,7 @@ export default function BackupsPage() {
               </span>
             </div>
             <div className="text-2xl font-bold font-mono text-white">
-              {backups.length}{" "}
+              {pageError?"—":backups.length}{" "}
               <span className="text-xs font-normal text-gray-400">archivos</span>
             </div>
             <div className="text-[11px] text-gray-500 font-mono">
@@ -171,7 +174,7 @@ export default function BackupsPage() {
               </span>
             </div>
             <div className="text-2xl font-bold font-mono text-white">
-              {totalMB} MB
+              {pageError?"—":totalMB} MB
             </div>
             <div className="text-[11px] text-gray-500 font-mono">
               Comprimidos con gzip (.gz)
@@ -389,7 +392,7 @@ export default function BackupsPage() {
                     onChange={(e) => setSchedules((prev) => prev.map((s) => s.slug === schedule.slug ? { ...s, enabled: e.target.checked } : s))} />
                   Activa
                 </label>
-                <button type="button" disabled={scheduleSaving === schedule.slug}
+                <button type="button" disabled={["onlypadel","onlycars","onlyerp"].includes(schedule.slug) || scheduleSaving === schedule.slug}
                   onClick={() => void handleSchedule(schedule.slug, schedule.enabled, schedule.hourLocal, schedule.weekdays)}
                   className="rounded-lg border border-brand-cyan/40 px-3 py-2 text-xs font-semibold text-brand-cyan disabled:opacity-50">
                   {scheduleSaving === schedule.slug ? "Guardando…" : "Guardar"}

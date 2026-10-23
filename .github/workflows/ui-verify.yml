@@ -35,6 +35,10 @@ jobs:
 
       - name: Backup engine safety tests
         run: node --test scripts/backup-engine.test.cjs
+      - name: Authentication, operations and truthfulness regressions
+        run: node --test scripts/audit-security.test.cjs
+      - name: Production dependency audit
+        run: npm audit --omit=dev --audit-level=moderate
 
       - name: Scheduler heartbeat healthcheck tests
         run: node --test scripts/backup-scheduler-health.test.cjs

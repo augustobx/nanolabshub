@@ -49,6 +49,7 @@ export default function SoftwarePage() {
       if (!data.success || !Array.isArray(data.data)) throw new Error(data.error || "Inventario no disponible");
       setApps(data.data);
     } catch (error) {
+      setApps([]);
       setLoadError(error instanceof Error ? error.message : "No se pudieron cargar los productos");
     } finally {
       setIsLoading(false);
@@ -102,7 +103,7 @@ export default function SoftwarePage() {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          setTerminalOutput((prev) => prev + decoder.decode(value, { stream: true }));
+          setTerminalOutput((prev) => (prev + decoder.decode(value, { stream: true })).slice(-200000));
         }
       }
     } catch (err: any) {
@@ -340,7 +341,7 @@ export default function SoftwarePage() {
                   )}
                   {app.containers[0] && (
                     <button
-                      disabled={app.lifecycle?.state !== undefined && app.lifecycle.state !== "active"}
+                      disabled={["onlypadel","onlycars","onlyerp"].includes(app.slug) || (app.lifecycle?.state !== undefined && app.lifecycle.state !== "active")}
                       onClick={() => handleRestart(app.containers[0].name)}
                       className="px-3 py-1.5 rounded-lg bg-surface-100 hover:bg-surface-50 text-gray-300 hover:text-white border border-white/10 text-xs font-mono flex items-center gap-1.5 transition-colors"
                       title={app.lifecycle?.state && app.lifecycle.state !== "active" ? "Bloqueado por ciclo de vida" : "Reiniciar contenedor principal"}
@@ -352,18 +353,13 @@ export default function SoftwarePage() {
                   {app.hasDockerCompose && (
                     <button
                       type="button"
-                      disabled={(app.lifecycle?.state !== undefined && app.lifecycle.state !== "active") || !app.git.isRepo || !!app.git.localError || !app.git.branch ||
-                        app.git.branch === "detached" || app.git.dirtyFilesCount > 0}
+                      disabled
                       onClick={() => handleStreamingDeploy(app)}
-                      title={app.lifecycle?.state && app.lifecycle.state !== "active" ? "Reactiva la aplicación antes de desplegar" : !app.git.isRepo ? "La aplicación no tiene un repositorio Git local" :
-                        app.git.localError ? app.git.localError :
-                        app.git.branch === "detached" ? "Checkout detached: seleccioná una rama válida en el servidor antes de desplegar" :
-                        app.git.dirtyFilesCount > 0 ? "Hay cambios locales. Revisalos antes de desplegar" : "Desplegar con Git pull --ff-only"}
+                      title="Despliegue genérico deshabilitado: requiere composición efectiva y rollback verificados"
                       className="px-3 py-1.5 rounded-lg bg-brand-cyan/15 hover:bg-brand-cyan/25 text-brand-cyan border border-brand-cyan/30 text-xs font-mono font-semibold flex items-center gap-1.5 transition-all shadow-glow disabled:cursor-not-allowed disabled:border-slate-700 disabled:bg-slate-700/20 disabled:text-slate-400 disabled:shadow-none"
                     >
                       <Play className="w-3.5 h-3.5 fill-current" />
-                      <span>{(app.lifecycle?.state !== undefined && app.lifecycle.state !== "active") || !app.git.isRepo || !!app.git.localError || !app.git.branch ||
-                        app.git.branch === "detached" || app.git.dirtyFilesCount > 0 ? "Deploy bloqueado" : "Desplegar"}</span>
+                      <span>Deploy bloqueado</span>
                     </button>
                   )}
                 </div>
