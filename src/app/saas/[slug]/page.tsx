@@ -59,6 +59,7 @@ export default function SaaSWorkspacePage() {
   const tenants=gov?.tenants.filter(t=>t.saas===slug)||[];
   const source=gov?.sources?.find(item=>item.saas===slug);
   const sourceAvailable=source?.status==="available";
+  const management=gov?.managementProducts?.includes(product.slug) ?? false;
   const copies=(backups||[]).filter(b=>b.appSlug===slug);
   const last=copies.find(b=>b.status==="verified");
   const containers=app?.containers||[];
@@ -78,6 +79,7 @@ export default function SaaSWorkspacePage() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          {(slug==="onlygym"||slug==="onlyturn")&&<Link className="hub-primary-action" href={"/saas/"+slug+"/manage"}>Administrar plataforma <Settings2 className="h-4 w-4"/></Link>}
           <Link className="hub-secondary-action" href={"/governance?saas="+slug}><Users className="h-4 w-4"/> Ver tenants</Link>
           <Link className="hub-primary-action" href="/software"><ServerCog className="h-4 w-4"/> Acciones técnicas <ArrowUpRight className="h-4 w-4"/></Link>
         </div>
@@ -120,18 +122,19 @@ export default function SaaSWorkspacePage() {
       {tab==="settings"&&<section className="hub-card space-y-5 p-5 sm:p-6"><h2 className="hub-section-heading">Configuración e integraciones</h2>
         <div className="grid gap-3 sm:grid-cols-2">{[
           {name:"Lectura de tenants",state:product.capabilities.tenantRead},
-          {name:"Cambios de estado",state:product.capabilities.statusWrite},
-          {name:"Módulos",state:product.capabilities.moduleWrite},
-          {name:"Impersonación segura",state:product.capabilities.impersonation},
-          {name:"Branding y configuración",state:product.capabilities.settings},
-          {name:"Actividad del tenant",state:product.capabilities.activity}
+          {name:"Estados y suscripciones",state:management?"connected":product.capabilities.statusWrite},
+          {name:"Módulos y planes",state:management?"connected":product.capabilities.moduleWrite},
+          {name:"Credenciales y sesiones",state:management?"connected":product.capabilities.impersonation},
+          {name:"Datos del tenant",state:management?"connected":product.capabilities.settings},
+          {name:"Actividad del tenant",state:management?"connected":product.capabilities.activity}
         ].map(x=><div key={x.name} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 p-4"><span className="text-[13px] text-slate-200">{x.name}</span><span className={qualityClass(x.state)}>{connected(x.state)}</span></div>)}</div>
-        <NotConnected title="Configuración central en preparación" explanation="El estándar de interfaz ya es compartido. Las opciones de branding, planes y acceso requieren endpoints autenticados y auditables en cada SaaS antes de habilitarse."/>
+        {management?<Link href={"/saas/"+slug+"/manage"} className="hub-primary-action">Gestionar empresas, planes, suscripciones, módulos y accesos</Link>:<NotConnected title="Configuración central en preparación" explanation="Las opciones de gestión requieren endpoints autenticados y auditables en cada SaaS antes de habilitarse."/>}
       </section>}
       {tab==="audit"&&<section className="hub-card space-y-4 p-5 sm:p-6"><h2 className="hub-section-heading">Auditoría del producto</h2>
-        <NotConnected title="Eventos unificados pendientes" explanation="La auditoría interna del Hub existe, pero todavía no hay un contrato por producto que devuelva todos sus eventos y acciones administrativas. Se mantiene explícitamente pendiente."/>
+        {management?<Link className="hub-primary-action" href={"/saas/"+slug+"/manage?section=audit"}>Consultar auditoría del producto</Link>:<NotConnected title="Eventos unificados pendientes" explanation="Todavía no hay un contrato por producto que devuelva sus eventos y acciones administrativas."/>}
         <Link className="hub-text-link" href="/superadmin">Ver estado del Superadmin <ArrowUpRight className="h-4 w-4"/></Link>
       </section>}
     </div>
   </div>;
 }
+

@@ -31,7 +31,7 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Selective SaaS read-only integration tests
-        run: node --test scripts/saas-bridge.test.cjs
+        run: node --test scripts/saas-bridge.test.cjs scripts/saas-management.test.cjs
 
       - name: Backup engine safety tests
         run: node --test scripts/backup-engine.test.cjs
@@ -72,6 +72,11 @@ jobs:
           UI_BASE_URL: http://127.0.0.1:3005
         run: node scripts/ui-smoke.mjs
 
+      - name: Desktop and mobile SaaS management workflows
+        env:
+          UI_BASE_URL: http://127.0.0.1:3005
+        run: node scripts/management-ui-smoke.mjs
+
       - name: Attach screenshot fixtures
         if: always()
         uses: actions/upload-artifact@v4
@@ -80,3 +85,4 @@ jobs:
           path: ui-screenshots/
           if-no-files-found: ignore
           retention-days: 7
+

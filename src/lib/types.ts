@@ -143,6 +143,7 @@ export interface UniversalTenant {
 }
 
 export interface GovernanceOverview {
+  managementProducts?: SaaSSlug[];
   totalTenants: number;
   activeTenants: number;
   trialTenants: number;
@@ -165,4 +166,5 @@ export interface GovernanceOverview {
     notes: string;
   }>;
 }
+
 
