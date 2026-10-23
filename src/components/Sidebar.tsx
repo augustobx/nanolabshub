@@ -5,13 +5,15 @@ import { useEffect, useState } from "react";
 import {
   LayoutDashboard, Layers3, Building2, Package, ServerCog, DatabaseBackup,
   Globe2, Menu, X, PanelLeftClose, PanelLeftOpen, ShieldCheck,
-  Workflow, Boxes, Archive, Activity, ChevronRight
+  Workflow, Boxes, Archive, Activity, ChevronRight, ShieldAlert, ScrollText, HeartPulse, History
 } from "lucide-react";
 
 export const NAV_GROUPS = [
   { title: "Gobierno", items: [
     { name: "Inicio", href: "/", icon: LayoutDashboard, description: "Estado y prioridades" },
     { name: "Superadmin", href: "/superadmin", icon: ShieldCheck, description: "Alcance y control global" },
+    { name: "Seguridad", href: "/security", icon: ShieldAlert, description: "Controles e integraciones" },
+    { name: "Auditoría", href: "/audit", icon: ScrollText, description: "Historial de acciones en Hub" },
   ] },
   { title: "Negocio", items: [
     { name: "Productos SaaS", href: "/saas", icon: Layers3, description: "Un espacio consistente por producto" },
@@ -21,11 +23,13 @@ export const NAV_GROUPS = [
     { name: "Apps internas", href: "/software?segment=internal", icon: Package, description: "Herramientas NanoLabs" },
     { name: "Clientes dedicados", href: "/software?segment=dedicated", icon: Boxes, description: "Instancias particulares" },
     { name: "Archivadas", href: "/software?archived=1", icon: Archive, description: "Historial y reactivación" },
+    { name: "Migración de paneles", href: "/legacy", icon: History, description: "Superadmin heredados" },
   ] },
   { title: "Plataforma", items: [
     { name: "Operación técnica", href: "/operations", icon: Activity, description: "Docker, Git y acciones avanzadas" },
     { name: "Infraestructura", href: "/infrastructure", icon: ServerCog, description: "Host y componentes clasificados" },
     { name: "Backups", href: "/backups", icon: DatabaseBackup, description: "Protección de datos" },
+    { name: "Recuperación", href: "/continuity", icon: HeartPulse, description: "Integridad y pruebas aisladas" },
     { name: "Red y dominios", href: "/networking", icon: Globe2, description: "Red y certificados" },
   ] },
 ];
