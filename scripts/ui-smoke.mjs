@@ -90,6 +90,15 @@ const responses = {
     { slug: "onlyfood", name: "OnlyFood", enabled: false, hourLocal: 3, weekdays: "0,1,2,3,4,5,6", lastRunDay: null },
     { slug: "onlypadel", name: "OnlyPadel", enabled: true, hourLocal: 4, weekdays: "0", lastRunDay: "2026-10-21" },
   ] },
+  "/api/audit": { success: true, data: [{id:1,timestamp:new Date().toISOString(),actor:"ci",action:"BACKUP_CREATED",target:"nanolabshub",details:"Copia verificada",source:"hub-local"}] },
+  "/api/security/summary": { success: true, data: {
+    access:{adminCredentialsConfigured:true,multiFactorAvailable:false,roleBasedPermissionsAvailable:false,localAudit:true},
+    switches:{backups:true,lifecycle:true,saasConnectors:false},
+    connectors:["onlyfood","onlypadel","onlycars","onlyerp","onlygym","onlyturn","onlymob"].map(slug=>({slug,name:slug,enabled:false,credentialConfigured:false,safeWriteContract:false})),
+    offsite:{providerConfigured:false,lastVerifiedAt:null},
+    legacy:{dbCredentialsRotation:"not_verified",superadminMigration:"incomplete"}
+  } },
+  "/api/backups/restore-check": { success: true, data: [] },
   "/api/alerts": { success: true, data: { alerts: [] } },
 };
 
@@ -169,6 +178,10 @@ try {
       ["/infrastructure", "Infraestructura"],
       ["/hardware", "Infraestructura"],
       ["/backups", "Copias de seguridad"],
+      ["/continuity", "Recuperación"],
+      ["/security", "Seguridad"],
+      ["/audit", "Auditoría"],
+      ["/legacy", "Migración de paneles"],
       ["/networking", "Dominios y red"],
     ]) {
       await page.goto(`${origin}${path}`, { waitUntil: "domcontentloaded" });
@@ -182,6 +195,20 @@ try {
         if (width > device.viewport.width + 4) {
           throw new Error(`Mobile horizontal overflow at ${path}: ${width}px (viewport ${device.viewport.width}px)`);
         }
+      }
+      if (path === "/continuity") {
+        await page.getByRole("heading", { name: "Preparación de recuperación por aplicación" }).waitFor();
+        await page.getByText("Copia externa verificada").first().waitFor();
+      }
+      if (path === "/security") {
+        await page.getByRole("heading", { name: "Integración por SaaS" }).waitFor();
+      }
+      if (path === "/audit") {
+        await page.getByRole("heading", { name: "Eventos locales del Hub" }).waitFor();
+        await page.getByText("BACKUP_CREATED").first().waitFor();
+      }
+      if (path === "/legacy") {
+        await page.getByRole("heading", { name: "Planes de migración por producto" }).waitFor();
       }
       if (path === "/infrastructure") {
         await page.getByRole("heading", { name: "Inventario técnico clasificado" }).waitFor();
