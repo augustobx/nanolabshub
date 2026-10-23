@@ -13,6 +13,10 @@ interface HeaderProps {
 const PAGE_INFO: Record<string, { title: string; section: string }> = {
   "/": { title: "Inicio", section: "Gobierno" },
   "/superadmin": { title: "Superadmin", section: "Gobierno" },
+  "/security": { title: "Seguridad", section: "Gobierno" },
+  "/audit": { title: "Auditoría", section: "Gobierno" },
+  "/continuity": { title: "Recuperación", section: "Plataforma" },
+  "/legacy": { title: "Migración de paneles", section: "Portafolio" },
   "/saas": { title: "Productos SaaS", section: "Negocio" },
   "/operations": { title: "Operación técnica", section: "Plataforma" },
   "/governance": { title: "Clientes y tenants", section: "Negocio" },
