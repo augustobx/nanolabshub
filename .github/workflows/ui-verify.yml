@@ -30,6 +30,9 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
+      - name: Selective SaaS read-only integration tests
+        run: node --test scripts/saas-bridge.test.cjs
+
       - name: Backup engine safety tests
         run: node --test scripts/backup-engine.test.cjs
 

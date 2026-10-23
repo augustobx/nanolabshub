@@ -314,6 +314,12 @@ export default function GovernancePage() {
             </div>
           </div>
         )}
+        {data?.sources?.some(source => source.status === "disabled") && (
+          <p role="status" className="rounded-xl border border-white/10 p-4 text-xs text-slate-400">
+            Conectores pendientes de habilitación: {data.sources.filter(source => source.status === "disabled").map(source => source.saas).join(", ")}.
+            {" "}No se incluyen en los totales ni se consideran errores de conexión.
+          </p>
+        )}
         {/* Global KPIs */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
           <div className="hub-card p-4 space-y-1">

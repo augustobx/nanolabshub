@@ -152,7 +152,7 @@ export interface GovernanceOverview {
   tenants: UniversalTenant[];
   sources?: Array<{
     saas: SaaSSlug;
-    status: "available" | "unavailable";
+    status: "available" | "unavailable" | "disabled";
     count: number | null;
     checkedAt: string;
     message: string | null;
