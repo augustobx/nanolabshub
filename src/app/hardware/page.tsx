@@ -176,27 +176,22 @@ export default function HardwarePage() {
     <div className="flex-1 flex flex-col pb-12">
       <Header onRefresh={fetchMetrics} isRefreshing={isLoading} />
 
-      <div className="px-6 py-6 max-w-7xl w-full mx-auto space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-              <Cpu className="w-5 h-5 text-brand-cyan" />
-              <span>Hardware, Infraestructura & Tendencias</span>
-            </h1>
-            <p className="text-xs text-gray-400 font-mono mt-0.5">
-              Dedicado Debian GNU/Linux 13 · 149.50.159.163 · DattaWeb Datacenter
+      <div className="hub-content space-y-7">
+        <section className="hub-hero flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-3">
+            <p className="hub-eyebrow">Operación / Infraestructura</p>
+            <h1 className="hub-hero-title">Infraestructura y rendimiento.</h1>
+            <p className="hub-description">
+              Uso de recursos, disponibilidad de contenedores y tendencias del servidor.
+              Supervisá el entorno sin salir del Hub.
             </p>
           </div>
-
-          <button
-            onClick={handleSafePrune}
-            className="px-3.5 py-2 rounded-xl bg-surface-100 hover:bg-surface-50 text-gray-300 hover:text-white border border-white/10 text-xs font-mono font-medium flex items-center gap-2 transition-all shadow-sm"
-            title="Elimina imágenes huérfanas <none> sin tocar volúmenes de datos"
-          >
-            <Trash2 className="w-3.5 h-3.5 text-amber-400" />
-            <span>LIMPIEZA SEGURA DOCKER</span>
+          <button type="button" onClick={handleSafePrune}
+            title="Elimina imágenes Docker huérfanas sin tocar volúmenes de datos"
+            className="inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-xl border border-amber-400/20 bg-amber-400/[0.07] px-4 py-3 text-xs font-semibold text-amber-200 transition-colors hover:bg-amber-400/10">
+            <Trash2 className="h-4 w-4" /> Limpiar imágenes Docker
           </button>
-        </div>
+        </section>
 
         {/* Primary Hardware Gauges */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -205,20 +200,20 @@ export default function HardwarePage() {
             <div className="flex items-center justify-between border-b border-white/5 pb-3">
               <span className="text-xs font-mono text-gray-400 flex items-center gap-2">
                 <Cpu className="w-4 h-4 text-brand-cyan" />
-                PROCESADOR FÍSICO
+                Procesador
               </span>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-brand-cyan/10 text-brand-cyan border border-brand-cyan/20">
-                12 THREADS
+                CPU
               </span>
             </div>
 
             <div className="space-y-2">
               <div className="text-xs text-gray-400">Modelo:</div>
               <div className="text-sm font-bold text-white font-mono">
-                12th Gen Intel(R) Core(TM) i5-12400
+                {metrics?.cpu.model || "Modelo no disponible"}
               </div>
               <div className="text-xs text-gray-500 font-mono">
-                Arquitectura: x86_64 · 6 Cores / 12 Hilos
+                {metrics?.cpu.cores ? `${metrics.cpu.cores} procesadores lógicos · lectura del host` : "Cantidad de procesadores no disponible"}
               </div>
             </div>
 
@@ -251,7 +246,7 @@ export default function HardwarePage() {
                 MEMORIA RAM & SWAP
               </span>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">
-                DDR4
+                RAM / SWAP
               </span>
             </div>
 
@@ -309,20 +304,20 @@ export default function HardwarePage() {
             <div className="flex items-center justify-between border-b border-white/5 pb-3">
               <span className="text-xs font-mono text-gray-400 flex items-center gap-2">
                 <HardDrive className="w-4 h-4 text-emerald-400" />
-                DISCO NVMe PRODUCTIVO
+                ALMACENAMIENTO DEL HOST
               </span>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                PCIe Gen4
+                Disco
               </span>
             </div>
 
             <div className="space-y-2">
-              <div className="text-xs text-gray-400">Partición Raíz & Docker:</div>
+              <div className="text-xs text-gray-400">Filesystem monitorizado:</div>
               <div className="text-sm font-bold text-white font-mono">
-                /dev/nvme0n1p3 sobre /
+                {metrics?.disks[0]?.filesystem || "No informado"}
               </div>
               <div className="text-xs text-gray-500 font-mono">
-                Montajes compartidos: /opt, /srv, /var/lib/docker
+                {metrics?.disks[0]?.mount ? `Montaje analizado: ${metrics.disks[0].mount}` : "Montaje sin información"}
               </div>
             </div>
 
@@ -404,7 +399,7 @@ export default function HardwarePage() {
             <div>
               <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
                 <Boxes className="w-5 h-5 text-brand-cyan" />
-                <span>Inventario Activo de Contenedores Docker</span>
+                <span>Contenedores del servidor</span>
               </h2>
               <p className="text-xs text-gray-500 font-mono">
                 {containers.length} contenedores registrados en el Docker Daemon
@@ -412,7 +407,42 @@ export default function HardwarePage() {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="space-y-3 md:hidden">
+            {containers.length === 0 ? (
+              <div className="rounded-xl border border-white/10 bg-white/[0.025] p-5 text-center text-xs text-slate-400">
+                No hay contenedores registrados.
+              </div>
+            ) : containers.map((container) => (
+              <div key={container.id} className="rounded-xl border border-white/[0.09] bg-white/[0.025] p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="break-all text-xs font-semibold text-white">{container.name}</div>
+                    <div className="mt-1 break-all text-[11px] text-slate-500">{container.image}</div>
+                  </div>
+                  <span className={`shrink-0 rounded-md px-2 py-1 text-[10px] font-semibold ${container.state === "running"
+                    ? "bg-emerald-400/10 text-emerald-300" : "bg-amber-400/10 text-amber-200"}`}>
+                    {container.state === "running" ? "Activo" : container.state === "exited" ? "Detenido" : container.state}
+                  </span>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
+                  <div><p className="text-slate-500">Salud</p><p className="mt-1 text-slate-300">{container.health === "none" ? "Sin verificación" : container.health}</p></div>
+                  <div><p className="text-slate-500">Puertos</p><p className="mt-1 break-all text-slate-300">{container.ports || "Internos"}</p></div>
+                </div>
+                <div className="mt-4 flex gap-2 border-t border-white/[0.08] pt-3">
+                  <button type="button" onClick={() => handleOpenStreamingLogs(container.name)}
+                    className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] text-xs text-slate-200">
+                    <Terminal className="h-4 w-4 text-brand-cyan" /> Logs
+                  </button>
+                  <button type="button" onClick={() => handleRestartContainer(container.name)}
+                    className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg border border-amber-400/20 bg-amber-400/[0.04] text-xs text-amber-200">
+                    <RotateCw className="h-4 w-4" /> Reiniciar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-left text-xs font-mono">
               <thead className="bg-surface-100/60 text-gray-400 uppercase text-[10px] tracking-wider border-b border-white/5">
                 <tr>
@@ -432,7 +462,7 @@ export default function HardwarePage() {
                       <span
                         className={`w-2 h-2 rounded-full ${
                           c.state === "running"
-                            ? "bg-emerald-400 animate-pulse"
+                            ? "bg-emerald-400"
                             : c.state === "exited"
                             ? "bg-gray-600"
                             : "bg-amber-400"

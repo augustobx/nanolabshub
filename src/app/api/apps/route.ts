@@ -1,11 +1,11 @@
-import { getAppsStatus } from "@/lib/server-api";
+import { getOperationalApps } from "@/lib/operations";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export async function GET() {
   try {
-    const apps = await getAppsStatus();
+    const apps = await getOperationalApps();
     return Response.json({
       success: true,
       data: apps,

@@ -17,6 +17,17 @@ export interface AppDefinition {
 
 export const KNOWN_APPS: AppDefinition[] = [
   {
+    slug: "nanolabshub",
+    name: "NanoLabs Hub",
+    type: "internal",
+    path: "/opt/apps/nanolabshub-redesign",
+    url: "https://hub.nanoapps.ar",
+    containerNames: ["nanolabshub"],
+    dbType: "sqlite",
+    sqlitePath: "/opt/apps/nanolabshub/data/hub.sqlite",
+    description: "Centro de control de operaciones NanoLabs",
+  },
+  {
     slug: "onlyfood",
     name: "OnlyFood SaaS",
     type: "saas",
@@ -149,8 +160,8 @@ export const KNOWN_APPS: AppDefinition[] = [
     name: "NanoMonitor",
     type: "internal",
     path: "/opt/apps/nanomonitor",
-    url: "https://monitor.nanoapps.site",
-    containerNames: ["nanomonitor-server", "nanomonitor-postgres"],
+    url: "https://monitor.nanolabs.com.ar",
+    containerNames: ["nanomonitor-server", "nanomonitor-postgres", "nanomonitor-redis"],
     dbType: "postgres",
     dbContainer: "nanomonitor-postgres",
     dbPort: 5432,
@@ -162,7 +173,7 @@ export const KNOWN_APPS: AppDefinition[] = [
     type: "internal",
     path: "/opt/apps/nanokeys",
     url: "https://keys.nanolabs.online",
-    containerNames: ["nanokeys-web", "nanokeys-api"],
+    containerNames: ["nanokeys-nanokeys-web-1", "nanokeys-nanokeys-api-1"],
     dbType: "sqlite",
     sqlitePath: "/opt/apps/nanokeys/data/identity.sqlite",
     description: "Gestión de licencias de escritorio e identidad",

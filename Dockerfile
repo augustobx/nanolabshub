@@ -21,6 +21,8 @@ RUN npm run build
 
 # Runner stage
 FROM base AS runner
+ARG BUILD_REVISION=unknown
+LABEL org.opencontainers.image.revision="$BUILD_REVISION"
 WORKDIR /app
 RUN apk add --no-cache curl python3 docker-cli git
 ENV NODE_ENV=production
@@ -31,6 +33,10 @@ ENV HOSTNAME="0.0.0.0"
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/scripts/backup-engine.cjs /app/scripts/backup-engine.cjs
+COPY --from=builder /app/scripts/recovery-engine.cjs /app/scripts/recovery-engine.cjs
+COPY --from=builder /app/scripts/backup-scheduler.cjs /app/scripts/backup-scheduler.cjs
+COPY --from=builder /app/scripts/backup-scheduler-health.cjs /app/scripts/backup-scheduler-health.cjs
 
 EXPOSE 3000
 

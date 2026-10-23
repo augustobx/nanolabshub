@@ -1,0 +1,79 @@
+name: Validate UI redesign
+
+on:
+  push:
+    branches:
+      - design/governance-hub-redesign-0.1.0
+  pull_request:
+    branches:
+      - 0.1.0
+
+jobs:
+  typecheck-build-and-visual-smoke:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Backup engine safety tests
+        run: node --test scripts/backup-engine.test.cjs
+
+      - name: Scheduler heartbeat healthcheck tests
+        run: node --test scripts/backup-scheduler-health.test.cjs
+
+      - name: Isolated recovery validation tests
+        run: node --test scripts/recovery-engine.test.cjs
+
+      - name: Production build
+        run: npm run build
+
+      - name: Install screenshot test browser
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Start isolated UI test server
+        env:
+          ADMIN_USER: ci_smoke
+          ADMIN_PASS: ci_smoke_password
+          HUB_MASTER_KEY: ci_smoke_not_for_production_only
+        run: |
+          nohup npm run start > /tmp/nanolabs-ui-smoke-server.log 2>&1 &
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:3005/api/health >/dev/null; then
+              echo "UI test server ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/nanolabs-ui-smoke-server.log
+          exit 1
+
+      - name: Desktop and mobile smoke screenshots
+        env:
+          UI_BASE_URL: http://127.0.0.1:3005
+        run: node scripts/ui-smoke.mjs
+
+      - name: Attach screenshot fixtures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: governance-ui-screenshots
+          path: ui-screenshots/
+          if-no-files-found: ignore
+          retention-days: 7

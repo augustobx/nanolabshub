@@ -1,10 +1,18 @@
 import { spawn } from "node:child_process";
 import { KNOWN_APPS } from "@/lib/apps-registry";
 import { getDatabase } from "@/lib/db";
+import { requireMutatingSession } from "@/lib/action-security";
+import { assertAppActive } from "@/lib/app-lifecycle";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request) {
+export async function POST(req: Request) {
+  let actor: string;
+  try {
+    actor = await requireMutatingSession(req);
+  } catch (error) {
+    return new Response(error instanceof Error ? error.message : "No autorizado", { status: 403 });
+  }
   const { searchParams } = new URL(req.url);
   const slug = searchParams.get("slug");
 
@@ -17,11 +25,17 @@ export async function GET(req: Request) {
     return new Response(`App ${slug} no encontrada`, { status: 404 });
   }
 
+  try {
+    assertAppActive(app.slug);
+  } catch (error) {
+    return new Response(error instanceof Error ? error.message : "Operación bloqueada", { status: 409 });
+  }
+
   const encoder = new TextEncoder();
 
   // Audit log start
   try {
-    getDatabase().logAudit("augusto", "DEPLOY_STARTED", app.slug, `Iniciado despliegue en ${app.path}`);
+    getDatabase().logAudit(actor, "DEPLOY_STARTED", app.slug, `Iniciado despliegue en ${app.path}`);
   } catch {}
 
   const stream = new ReadableStream({
@@ -37,22 +51,35 @@ export async function GET(req: Request) {
         )
       );
 
+      // A failed Git operation must never fall through to a Docker rebuild.
+      // Scope safe.directory to this exact registered checkout.
       const deployScript = `
-        cd "${app.path}"
-        echo "[1/4] Comprobando rama y cambios locales..."
-        BRANCH=$(git branch --show-current 2>/dev/null || echo "main")
-        echo "Rama activa: $BRANCH"
-        git status -s
+        set -euo pipefail
+        APP_PATH=${JSON.stringify(app.path)}
+        cd "$APP_PATH"
+        echo "[1/4] Validando repositorio, rama y cambios locales..."
+        GIT=(git -c "safe.directory=$APP_PATH" -C "$APP_PATH")
+        "\${GIT[@]}" rev-parse --is-inside-work-tree | grep -qx true || { echo "No hay repositorio Git"; exit 2; }
+        BRANCH=$("\${GIT[@]}" symbolic-ref --quiet --short HEAD) || {
+          echo "Despliegue cancelado: checkout detached, no hay rama activa"; exit 2;
+        }
+        test -n "$BRANCH" || { echo "No hay rama seleccionada"; exit 2; }
+        test -z "$("\${GIT[@]}" status --porcelain)" || {
+          echo "Despliegue cancelado: hay cambios locales sin guardar"; exit 2;
+        }
+        docker compose config --services >/dev/null || {
+          echo "Despliegue cancelado: Docker Compose no disponible"; exit 2;
+        }
 
-        echo "\n[2/4] Descargando ultimas modificaciones desde GitHub (git pull origin $BRANCH)..."
-        git pull origin "$BRANCH"
+        echo "[2/4] Git pull --ff-only de origin/$BRANCH..."
+        GIT_TERMINAL_PROMPT=0 "\${GIT[@]}" pull --ff-only origin "$BRANCH"
 
-        echo "\n[3/4] Reconstruyendo y levantando contenedores (docker compose up -d --build)..."
+        echo "[3/4] Reconstruyendo y levantando servicios..."
         docker compose up -d --build
 
-        echo "\n[4/4] Verificando estado final de servicios..."
+        echo "[4/4] Estado final..."
         docker compose ps
-        echo "\n=== [DESPLIEGUE COMPLETADO EXITOSAMENTE] ==="
+        echo "=== DESPLIEGUE COMPLETADO ==="
       `;
 
       const child = spawn("bash", ["-c", deployScript]);
@@ -80,7 +107,7 @@ export async function GET(req: Request) {
       child.on("close", (code) => {
         try {
           getDatabase().logAudit(
-            "augusto",
+            actor,
             code === 0 ? "DEPLOY_SUCCESS" : "DEPLOY_FAILED",
             app.slug,
             `Despliegue finalizado con código ${code}`

@@ -1,89 +1,39 @@
-import { getBackupsList } from "@/lib/server-api";
-import { executeRemoteCommand } from "@/lib/ssh";
+import { getSessionUser } from "@/lib/auth";
+import { requireMutatingSession } from "@/lib/action-security";
+import { backupEngine, assertBackupSecurity } from "@/lib/backup-service";
 import { KNOWN_APPS } from "@/lib/apps-registry";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+const headers = { "Cache-Control": "private, no-store" };
 
 export async function GET() {
+  if (!await getSessionUser()) return Response.json({success:false,error:"Sesión requerida"},{status:401,headers});
   try {
-    const backups = await getBackupsList();
-    return Response.json({
-      success: true,
-      data: backups,
-    });
-  } catch (error: any) {
-    console.error("Backups error:", error);
-    return Response.json(
-      {
-        success: false,
-        error: error.message || "Failed to fetch backups",
-      },
-      { status: 500 }
-    );
+    return Response.json({ success:true, data:backupEngine.list(KNOWN_APPS),
+      schedules:backupEngine.schedules(KNOWN_APPS) },{headers});
+  } catch (error) {
+    return Response.json({success:false,error:error instanceof Error?error.message:"No se pudo consultar el historial"},{status:500,headers});
   }
 }
-
 export async function POST(req: Request) {
+  let actor: string;
+  try {actor=await requireMutatingSession(req);}
+  catch {return Response.json({success:false,error:"Sesión u origen no autorizado"},{status:403,headers});}
+  if (!req.headers.get("content-type")?.startsWith("application/json")) {
+    return Response.json({success:false,error:"Se requiere JSON"},{status:415,headers});
+  }
   try {
-    const body = await req.json();
-    const { slug } = body;
-
-    const app = KNOWN_APPS.find((a) => a.slug === slug);
-    if (!app) {
-      return Response.json({ success: false, error: `App ${slug} no encontrada` }, { status: 400 });
+    assertBackupSecurity();
+    const body=await req.json();
+    if(typeof body.slug!=="string"||!KNOWN_APPS.some(a=>a.slug===body.slug)) {
+      return Response.json({success:false,error:"App no registrada"},{status:400,headers});
     }
-
-    if (app.dbType === "none") {
-      return Response.json({ success: false, error: `${app.name} no posee base de datos configurable` }, { status: 400 });
-    }
-
-    // Trigger backup via docker or nanocontrol automated runner
-    const timestamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
-    const backupTargetDir = `/opt/backups/${app.slug}`;
-    let backupCmd = "";
-
-    if (app.dbType === "mariadb" || app.dbType === "mysql") {
-      backupCmd = `
-        echo Qap.1029Qap.1029 | sudo -S mkdir -p "${backupTargetDir}" && \\
-        echo Qap.1029Qap.1029 | sudo -S docker exec ${app.dbContainer} sh -c "mariadb-dump -u root -p\\$MYSQL_ROOT_PASSWORD --all-databases 2>/dev/null || mysqldump -u root -p\\$MYSQL_ROOT_PASSWORD --all-databases 2>/dev/null" | gzip > "${backupTargetDir}/manual_dump_${timestamp}.sql.gz" && \\
-        ls -lh "${backupTargetDir}/manual_dump_${timestamp}.sql.gz"
-      `;
-    } else if (app.dbType === "postgres") {
-      backupCmd = `
-        echo Qap.1029Qap.1029 | sudo -S mkdir -p "${backupTargetDir}" && \\
-        echo Qap.1029Qap.1029 | sudo -S docker exec ${app.dbContainer} sh -c "pg_dumpall -U postgres 2>/dev/null || pg_dumpall -U \\$POSTGRES_USER 2>/dev/null" | gzip > "${backupTargetDir}/manual_dump_${timestamp}.sql.gz" && \\
-        ls -lh "${backupTargetDir}/manual_dump_${timestamp}.sql.gz"
-      `;
-    } else if (app.dbType === "sqlite" && app.sqlitePath) {
-      backupCmd = `
-        echo Qap.1029Qap.1029 | sudo -S mkdir -p "${backupTargetDir}" && \\
-        echo Qap.1029Qap.1029 | sudo -S cp "${app.sqlitePath}" "${backupTargetDir}/identity_${timestamp}.sqlite" && \\
-        gzip "${backupTargetDir}/identity_${timestamp}.sqlite" && \\
-        ls -lh "${backupTargetDir}/identity_${timestamp}.sqlite.gz"
-      `;
-    }
-
-    const { stdout, stderr, code } = await executeRemoteCommand(backupCmd);
-    if (code !== 0) {
-      throw new Error(`Error generando backup: ${stderr || stdout}`);
-    }
-
-    return Response.json({
-      success: true,
-      data: {
-        appSlug: app.slug,
-        output: stdout,
-        timestamp,
-      },
-    });
-  } catch (error: any) {
-    console.error("Backup trigger error:", error);
-    return Response.json(
-      {
-        success: false,
-        error: error.message || "Failed to trigger backup",
-      },
-      { status: 500 }
-    );
+    const result=await backupEngine.createBackup(KNOWN_APPS,body.slug,"manual",actor);
+    return Response.json({success:true,data:result},{headers});
+  } catch (error) {
+    const msg=error instanceof Error?error.message:"Falló el respaldo";
+    console.error("[backup] Falló una operación de respaldo",msg);
+    return Response.json({success:false,error:msg},{status:422,headers});
   }
 }

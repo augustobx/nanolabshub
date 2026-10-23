@@ -13,8 +13,8 @@ services:
       - SERVER_PORT=2207
       - SERVER_USER=augusto
       - ADMIN_USER=${ADMIN_USER:-augusto}
-      - ADMIN_PASS=${ADMIN_PASS:-Qap.1029Qap.1029}
-      - HUB_MASTER_KEY=${HUB_MASTER_KEY:-nanolabs_governance_supreme_2026}
+      - ADMIN_PASS=${ADMIN_PASS:?ADMIN_PASS es obligatorio; definir clave segura en archivo .env}
+      - HUB_MASTER_KEY=${HUB_MASTER_KEY:?HUB_MASTER_KEY es obligatorio; definir clave segura en archivo .env}
       - DATA_DIR=/app/data
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

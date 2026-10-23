@@ -15,137 +15,130 @@ interface TerminalModalProps {
 }
 
 export function TerminalModal({
-  isOpen,
-  onClose,
-  title,
-  output,
-  isLoading,
-  isStreaming,
-  onStopStream,
-  onRefresh,
+  isOpen, onClose, title, output, isLoading, isStreaming, onStopStream, onRefresh,
 }: TerminalModalProps) {
   const [copied, setCopied] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const outputRef = useRef<HTMLDivElement>(null);
+  const shouldFollowRef = useRef(true);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
 
   useEffect(() => {
-    if (isOpen) {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (!isOpen) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    shouldFollowRef.current = true;
+    dialogRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeRef.current();
+      if (event.key !== "Tab") return;
+      const controls = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+      ) ?? []).filter((node) => node.getClientRects().length > 0);
+      if (!controls.length) return;
+      if (event.shiftKey && (document.activeElement === controls[0] || document.activeElement === dialogRef.current)) {
+        event.preventDefault();
+        controls[controls.length - 1].focus();
+      } else if (!event.shiftKey && document.activeElement === controls[controls.length - 1]) {
+        event.preventDefault();
+        controls[0].focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus();
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    const viewport = outputRef.current;
+    if (isOpen && viewport && shouldFollowRef.current) {
+      viewport.scrollTop = viewport.scrollHeight;
     }
   }, [output, isOpen]);
 
   if (!isOpen) return null;
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(output);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(output);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
   };
 
   const handleDownload = () => {
-    const blob = new Blob([output], { type: "text/plain" });
+    const blob = new Blob([output], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${title.toLowerCase().replace(/[^a-z0-9]/g, "_")}_output.log`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${title.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "_")}_output.log`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="w-full max-w-5xl h-[78vh] flex flex-col bg-[#080c14] border border-brand-cyan/35 rounded-2xl shadow-2xl overflow-hidden font-mono text-xs">
-        {/* Modal Header */}
-        <div className="h-12 px-4 bg-[#0d1424] border-b border-white/10 flex items-center justify-between select-none">
-          <div className="flex items-center gap-3">
-            <div className="p-1.5 rounded-lg bg-brand-cyan/15 text-brand-cyan border border-brand-cyan/30">
-              <TerminalIcon className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-white text-xs">{title}</span>
-                {isStreaming && (
-                  <span className="flex items-center gap-1 text-[9px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-bold animate-pulse">
-                    <Radio className="w-3 h-3" />
-                    STREAMING EN VIVO
-                  </span>
-                )}
-                {isLoading && !isStreaming && (
-                  <span className="flex items-center gap-1 text-[9px] text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">
-                    <RefreshCw className="w-3 h-3 animate-spin" />
-                    PROCESANDO...
-                  </span>
-                )}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#060a12]/85 p-2 backdrop-blur-sm sm:p-6"
+      onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="hub-terminal-title"
+        className="flex h-[min(85dvh,760px)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#121c2b] font-mono text-xs shadow-2xl outline-none">
+        <div className="flex min-h-[66px] items-center justify-between gap-2 border-b border-white/[0.08] bg-[#1a2639] px-3 py-3 sm:px-5">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#2c3e5d] text-brand-cyan">
+              <TerminalIcon className="h-[17px] w-[17px]" />
+            </span>
+            <div className="min-w-0">
+              <div id="hub-terminal-title" className="truncate text-xs font-semibold text-slate-100 sm:text-sm">{title}</div>
+              <div role="status" className="mt-1 flex items-center gap-1.5 text-[10px] text-slate-400">
+                {isStreaming ? (
+                  <><Radio className="h-3 w-3 text-emerald-400" /> Recibiendo información en vivo</>
+                ) : isLoading ? (
+                  <><RefreshCw className="h-3 w-3 animate-spin text-amber-400" /> Procesando</>
+                ) : "Registro de ejecución"}
               </div>
             </div>
           </div>
-
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
             {isStreaming && onStopStream && (
-              <button
-                onClick={onStopStream}
-                className="px-2 py-1 rounded bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 text-[10px] flex items-center gap-1 transition-colors"
-                title="Detener recepción de logs"
-              >
-                <Square className="w-3 h-3 fill-current" />
-                <span>DETENER</span>
+              <button type="button" onClick={onStopStream} title="Detener recepción" aria-label="Detener recepción de logs"
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-rose-400/20 bg-rose-400/[0.08] px-2.5 text-[11px] text-rose-200 hover:bg-rose-400/15">
+                <Square className="h-3 w-3" /><span className="hidden sm:inline">Detener</span>
               </button>
             )}
-
             {onRefresh && (
-              <button
-                onClick={onRefresh}
-                className="p-1.5 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
-                title="Refrescar"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin text-brand-cyan" : ""}`} />
-              </button>
+              <button type="button" onClick={onRefresh} title="Actualizar" aria-label="Actualizar consola"
+                className="hub-icon-button !h-9 !w-9"><RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} /></button>
             )}
-
-            <button
-              onClick={handleCopy}
-              className="p-1.5 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
-              title="Copiar texto"
-            >
-              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+            <button type="button" onClick={handleCopy} title="Copiar registro" aria-label="Copiar registro"
+              className="hub-icon-button !h-9 !w-9">
+              {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
             </button>
-
-            <button
-              onClick={handleDownload}
-              className="p-1.5 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
-              title="Descargar salida"
-            >
-              <Download className="w-3.5 h-3.5" />
-            </button>
-
-            <button
-              onClick={onClose}
-              className="p-1.5 rounded hover:bg-rose-500/20 text-gray-400 hover:text-rose-400 transition-colors ml-1"
-              title="Cerrar ventana"
-            >
-              <X className="w-4 h-4" />
-            </button>
+            <button type="button" onClick={handleDownload} title="Descargar registro" aria-label="Descargar registro"
+              className="hub-icon-button !h-9 !w-9"><Download className="h-4 w-4" /></button>
+            <button type="button" onClick={onClose} title="Cerrar consola" aria-label="Cerrar consola"
+              className="hub-icon-button !h-9 !w-9 hover:!text-rose-300"><X className="h-4 w-4" /></button>
           </div>
         </div>
 
-        {/* Modal Terminal Body */}
-        <div className="flex-1 p-4 bg-[#05080e] overflow-y-auto text-gray-300 whitespace-pre-wrap font-mono leading-relaxed select-text border-t border-b border-white/5">
-          {output ? (
-            output
-          ) : (
-            <div className="text-gray-500 italic flex items-center justify-center h-full">
-              Conectando con el flujo de salida en el servidor...
-            </div>
-          )}
-          <div ref={bottomRef} />
+        <div ref={outputRef}
+          onScroll={(event) => {
+            const el = event.currentTarget;
+            shouldFollowRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 70;
+          }}
+          aria-label="Salida de la consola" role="log" aria-live="off"
+          className="min-h-0 flex-1 overflow-auto bg-[#080f1b] px-4 py-5 font-mono text-xs leading-6 text-slate-300 sm:px-6">
+          {output ? <pre className="whitespace-pre-wrap break-words font-mono">{output}</pre> :
+            <div className="flex h-full items-center justify-center text-center text-slate-500">Conectando con el registro…</div>}
         </div>
-
-        {/* Modal Footer */}
-        <div className="h-9 px-4 bg-[#090d16] flex items-center justify-between text-[10px] text-gray-500 font-mono">
-          <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-            <span>Servidor Dedicado Debian · /var/run/docker.sock</span>
-          </div>
-          <span>Presione ESC o Cerrar para salir</span>
+        <div className="flex min-h-[42px] flex-wrap items-center justify-between gap-2 border-t border-white/[0.07] bg-[#131e2d] px-4 py-2 text-[10px] text-slate-500 sm:px-6">
+          <span>{isStreaming ? "Transmisión activa" : "Salida de comando"}</span>
+          <span>Esc para cerrar · Copiar o guardar registro</span>
         </div>
       </div>
     </div>

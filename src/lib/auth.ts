@@ -1,15 +1,18 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 
-const SECRET = process.env.HUB_MASTER_KEY || "nanolabs_governance_supreme_2026";
+const SECRET = process.env.HUB_MASTER_KEY || "";
 const ADMIN_USER = process.env.ADMIN_USER || "augusto";
-const ADMIN_PASS = process.env.ADMIN_PASS || "Qap.1029Qap.1029";
+const ADMIN_PASS = process.env.ADMIN_PASS || "";
 export const SESSION_COOKIE_NAME = "nanolabs_hub_session";
+const secureConfig = () => SECRET.length >= 32 && ADMIN_PASS.length >= 16 &&
+  SECRET !== "nanolabs_governance_supreme_2026" && ADMIN_PASS !== "Qap.1029Qap.1029";
 
 /**
  * Creates a signed token for user session
  */
 export function createSessionToken(username: string): string {
+  if (!secureConfig()) throw new Error("Seguridad de acceso Hub no configurada");
   const expiresAt = Date.now() + 1000 * 60 * 60 * 24 * 7; // 7 days
   const payload = `${username}:${expiresAt}`;
   const signature = createHmac("sha256", SECRET).update(payload).digest("hex");
@@ -20,6 +23,7 @@ export function createSessionToken(username: string): string {
  * Verifies a session token
  */
 export function verifySessionToken(token: string | undefined): { valid: boolean; user?: string } {
+  if (!secureConfig()) return { valid: false };
   if (!token) return { valid: false };
 
   const parts = token.split(".");
@@ -49,7 +53,7 @@ export function verifySessionToken(token: string | undefined): { valid: boolean;
  * Validates master login credentials
  */
 export function validateCredentials(user: string, pass: string): boolean {
-  return user.trim() === ADMIN_USER && pass.trim() === ADMIN_PASS;
+  return secureConfig() && user.trim() === ADMIN_USER && pass.trim() === ADMIN_PASS;
 }
 
 /**

@@ -1,252 +1,47 @@
 "use client";
-
+import { useEffect, useState } from "react";
 import { Header } from "@/components/Header";
-import {
-  Network,
-  ShieldCheck,
-  ExternalLink,
-  Lock,
-  Globe,
-  Radio,
-  CheckCircle2,
-  AlertCircle,
-  Layers,
-} from "lucide-react";
-
-const PROXY_ROUTES = [
-  {
-    domain: "hub.nanoapps.ar",
-    forwardTarget: "nanolabshub:3000",
-    ssl: "Let's Encrypt (*.nanoapps.ar)",
-    status: "active",
-    type: "governance",
-  },
-  {
-    domain: "proxy.nanoapps.site",
-    forwardTarget: "nginx-proxy-manager:81",
-    ssl: "Let's Encrypt",
-    status: "active",
-    type: "infrastructure",
-  },
-  {
-    domain: "portainer.nanoapps.site",
-    forwardTarget: "portainer:9000",
-    ssl: "Let's Encrypt",
-    status: "active",
-    type: "infrastructure",
-  },
-  {
-    domain: "onlyfood.nanoapps.ar",
-    forwardTarget: "onlyfood-app-1:3000",
-    ssl: "Let's Encrypt",
-    status: "active",
-    type: "saas",
-  },
-  {
-    domain: "onlypadel.nanoapps.ar",
-    forwardTarget: "onlypadel-web:3000",
-    ssl: "Let's Encrypt",
-    status: "active",
-    type: "saas",
-  },
-  {
-    domain: "onlycars.nanoapps.ar",
-    forwardTarget: "onlycars-app-1:3000",
-    ssl: "Let's Encrypt",
-    status: "active",
-    type: "saas",
-  },
-  {
-    domain: "onlygym.nanoapps.ar",
-    forwardTarget: "onlygym-web:3000",
-    ssl: "Let's Encrypt",
-    status: "active",
-    type: "saas",
-  },
-  {
-    domain: "onlymob.nanoapps.ar",
-    forwardTarget: "onlymob-web:3000",
-    ssl: "Let's Encrypt",
-    status: "active",
-    type: "saas",
-  },
-  {
-    domain: "onlyturn.nanoapps.ar",
-    forwardTarget: "onlyturn-web:3000",
-    ssl: "Let's Encrypt",
-    status: "active",
-    type: "saas",
-  },
-  {
-    domain: "onlyerp.nanoapps.ar",
-    forwardTarget: "onlyerp-web:3000",
-    ssl: "Let's Encrypt",
-    status: "active",
-    type: "client",
-  },
-  {
-    domain: "sanpedropadel.nanoapps.ar",
-    forwardTarget: "sanpedropadel-web:3000",
-    ssl: "Let's Encrypt",
-    status: "active",
-    type: "client",
-  },
-  {
-    domain: "gastos.nanoapps.ar",
-    forwardTarget: "gastosapp-web:3000",
-    ssl: "Let's Encrypt",
-    status: "active",
-    type: "internal",
-  },
-  {
-    domain: "keys.nanolabs.online",
-    forwardTarget: "nanokeys-web:3000",
-    ssl: "Let's Encrypt",
-    status: "active",
-    type: "internal",
-  },
-  {
-    domain: "nanolabs.com.ar",
-    forwardTarget: "nanolabs-web-1:3000",
-    ssl: "Let's Encrypt",
-    status: "active",
-    type: "internal",
-  },
-];
-
-export default function NetworkingPage() {
-  return (
-    <div className="flex-1 flex flex-col pb-12">
-      <Header />
-
-      <div className="px-6 py-6 max-w-7xl w-full mx-auto space-y-6">
-        <div>
-          <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-            <Network className="w-5 h-5 text-brand-cyan" />
-            <span>Red, Nginx Proxy Manager & Certificados SSL</span>
-          </h1>
-          <p className="text-xs text-gray-400 font-mono mt-0.5">
-            Rutas de entrada públicas, terminación TLS y aislamiento en la red Docker compartida `proxy`.
-          </p>
-        </div>
-
-        {/* Network Infrastructure Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="hub-card p-4 space-y-2">
-            <div className="flex items-center justify-between text-xs font-mono text-gray-400">
-              <span className="flex items-center gap-1.5">
-                <Globe className="w-4 h-4 text-brand-cyan" />
-                DOMINIOS PÚBLICOS ACTIVOS
-              </span>
-            </div>
-            <div className="text-2xl font-bold font-mono text-white">
-              {PROXY_ROUTES.length}{" "}
-              <span className="text-xs font-normal text-gray-400">hosts</span>
-            </div>
-            <div className="text-[11px] text-gray-500 font-mono">
-              Enrutados hacia la red Docker `proxy`
-            </div>
-          </div>
-
-          <div className="hub-card p-4 space-y-2">
-            <div className="flex items-center justify-between text-xs font-mono text-gray-400">
-              <span className="flex items-center gap-1.5">
-                <Lock className="w-4 h-4 text-emerald-400" />
-                SEGURIDAD & CERTIFICADOS
-              </span>
-            </div>
-            <div className="text-2xl font-bold font-mono text-emerald-400 flex items-center gap-2">
-              <CheckCircle2 className="w-6 h-6" />
-              <span>100% SSL (HTTPS)</span>
-            </div>
-            <div className="text-[11px] text-gray-500 font-mono">
-              Auto-renovación Let's Encrypt activa
-            </div>
-          </div>
-
-          <div className="hub-card p-4 space-y-2">
-            <div className="flex items-center justify-between text-xs font-mono text-gray-400">
-              <span className="flex items-center gap-1.5">
-                <Radio className="w-4 h-4 text-purple-400" />
-                PUERTOS PÚBLICOS AUTORIZADOS
-              </span>
-            </div>
-            <div className="text-2xl font-bold font-mono text-white">
-              80 / 443 / 2207
-            </div>
-            <div className="text-[11px] text-gray-500 font-mono">
-              HTTP, HTTPS y SSH seguro
-            </div>
-          </div>
-        </div>
-
-        {/* NPM Hosts Table */}
-        <div className="hub-card p-5 space-y-4">
-          <div className="flex items-center justify-between border-b border-white/5 pb-3">
-            <div>
-              <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
-                <span>Tabla de Proxy Hosts Registrados</span>
-              </h2>
-              <p className="text-xs text-gray-500 font-mono">
-                Gestionado centralmente por Nginx Proxy Manager en el servidor
-              </p>
-            </div>
-            <a
-              href="https://proxy.nanoapps.site"
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs font-mono text-brand-cyan hover:underline flex items-center gap-1"
-            >
-              Abrir panel NPM <ExternalLink className="w-3 h-3" />
-            </a>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs font-mono">
-              <thead className="bg-surface-100/60 text-gray-400 uppercase text-[10px] tracking-wider border-b border-white/5">
-                <tr>
-                  <th className="py-2.5 px-3">Dominio Público</th>
-                  <th className="py-2.5 px-3">Destino Interno (Docker)</th>
-                  <th className="py-2.5 px-3">Certificado SSL</th>
-                  <th className="py-2.5 px-3">Categoría</th>
-                  <th className="py-2.5 px-3 text-right">Estado</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5 text-gray-300">
-                {PROXY_ROUTES.map((route) => (
-                  <tr key={route.domain} className="hover:bg-white/[0.02] transition-colors">
-                    <td className="py-2.5 px-3 font-semibold text-white">
-                      <a
-                        href={`https://${route.domain}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-white hover:text-brand-cyan transition-colors flex items-center gap-1.5"
-                      >
-                        <Lock className="w-3 h-3 text-emerald-400" />
-                        <span>{route.domain}</span>
-                        <ExternalLink className="w-2.5 h-2.5 text-gray-500" />
-                      </a>
-                    </td>
-                    <td className="py-2.5 px-3 text-brand-cyan">{route.forwardTarget}</td>
-                    <td className="py-2.5 px-3 text-emerald-400 flex items-center gap-1">
-                      <ShieldCheck className="w-3.5 h-3.5" />
-                      <span>{route.ssl}</span>
-                    </td>
-                    <td className="py-2.5 px-3 text-gray-400 uppercase text-[10px]">
-                      {route.type}
-                    </td>
-                    <td className="py-2.5 px-3 text-right">
-                      <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                        ROUTED
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+import type { getInfrastructureInventory } from "@/lib/infrastructure-inventory";
+import { Globe2, ShieldAlert, ExternalLink, RefreshCw, Network, CheckCircle2 } from "lucide-react";
+type Inventory=Awaited<ReturnType<typeof getInfrastructureInventory>>;
+function label(status:string,lifecycle:string) {
+  if(lifecycle!=="active")return {name:"Monitoreo pausado",cls:"hub-state hub-state-neutral"};
+  if(status==="online")return {name:"HTTP responde",cls:"hub-state hub-state-good"};
+  if(status==="restricted")return {name:"Acceso restringido",cls:"hub-state hub-state-neutral"};
+  if(status==="http_error")return {name:"Error HTTP",cls:"hub-state hub-state-warn"};
+  if(status==="offline")return {name:"Sin conexión",cls:"hub-state hub-state-warn"};
+  return {name:"No comprobado",cls:"hub-state hub-state-neutral"};
+}
+export default function NetworkingPage(){
+ const [data,setData]=useState<Inventory|null>(null),[error,setError]=useState<string|null>(null),[loading,setLoading]=useState(true);
+ const load=async()=>{setLoading(true);try{const r=await fetch("/api/infrastructure",{cache:"no-store"});const json=await r.json();if(!r.ok||!json.success)throw Error(json.error||"Inventario no disponible");setData(json.data);setError(null);}catch(e){setError(e instanceof Error?e.message:"Error de consulta");}finally{setLoading(false);}};
+ useEffect(()=>{void load();},[]);
+ const domains=data?.domains||[];
+ return <div className="min-w-0 flex-1 pb-14"><Header onRefresh={()=>void load()} isRefreshing={loading}/>
+  <div className="hub-content space-y-6">
+   <section className="hub-hero space-y-3"><p className="hub-eyebrow">Plataforma / Conectividad</p><h1 className="hub-hero-title">Dominios y estado de acceso.</h1>
+    <p className="hub-description">URLs registradas y su respuesta HTTP reciente, sin confundir disponibilidad pública con configuración real de DNS, certificados o proxy.</p>
+   </section>
+   <div className="grid gap-4 sm:grid-cols-3">
+    <div className="hub-card p-5"><div className="flex items-center gap-2 text-xs text-slate-400"><Globe2 className="h-4 w-4"/> URLs registradas</div><p className="mt-2 text-3xl font-semibold text-white">{data?domains.length:"—"}</p><p className="mt-1 text-xs text-slate-400">Fuente: catálogo de aplicaciones</p></div>
+    <div className="hub-card p-5"><div className="flex items-center gap-2 text-xs text-slate-400"><CheckCircle2 className="h-4 w-4"/> Responden HTTP</div><p className="mt-2 text-3xl font-semibold text-white">{data?domains.filter(d=>d.status==="online"&&d.lifecycle==="active").length:"—"}</p><p className="mt-1 text-xs text-slate-400">No prueba configuración NPM</p></div>
+    <div className="hub-card p-5"><div className="flex items-center gap-2 text-xs text-slate-400"><ShieldAlert className="h-4 w-4"/> Requieren revisión</div><p className="mt-2 text-3xl font-semibold text-white">{data?domains.filter(d=>d.lifecycle==="active"&&["offline","http_error"].includes(d.status)).length:"—"}</p><p className="mt-1 text-xs text-slate-400">Solo servicios con ciclo activo</p></div>
+   </div>
+   {error&&<div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-400/20 p-4 text-xs text-amber-200">{error}<button className="ml-auto inline-flex items-center gap-1 underline" onClick={()=>void load()}><RefreshCw className="h-4 w-4"/> Reintentar</button></div>}
+   <section className="hub-card overflow-hidden">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.08] p-5"><div><h2 className="hub-section-heading">Inventario de URLs</h2><p className="mt-1 text-xs text-slate-400">Cada URL pertenece a una aplicación, no a una base de datos.</p></div>
+     <a href="https://proxy.nanoapps.site" target="_blank" rel="noopener noreferrer" className="hub-text-link">Abrir Nginx Proxy Manager <ExternalLink className="h-4 w-4"/></a>
     </div>
-  );
+    <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-left"><thead><tr><th className="px-5">Aplicación</th><th>Dominio registrado</th><th>Chequeo web</th><th>HTTP</th><th>Última consulta</th></tr></thead>
+    <tbody>{domains.map(d=>{const badge=label(d.status,d.lifecycle);return <tr key={d.slug} className="border-t border-white/[0.07]">
+     <td className="px-5 text-[13px] font-semibold text-white">{d.appName}</td>
+     <td><a href={d.url} target="_blank" rel="noopener noreferrer" className="hub-text-link">{new URL(d.url).hostname}<ExternalLink className="h-3 w-3"/></a></td>
+     <td><span className={badge.cls}>{badge.name}</span></td>
+     <td className="font-mono text-slate-300">{d.httpStatus??"—"}</td>
+     <td className="text-xs text-slate-400">{d.checkedAt?new Date(d.checkedAt).toLocaleString("es-AR"):"—"}</td>
+    </tr>;})}{data&&domains.length===0&&<tr><td colSpan={5} className="p-6 text-center text-slate-400">No hay dominios HTTPS registrados.</td></tr>}</tbody></table></div>
+   </section>
+   <div className="flex items-start gap-3 rounded-xl border border-white/10 p-5"><Network className="mt-0.5 h-5 w-5 text-[#acc4f9]"/><div><h2 className="text-sm font-semibold text-white">Diferencia entre inventario y proxy</h2><p className="mt-1 text-xs leading-6 text-slate-400">El dominio registrado es solo una referencia; el Hub no afirma que exista un Proxy Host configurado ni un certificado válido. Para confirmar enrutamiento y expiraciones debemos integrar una lectura restringida de Nginx Proxy Manager. Ninguna operación de esta página modifica DNS, certificados ni NPM.</p></div></div>
+  </div>
+ </div>;
 }

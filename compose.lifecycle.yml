@@ -1,0 +1,5 @@
+services:
+  nanolabshub:
+    environment:
+      HUB_LIFECYCLE_ENABLED: ${HUB_LIFECYCLE_ENABLED:-false}
+      HUB_PUBLIC_ORIGIN: ${HUB_PUBLIC_ORIGIN:-https://hub.nanoapps.ar}

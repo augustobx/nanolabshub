@@ -4,6 +4,7 @@ export interface ServerMetrics {
   osInfo: string;
   cpu: {
     cores: number;
+    model?: string | null;
     usagePercent: number;
     loadAvg: [number, number, number];
   };
@@ -45,6 +46,10 @@ export interface ContainerInfo {
   created: string;
   cpuPercent?: string;
   memoryUsage?: string;
+  deployedRevision?: string | null;
+  imageId?: string | null;
+  exitCode?: number | null;
+  isJob?: boolean;
 }
 
 export interface AppInfo {
@@ -61,10 +66,22 @@ export interface AppInfo {
     commitDate: string;
     commitAuthor: string;
     dirtyFilesCount: number;
+    remoteCommit?: string | null;
+    remoteStatus?: "synced" | "different" | "unavailable" | "not_repo";
+    remoteCheckedAt?: string | null;
+    remoteRef?: string | null;
+    remoteError?: string | null;
+    localError?: string | null;
     remoteAhead?: number;
     remoteBehind?: number;
   };
   containers: ContainerInfo[];
+  lifecycle?: {
+    state: "active" | "suspended" | "pending_retirement" | "archived";
+    updatedAt: string | null;
+    updatedBy: string | null;
+    note: string;
+  };
   database?: {
     type: "postgres" | "mysql" | "mariadb" | "sqlite" | "none";
     host?: string;
@@ -73,8 +90,10 @@ export interface AppInfo {
     backupSize?: string;
     backupStatus?: "success" | "warning" | "error";
   };
+  deployment?: { revision: string | null; imageId: string | null; imageTag?: string | null; status: "identified" | "unidentified" | "not_running" };
+  web?: { status: "online" | "restricted" | "http_error" | "offline" | "unknown"; httpStatus: number | null; latencyMs: number | null; checkedAt: string | null };
   hasDockerCompose: boolean;
-  status: "operational" | "degraded" | "down" | "deploying";
+  status: "operational" | "degraded" | "down" | "deploying" | "not_deployed";
 }
 
 export interface BackupRecord {
@@ -89,9 +108,14 @@ export interface BackupRecord {
   createdAt: string;
   status: "verified" | "unverified" | "failed";
   storageLocation: "local" | "cloud_synced";
+  checksum?: string | null;
+  integrityStatus?: "running" | "integrity_ok" | "failed";
+  error?: string | null;
+  trigger?: "manual" | "scheduled";
+  restoreTested?: boolean;
 }
 
-export type SaaSSlug = "onlyfood" | "onlypadel" | "onlycars" | "onlygym" | "onlyturn" | "onlyerp";
+export type SaaSSlug = "onlyfood" | "onlypadel" | "onlycars" | "onlygym" | "onlyturn" | "onlyerp" | "onlymob";
 
 export interface UniversalTenant {
   id: string;
@@ -109,6 +133,7 @@ export interface UniversalTenant {
   metrics: {
     totalRecords: number;
     recordLabel: string;
+    available?: boolean;
     secondaryMetric?: {
       label: string;
       value: number;
@@ -125,6 +150,13 @@ export interface GovernanceOverview {
   saasCount: number;
   totalRecordsManaged: number;
   tenants: UniversalTenant[];
+  sources?: Array<{
+    saas: SaaSSlug;
+    status: "available" | "unavailable";
+    count: number | null;
+    checkedAt: string;
+    message: string | null;
+  }>;
   legacyPanels: Array<{
     saas: string;
     legacyAdminUrl: string;

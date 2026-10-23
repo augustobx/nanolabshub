@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Header } from "@/components/Header";
 import { TerminalModal } from "@/components/TerminalModal";
+import { AppLifecycleControls } from "@/components/AppLifecycleControls";
 import {
   Boxes,
   GitBranch,
@@ -19,11 +20,15 @@ import {
   User,
 } from "lucide-react";
 import { AppInfo } from "@/lib/types";
+import { portfolioSegment, type PortfolioSegment } from "@/lib/product-taxonomy";
 
 export default function SoftwarePage() {
   const [apps, setApps] = useState<AppInfo[]>([]);
-  const [filterType, setFilterType] = useState<string>("all");
+  const [filterType, setFilterType] = useState<PortfolioSegment | "all">("internal");
   const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState<"name" | "status">("name");
+  const [showArchived, setShowArchived] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Terminal modal state
@@ -36,18 +41,27 @@ export default function SoftwarePage() {
 
   const fetchApps = async () => {
     setIsLoading(true);
+    setLoadError(null);
     try {
       const res = await fetch("/api/apps");
+      if (!res.ok) throw new Error("No se pudo conectar con el inventario de productos");
       const data = await res.json();
-      if (data.success) {
-        setApps(data.data);
-      }
+      if (!data.success || !Array.isArray(data.data)) throw new Error(data.error || "Inventario no disponible");
+      setApps(data.data);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "No se pudieron cargar los productos");
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
+    const query = new URLSearchParams(window.location.search);
+    const segment = query.get("segment");
+    const show = query.get("archived") === "1";
+    setShowArchived(show);
+    setFilterType(show ? "all" :
+      segment === "saas" || segment === "internal" || segment === "dedicated" || segment === "infrastructure" ? segment : "internal");
     fetchApps();
   }, []);
 
@@ -143,7 +157,7 @@ export default function SoftwarePage() {
 
     try {
       const res = await fetch(`/api/apps/deploy/stream?slug=${encodeURIComponent(app.slug)}`, {
-        signal: controller.signal,
+        method: "POST", signal: controller.signal,
       });
 
       if (!res.ok) {
@@ -173,33 +187,37 @@ export default function SoftwarePage() {
   };
 
   const filteredApps = apps.filter((app) => {
-    const matchesFilter = filterType === "all" || app.type === filterType;
+    if (showArchived && app.lifecycle?.state !== "archived") return false;
+    if (!showArchived && app.lifecycle?.state === "archived") return false;
+    const matchesFilter = showArchived || filterType === "all" || portfolioSegment(app) === filterType;
     const matchesSearch =
       app.name.toLowerCase().includes(search.toLowerCase()) ||
       app.slug.toLowerCase().includes(search.toLowerCase()) ||
       app.path.toLowerCase().includes(search.toLowerCase());
     return matchesFilter && matchesSearch;
-  });
+  }).sort((a, b) =>
+    sortBy === "status" ? a.status.localeCompare(b.status) || a.name.localeCompare(b.name, "es")
+    : a.name.localeCompare(b.name, "es")
+  );
 
   return (
     <div className="flex-1 flex flex-col pb-12">
       <Header onRefresh={fetchApps} isRefreshing={isLoading} />
 
-      <div className="px-6 py-6 max-w-7xl w-full mx-auto space-y-6">
-        <div>
-          <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-            <Boxes className="w-5 h-5 text-brand-cyan" />
-            <span>Control de Software, Versiones & Despliegues</span>
-          </h1>
-          <p className="text-xs text-gray-400 font-mono mt-0.5">
-            Matriz de repositorios Git, estado de ramas, hashes de commit y orquestación de Docker Compose.
+      <div className="hub-content space-y-7">
+        <section className="hub-hero space-y-3">
+          <p className="hub-eyebrow">Portafolio / Inventario</p>
+          <h1 className="hub-hero-title">Aplicaciones, por categoría.</h1>
+          <p className="hub-description">
+            Cada instancia está en su grupo correcto: productos SaaS, herramientas internas,
+            clientes dedicados e infraestructura. Las acciones Docker y Git siguen disponibles aquí.
           </p>
-        </div>
+        </section>
 
         {/* Filters and Search Bar */}
-        <div className="hub-card p-3 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <div className="relative w-full sm:w-72">
+        <div className="hub-card p-4 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+          <div className="flex items-center gap-2 w-full xl:w-auto">
+            <div className="relative w-full xl:w-72">
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
@@ -211,17 +229,17 @@ export default function SoftwarePage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto">
+          <div className="flex max-w-full items-center gap-1.5 overflow-x-auto pb-1">
             {[
-              { id: "all", label: "Todos" },
-              { id: "saas", label: "SaaS Core" },
-              { id: "client", label: "Clientes" },
-              { id: "internal", label: "Internos" },
-              { id: "infrastructure", label: "Infra" },
+              { id: "internal", label: "Apps internas" },
+              { id: "dedicated", label: "Clientes dedicados" },
+              { id: "saas", label: "SaaS" },
+              { id: "infrastructure", label: "Infraestructura" },
+              { id: "all", label: "Vista completa" },
             ].map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setFilterType(tab.id)}
+                onClick={() => setFilterType(tab.id as PortfolioSegment | "all")}
                 className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-all ${
                   filterType === tab.id
                     ? "bg-brand-cyan/15 text-brand-cyan border border-brand-cyan/30 font-semibold"
@@ -234,8 +252,38 @@ export default function SoftwarePage() {
           </div>
         </div>
 
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div role="status" className="text-xs text-slate-400">
+            {isLoading ? "Cargando productos…" : loadError ? "Inventario no disponible" : `${filteredApps.length} de ${apps.length} productos`}
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="button" aria-pressed={showArchived} onClick={() => setShowArchived((value) => !value)}
+              className="rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-white/5">
+              {showArchived ? "Ocultar archivadas" : "Mostrar archivadas (" + apps.filter((app) => app.lifecycle?.state === "archived").length + ")"}
+            </button>
+          <label className="flex items-center gap-2 text-xs text-slate-400">
+            Ordenar por
+            <select value={sortBy} onChange={(event) => setSortBy(event.target.value as typeof sortBy)}
+              className="rounded-lg border border-white/10 bg-surface-100 px-3 py-2 text-xs text-white">
+              <option value="name">Nombre</option>
+              <option value="status">Estado</option>
+            </select>
+          </label>
+          </div>
+        </div>
+        {loadError && (
+          <div role="alert" className="rounded-xl border border-rose-400/20 bg-rose-400/[0.07] p-4 text-xs text-rose-200">
+            {loadError}. <button type="button" onClick={fetchApps} className="ml-2 font-semibold underline">Reintentar</button>
+          </div>
+        )}
+
         {/* Apps Matrix Table */}
         <div className="space-y-4">
+          {!isLoading && !loadError && filteredApps.length === 0 && (
+            <div className="hub-card px-6 py-10 text-center text-sm text-slate-400">
+              No hay productos que coincidan con la búsqueda o los filtros.
+            </div>
+          )}
           {filteredApps.map((app) => (
             <div
               key={app.slug}
@@ -245,7 +293,7 @@ export default function SoftwarePage() {
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                 {/* App Title & Path */}
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-bold text-white text-sm">{app.name}</h3>
                     <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/[0.04] text-gray-400 border border-white/5 uppercase">
                       {app.type}
@@ -257,10 +305,13 @@ export default function SoftwarePage() {
                           : "text-amber-400 bg-amber-500/10 border border-amber-500/20"
                       }`}
                     >
-                      {app.status.toUpperCase()}
+                      {app.lifecycle?.state === "archived" ? "Archivada" : app.lifecycle?.state === "suspended" ? "Suspendida" :
+                        app.lifecycle?.state === "pending_retirement" ? "Baja pendiente" :
+                        app.status === "operational" ? "Operativa" : app.status === "degraded" ? "Degradada" :
+                        app.status === "deploying" ? "Desplegando" : app.status === "not_deployed" ? "No desplegada" : "Caída"}
                     </span>
                   </div>
-                  <div className="text-xs text-gray-500 font-mono flex items-center gap-3 mt-1">
+                  <div className="mt-2 flex min-w-0 flex-wrap items-center gap-3 break-all text-xs text-gray-500 font-mono">
                     <span>{app.path}</span>
                     {app.url && (
                       <a
@@ -276,7 +327,7 @@ export default function SoftwarePage() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {app.containers.length > 0 && (
                     <button
                       onClick={() => handleOpenStreamingLogs(app.containers[0].name)}
@@ -284,46 +335,94 @@ export default function SoftwarePage() {
                       title="Ver logs en vivo (streaming)"
                     >
                       <Terminal className="w-3.5 h-3.5 text-brand-cyan" />
-                      <span>LOGS EN VIVO</span>
+                      <span>Ver logs</span>
                     </button>
                   )}
                   {app.containers[0] && (
                     <button
+                      disabled={app.lifecycle?.state !== undefined && app.lifecycle.state !== "active"}
                       onClick={() => handleRestart(app.containers[0].name)}
                       className="px-3 py-1.5 rounded-lg bg-surface-100 hover:bg-surface-50 text-gray-300 hover:text-white border border-white/10 text-xs font-mono flex items-center gap-1.5 transition-colors"
-                      title="Reiniciar contenedor principal"
+                      title={app.lifecycle?.state && app.lifecycle.state !== "active" ? "Bloqueado por ciclo de vida" : "Reiniciar contenedor principal"}
                     >
                       <RotateCw className="w-3.5 h-3.5" />
-                      <span>REINICIAR</span>
+                      <span>Reiniciar</span>
                     </button>
                   )}
                   {app.hasDockerCompose && (
                     <button
+                      type="button"
+                      disabled={(app.lifecycle?.state !== undefined && app.lifecycle.state !== "active") || !app.git.isRepo || !!app.git.localError || !app.git.branch ||
+                        app.git.branch === "detached" || app.git.dirtyFilesCount > 0}
                       onClick={() => handleStreamingDeploy(app)}
-                      className="px-3 py-1.5 rounded-lg bg-brand-cyan/15 hover:bg-brand-cyan/25 text-brand-cyan border border-brand-cyan/30 text-xs font-mono font-semibold flex items-center gap-1.5 transition-all shadow-glow"
+                      title={app.lifecycle?.state && app.lifecycle.state !== "active" ? "Reactiva la aplicación antes de desplegar" : !app.git.isRepo ? "La aplicación no tiene un repositorio Git local" :
+                        app.git.localError ? app.git.localError :
+                        app.git.branch === "detached" ? "Checkout detached: seleccioná una rama válida en el servidor antes de desplegar" :
+                        app.git.dirtyFilesCount > 0 ? "Hay cambios locales. Revisalos antes de desplegar" : "Desplegar con Git pull --ff-only"}
+                      className="px-3 py-1.5 rounded-lg bg-brand-cyan/15 hover:bg-brand-cyan/25 text-brand-cyan border border-brand-cyan/30 text-xs font-mono font-semibold flex items-center gap-1.5 transition-all shadow-glow disabled:cursor-not-allowed disabled:border-slate-700 disabled:bg-slate-700/20 disabled:text-slate-400 disabled:shadow-none"
                     >
                       <Play className="w-3.5 h-3.5 fill-current" />
-                      <span>STREAM DEPLOY</span>
+                      <span>{(app.lifecycle?.state !== undefined && app.lifecycle.state !== "active") || !app.git.isRepo || !!app.git.localError || !app.git.branch ||
+                        app.git.branch === "detached" || app.git.dirtyFilesCount > 0 ? "Deploy bloqueado" : "Desplegar"}</span>
                     </button>
                   )}
                 </div>
               </div>
 
+              <AppLifecycleControls app={app} onChanged={fetchApps} />
+
               {/* Git & Stack Status Bar */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-3 border-t border-white/5 font-mono text-xs">
+              <div className="grid grid-cols-1 gap-3 border-t border-white/5 pt-3 text-xs sm:grid-cols-2 xl:grid-cols-3">
                 {/* Git Branch & Commit */}
                 <div className="p-2.5 rounded-lg bg-surface-100/50 border border-white/5 space-y-1">
                   <div className="text-[10px] text-gray-500 uppercase flex items-center gap-1">
                     <FolderGit2 className="w-3 h-3 text-brand-cyan" />
-                    Rama & Commit
+                    Servidor · Rama y commit
                   </div>
                   <div className="flex items-center justify-between text-gray-200 font-semibold">
-                    <span>{app.git.branch || "no-git"}</span>
-                    <span className="text-brand-cyan">{app.git.commitHash || "---"}</span>
+                    <span>{app.git.branch || (app.git.isRepo ? "Git inaccesible" : "Sin repositorio")}</span>
+                    <span className="text-brand-cyan">{app.git.commitHash?.slice(0, 8) || "—"}</span>
                   </div>
                   <div className="text-[10px] text-gray-400 truncate" title={app.git.commitMessage}>
-                    {app.git.commitMessage || "Sin cambios registrados"}
+                    {app.git.localError || app.git.commitMessage || (app.git.isRepo ? "Sin mensaje de commit" : "No hay repositorio Git local")}
                   </div>
+                </div>
+
+                <div className="min-w-0 rounded-lg border border-white/5 bg-surface-100/50 p-3 space-y-2">
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">GitHub / Git remoto</div>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-mono text-sm font-semibold text-white" title={app.git.remoteCommit || undefined}>
+                      {app.git.remoteCommit?.slice(0, 8) || "—"}
+                    </span>
+                    <span className={`text-[11px] font-medium ${app.git.remoteStatus === "synced" && app.git.dirtyFilesCount === 0 ? "text-emerald-300" : app.git.remoteStatus === "different" || app.git.dirtyFilesCount > 0 ? "text-amber-300" : "text-slate-400"}`}>
+                      {app.git.remoteStatus === "synced" && app.git.dirtyFilesCount > 0 ? "Mismo commit · cambios locales" : app.git.remoteStatus === "synced" ? "Mismo commit" : app.git.remoteStatus === "different" ? "Commits distintos" : "Remoto no comprobado"}
+                    </span>
+                  </div>
+                  <p className="text-[11px] leading-5 text-slate-500">
+                    {app.git.remoteError || (app.git.remoteRef === "HEAD" ? "Comparado con HEAD de la rama remota predeterminada (checkout detached)." : "Comparación de commits; no implica que el servidor haya desplegado la nueva versión.")}
+                  </p>
+                </div>
+
+                <div className="min-w-0 rounded-lg border border-white/5 bg-surface-100/50 p-3 space-y-2">
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Imagen realmente ejecutada</div>
+                  <p className="font-mono text-sm font-semibold text-white" title={app.deployment?.revision || app.deployment?.imageId || undefined}>
+                    {app.deployment?.revision?.slice(0, 8) || (app.deployment?.imageId ? app.deployment.imageId.slice(7, 19) : "—")}
+                  </p>
+                  <p className="text-[11px] leading-5 text-slate-500">
+                    {app.deployment?.status === "identified" ? "SHA registrado en la imagen Docker" : app.deployment?.imageId ? "ID Docker (sin commit registrado)" : "No se detectó imagen activa"}
+                    {app.deployment?.imageTag ? ` · ${app.deployment.imageTag}` : ""}
+                  </p>
+                </div>
+
+                <div className="min-w-0 rounded-lg border border-white/5 bg-surface-100/50 p-3 space-y-2">
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Sitio público</div>
+                  <p className={`text-sm font-semibold ${app.web?.status === "online" ? "text-emerald-300" : app.web?.status === "offline" ? "text-rose-300" : "text-amber-200"}`}>
+                    {app.web?.status === "online" ? "Responde" : app.web?.status === "restricted" ? "Acceso restringido" : app.web?.status === "offline" ? "No conecta" : app.web?.status === "http_error" ? `La web responde HTTP ${app.web.httpStatus}` : "Sin comprobación"}
+                  </p>
+                  <p className="text-[11px] text-slate-500">
+                    {app.web?.httpStatus ? `HTTP ${app.web.httpStatus}` : "HTTP no disponible"}
+                    {app.web?.latencyMs != null ? ` · ${app.web.latencyMs} ms` : ""}
+                  </p>
                 </div>
 
                 {/* Author & Date */}
@@ -345,7 +444,11 @@ export default function SoftwarePage() {
                 <div className="p-2.5 rounded-lg bg-surface-100/50 border border-white/5 space-y-1">
                   <div className="text-[10px] text-gray-500 uppercase">Estado Local Git</div>
                   <div className="flex items-center gap-1.5">
-                    {app.git.dirtyFilesCount === 0 ? (
+                    {app.git.localError ? (
+                      <span className="text-amber-300 flex items-center gap-1" title={app.git.localError}>
+                        <AlertTriangle className="w-3.5 h-3.5" /> {app.git.localError}
+                      </span>
+                    ) : app.git.dirtyFilesCount === 0 ? (
                       <span className="text-emerald-400 flex items-center gap-1">
                         <CheckCircle2 className="w-3.5 h-3.5" /> Limpio (clean)
                       </span>
@@ -356,7 +459,7 @@ export default function SoftwarePage() {
                     )}
                   </div>
                   <div className="text-[10px] text-gray-500">
-                    {app.hasDockerCompose ? "Compose detectado" : "Sin compose"}
+                    {app.hasDockerCompose ? "Compose detectado" : "Sin Compose predeterminado"}
                   </div>
                 </div>
 

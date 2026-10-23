@@ -1,21 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import {
-  Activity,
-  RefreshCw,
-  Terminal,
-  Shield,
-  Clock,
-  Cpu,
-  Layers,
-  Bell,
-  LogOut,
-  AlertTriangle,
-  X,
-  CheckCircle2,
-} from "lucide-react";
+import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { Bell, RefreshCw, LogOut, X, AlertCircle, CheckCircle2, ChevronRight, Shield } from "lucide-react";
 import { SystemAlert } from "@/lib/alerts";
 
 interface HeaderProps {
@@ -23,193 +10,126 @@ interface HeaderProps {
   isRefreshing?: boolean;
 }
 
-export function Header({ onRefresh, isRefreshing }: HeaderProps) {
+const PAGE_INFO: Record<string, { title: string; section: string }> = {
+  "/": { title: "Inicio", section: "Gobierno" },
+  "/superadmin": { title: "Superadmin", section: "Gobierno" },
+  "/security": { title: "Seguridad", section: "Gobierno" },
+  "/audit": { title: "Auditoría", section: "Gobierno" },
+  "/continuity": { title: "Recuperación", section: "Plataforma" },
+  "/legacy": { title: "Migración de paneles", section: "Portafolio" },
+  "/saas": { title: "Productos SaaS", section: "Negocio" },
+  "/operations": { title: "Operación técnica", section: "Plataforma" },
+  "/governance": { title: "Clientes y tenants", section: "Negocio" },
+  "/software": { title: "Aplicaciones y versiones", section: "Portafolio" },
+  "/infrastructure": { title: "Infraestructura", section: "Plataforma" },
+  "/hardware": { title: "Infraestructura", section: "Plataforma" },
+  "/backups": { title: "Copias de seguridad", section: "Plataforma" },
+  "/networking": { title: "Dominios y red", section: "Plataforma" },
+};
+
+export function Header({ onRefresh, isRefreshing = false }: HeaderProps) {
+  const pathname = usePathname();
   const router = useRouter();
-  const [time, setTime] = useState<string>("");
+  const info = PAGE_INFO[pathname] ?? (pathname.startsWith("/saas/") ? { title: "Espacio de SaaS", section: "Negocio" } : PAGE_INFO["/"]);
   const [alerts, setAlerts] = useState<SystemAlert[]>([]);
-  const [showAlertsDrawer, setShowAlertsDrawer] = useState(false);
+  const [alertsOpen, setAlertsOpen] = useState(false);
+  const [alertsLoaded, setAlertsLoaded] = useState(false);
 
   useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      setTime(
-        now.toLocaleTimeString("es-AR", {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-          hour12: false,
-          timeZone: "America/Argentina/Buenos_Aires",
-        })
-      );
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Fetch alerts
-  useEffect(() => {
-    const fetchAlerts = async () => {
+    let active = true;
+    const loadAlerts = async () => {
       try {
         const res = await fetch("/api/alerts");
+        if (!res.ok) throw new Error("No se pudieron consultar las alertas");
         const data = await res.json();
-        if (data.success && data.data?.alerts) {
+        if (active && data.success && Array.isArray(data.data?.alerts)) {
           setAlerts(data.data.alerts);
+          setAlertsLoaded(true);
         }
-      } catch {}
+      } catch {
+        if (active) setAlertsLoaded(false);
+      }
     };
-    fetchAlerts();
-    const interval = setInterval(fetchAlerts, 30000);
-    return () => clearInterval(interval);
+    void loadAlerts();
+    const interval = setInterval(loadAlerts, 30000);
+    return () => { active = false; clearInterval(interval); };
   }, []);
 
-  const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
-    router.refresh();
-  };
+  useEffect(() => setAlertsOpen(false), [pathname]);
 
-  const criticalCount = alerts.filter((a) => a.level === "critical").length;
+  const logout = async () => {
+    try {
+      const res = await fetch("/api/auth/logout", { method: "POST" });
+      if (!res.ok) throw new Error("No se pudo cerrar la sesión");
+      router.push("/login");
+      router.refresh();
+    } catch {
+      window.alert("No se pudo cerrar la sesión. Volvé a intentarlo.");
+    }
+  };
+  const critical = alerts.filter((a) => a.level === "critical").length;
 
   return (
-    <header className="h-16 border-b border-white/5 bg-[#080c14]/80 backdrop-blur-md px-6 flex items-center justify-between sticky top-0 z-30 font-sans">
-      {/* Left: Server Pulse & Host */}
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono font-medium">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span>PROD-DEDICATED</span>
-          <span className="text-gray-500">|</span>
-          <span className="text-gray-300 font-semibold">149.50.159.163</span>
+    <header className="hub-header sticky top-0 z-20 flex min-h-[76px] w-full items-center justify-between gap-3 border-b border-white/[0.07] bg-[#142236]/95 px-5 pl-[74px] backdrop-blur-xl sm:px-7 sm:pl-[74px] lg:px-9">
+      <div className="min-w-0">
+        <div className="hidden items-center gap-1.5 text-[11px] font-medium text-slate-500 sm:flex">
+          NanoLabs <ChevronRight className="h-3 w-3" /> {info.section}
         </div>
-
-        <div className="hidden lg:flex items-center gap-3 text-xs text-gray-400 font-mono">
-          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/[0.03] border border-white/5">
-            <Cpu className="w-3.5 h-3.5 text-brand-cyan" />
-            i5-12400 (12T)
-          </span>
-          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/[0.03] border border-white/5">
-            <Layers className="w-3.5 h-3.5 text-purple-400" />
-            16GB RAM · 462GB NVMe
-          </span>
-        </div>
+        <h1 className="truncate text-[15px] font-semibold tracking-tight text-slate-100 sm:mt-0.5 sm:text-[18px]">
+          {info.title}
+        </h1>
       </div>
-
-      {/* Right: Actions, Live Clock, Alerts & Master Access */}
-      <div className="flex items-center gap-3">
-        {/* Clock */}
-        <div className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-white/[0.03] border border-white/5 text-gray-300 font-mono text-xs">
-          <Clock className="w-3.5 h-3.5 text-gray-500" />
-          <span>{time || "00:00:00"}</span>
-          <span className="text-[10px] text-gray-500">ART</span>
-        </div>
-
-        {/* Live Refresh */}
-        <button
-          id="btn-global-refresh"
-          onClick={onRefresh}
-          disabled={isRefreshing}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all border ${
-            isRefreshing
-              ? "bg-brand-cyan/20 text-brand-cyan border-brand-cyan/30"
-              : "bg-surface-100 hover:bg-surface-50 text-gray-300 hover:text-white border-white/10"
-          }`}
-          title="Actualizar telemetría de producción"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-brand-cyan" : ""}`} />
-          <span>{isRefreshing ? "ACTUALIZANDO..." : "REFRESCAR"}</span>
-        </button>
-
-        {/* Alerts Bell */}
+      <div className="flex shrink-0 items-center gap-2">
+        {onRefresh && (
+          <button type="button" onClick={onRefresh} disabled={isRefreshing}
+            aria-label="Actualizar datos" title="Actualizar datos"
+            className="hub-icon-button !w-auto min-w-[38px] flex items-center gap-2 px-3 disabled:cursor-wait disabled:opacity-50">
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+            <span className="hidden text-xs font-medium sm:inline">{isRefreshing ? "Actualizando" : "Actualizar"}</span>
+          </button>
+        )}
         <div className="relative">
-          <button
-            onClick={() => setShowAlertsDrawer(!showAlertsDrawer)}
-            className={`p-2 rounded-lg border transition-all relative ${
-              criticalCount > 0
-                ? "bg-rose-500/15 border-rose-500/30 text-rose-400 shadow-glow-rose"
-                : alerts.length > 0
-                ? "bg-amber-500/15 border-amber-500/30 text-amber-400"
-                : "bg-surface-100 border-white/10 text-gray-400 hover:text-gray-200"
-            }`}
-            title="Centro de Alertas y Diagnóstico"
-          >
-            <Bell className="w-4 h-4" />
+          <button type="button"
+            aria-label={alertsLoaded ? `Alertas: ${alerts.length}` : "Consultar alertas"}
+            aria-expanded={alertsOpen} title="Centro de alertas"
+            onClick={() => setAlertsOpen((v) => !v)} className="hub-icon-button relative">
+            <Bell className="h-4 w-4" />
             {alerts.length > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white font-mono text-[9px] flex items-center justify-center font-bold">
-                {alerts.length}
+              <span className={`absolute -right-1 -top-1 flex h-[17px] min-w-[17px] items-center justify-center rounded-full px-1 text-[9px] font-bold text-white ${critical ? "bg-rose-500" : "bg-amber-500"}`}>
+                {alerts.length > 99 ? "99+" : alerts.length}
               </span>
             )}
           </button>
-
-          {/* Alerts Dropdown Drawer */}
-          {showAlertsDrawer && (
-            <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-[#0a0f1c] border border-white/10 rounded-xl shadow-2xl p-4 z-50 font-mono text-xs space-y-3 animate-in fade-in">
-              <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                <span className="font-bold text-white flex items-center gap-1.5">
-                  <AlertTriangle className="w-4 h-4 text-amber-400" />
-                  Alertas del Sistema ({alerts.length})
-                </span>
-                <button
-                  onClick={() => setShowAlertsDrawer(false)}
-                  className="text-gray-500 hover:text-white"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+          {alertsOpen && (
+            <div role="dialog" aria-label="Centro de alertas"
+              className="absolute right-0 top-12 z-50 w-[min(350px,calc(100vw-28px))] overflow-hidden rounded-2xl border border-white/10 bg-[#182235] shadow-2xl">
+              <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+                <div className="text-sm font-semibold text-white">Centro de alertas <span className="text-slate-400">({alerts.length})</span></div>
+                <button type="button" onClick={() => setAlertsOpen(false)} aria-label="Cerrar alertas" className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white"><X className="h-4 w-4" /></button>
               </div>
-
-              <div className="max-h-64 overflow-y-auto space-y-2">
-                {alerts.length === 0 ? (
-                  <div className="py-4 text-center text-gray-500 flex flex-col items-center gap-1">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                    <span>Todos los sistemas operando con normalidad</span>
-                  </div>
-                ) : (
-                  alerts.map((alert) => (
-                    <div
-                      key={alert.id}
-                      className={`p-2.5 rounded-lg border space-y-1 ${
-                        alert.level === "critical"
-                          ? "bg-rose-500/10 border-rose-500/20 text-rose-300"
-                          : "bg-amber-500/10 border-amber-500/20 text-amber-300"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between font-bold text-[11px]">
-                        <span>{alert.title}</span>
-                        <span className="text-[9px] uppercase px-1.5 py-0.2 rounded bg-black/30">
-                          {alert.source}
-                        </span>
-                      </div>
-                      <div className="text-[10px] text-gray-300 leading-relaxed">
-                        {alert.message}
-                      </div>
+              <div className="max-h-80 space-y-2 overflow-y-auto p-3">
+                {!alertsLoaded ? (
+                  <p className="px-2 py-5 text-center text-xs text-slate-400">No se pudo verificar el estado de las alertas.</p>
+                ) : alerts.length === 0 ? (
+                  <div className="flex items-center justify-center gap-2 py-6 text-xs text-slate-400"><CheckCircle2 className="h-4 w-4 text-emerald-400" /> Sin alertas registradas</div>
+                ) : alerts.map((a) => (
+                  <div key={a.id} className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-slate-100">
+                      <AlertCircle className={`h-4 w-4 shrink-0 ${a.level === "critical" ? "text-rose-400" : "text-amber-400"}`} />{a.title}
                     </div>
-                  ))
-                )}
+                    <p className="mt-1.5 text-xs leading-5 text-slate-400">{a.message}</p>
+                    <p className="mt-2 text-[10px] uppercase tracking-wider text-slate-500">{a.source}</p>
+                  </div>
+                ))}
               </div>
             </div>
           )}
         </div>
-
-        {/* Master User & Logout */}
-        <div className="flex items-center gap-2 pl-2 border-l border-white/10">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center">
-              <Shield className="w-4 h-4 text-amber-400" />
-            </div>
-            <div className="hidden sm:block text-left font-mono">
-              <div className="text-[11px] text-gray-200 font-semibold leading-none">augusto</div>
-              <div className="text-[9px] text-amber-400 uppercase tracking-wider font-semibold">
-                Supreme Master
-              </div>
-            </div>
-          </div>
-
-          <button
-            onClick={handleLogout}
-            className="p-1.5 rounded-lg hover:bg-rose-500/20 text-gray-400 hover:text-rose-400 transition-colors ml-1"
-            title="Cerrar sesión"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
+        <div className="ml-1 flex items-center gap-2 border-l border-white/10 pl-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#273451] text-[#b0c1ff]" title="Administrador"><Shield className="h-[17px] w-[17px]" /></div>
+          <span className="hidden text-xs font-medium text-slate-300 xl:block">Administrador</span>
+          <button type="button" onClick={logout} title="Cerrar sesión" aria-label="Cerrar sesión"
+            className="hub-icon-button !border-transparent !bg-transparent hover:!bg-rose-500/10 hover:!text-rose-300"><LogOut className="h-4 w-4" /></button>
         </div>
       </div>
     </header>

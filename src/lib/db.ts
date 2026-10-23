@@ -50,6 +50,25 @@ export function getDatabase() {
         message TEXT NOT NULL,
         resolved INTEGER NOT NULL DEFAULT 0
       );
+
+      CREATE TABLE IF NOT EXISTS app_lifecycle (
+        slug TEXT PRIMARY KEY,
+        state TEXT NOT NULL CHECK(state IN ('active', 'suspended', 'pending_retirement', 'archived')),
+        updated_at TEXT NOT NULL,
+        updated_by TEXT NOT NULL,
+        note TEXT NOT NULL DEFAULT '',
+        restore_plan TEXT
+      );
+      CREATE TABLE IF NOT EXISTS app_lifecycle_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp TEXT NOT NULL,
+        slug TEXT NOT NULL,
+        actor TEXT NOT NULL,
+        action TEXT NOT NULL,
+        old_state TEXT NOT NULL,
+        new_state TEXT NOT NULL,
+        details TEXT NOT NULL
+      );
     `);
 
     dbInstance = {
@@ -89,6 +108,45 @@ export function getDatabase() {
           VALUES (?, ?, ?, ?, ?)
         `);
         stmt.run(new Date().toISOString(), user, action, target, details);
+      },
+      getLifecycleStates() {
+        return db.prepare("SELECT slug, state, updated_at AS updatedAt, updated_by AS updatedBy, note, restore_plan AS restorePlan FROM app_lifecycle").all();
+      },
+      getLifecycleHistory(slug: string, limit = 30) {
+        return db.prepare("SELECT id, timestamp, slug, actor, action, old_state AS oldState, new_state AS newState, details FROM app_lifecycle_events WHERE slug = ? ORDER BY id DESC LIMIT ?").all(slug, Math.max(1, Math.min(100, limit)));
+      },
+      // The restore plan is saved BEFORE Docker's restart policies are modified.
+      stageLifecycleRestorePlan(slug: string, currentState: string, actor: string, plan: string) {
+        db.prepare(`INSERT INTO app_lifecycle (slug, state, updated_at, updated_by, note, restore_plan)
+          VALUES (?, ?, ?, ?, '', ?)
+          ON CONFLICT(slug) DO UPDATE SET restore_plan = excluded.restore_plan`)
+          .run(slug, currentState, new Date().toISOString(), actor, plan);
+      },
+      saveLifecycleState(input: {
+        slug: string; state: string; actor: string; action: string;
+        oldState: string; details: string; note: string; restorePlan: string | null;
+      }) {
+        db.exec("BEGIN IMMEDIATE");
+        try {
+          const now = new Date().toISOString();
+          db.prepare(`INSERT INTO app_lifecycle (slug, state, updated_at, updated_by, note, restore_plan)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(slug) DO UPDATE SET
+              state = excluded.state, updated_at = excluded.updated_at,
+              updated_by = excluded.updated_by, note = excluded.note,
+              restore_plan = excluded.restore_plan`).run(
+                input.slug, input.state, now, input.actor, input.note, input.restorePlan
+              );
+          db.prepare(`INSERT INTO app_lifecycle_events
+            (timestamp, slug, actor, action, old_state, new_state, details)
+            VALUES (?, ?, ?, ?, ?, ?, ?)`).run(now, input.slug, input.actor, input.action, input.oldState, input.state, input.details);
+          db.prepare(`INSERT INTO audit_log (timestamp, user, action, target, details)
+            VALUES (?, ?, ?, ?, ?)`).run(now, input.actor, "APP_LIFECYCLE_" + input.action.toUpperCase(), input.slug, input.details);
+          db.exec("COMMIT");
+        } catch (error) {
+          db.exec("ROLLBACK");
+          throw error;
+        }
       },
       getAuditLogs(limit = 50) {
         const stmt = db.prepare(`
