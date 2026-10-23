@@ -1,17 +1,33 @@
 "use strict";
+const fs=require("node:fs");
+const HEARTBEAT="/tmp/nanolabs-scheduler-heartbeat";
+
 async function dispatch() {
   const key=process.env.HUB_BACKUP_SCHEDULER_KEY||"";
-  if(key.length<32){console.error("Scheduler: falta HUB_BACKUP_SCHEDULER_KEY");return;}
-  try{
-    const r=await fetch("http://nanolabshub:3000/api/backups/schedule/run",{
-      method:"POST",headers:{Authorization:"Bearer "+key},
+  if(Buffer.byteLength(key)<32){console.error("Scheduler: falta HUB_BACKUP_SCHEDULER_KEY segura");return false;}
+  try {
+    const response=await fetch("http://nanolabshub:3000/api/backups/schedule/run",{
+      method:"POST",
+      headers:{Authorization:"Bearer "+key},
       signal:AbortSignal.timeout(22*60*1000)
     });
-    if(!r.ok)console.error("Scheduler: HTTP",r.status);
-    else{const body=await r.json();if(body.data?.length)console.log("Scheduler:",JSON.stringify(body.data));}
-  }catch(e){console.error("Scheduler:",e.message);}
+    if(!response.ok){console.error("Scheduler: Hub HTTP",response.status);return false;}
+    const payload=await response.json();
+    if(payload.success!==true || !Array.isArray(payload.data)){
+      console.error("Scheduler: respuesta de Hub inválida");
+      return false;
+    }
+    // Heartbeat means the authenticated scheduler reached the Hub successfully;
+    // it does NOT mean a particular backup was restored or completed.
+    fs.writeFileSync(HEARTBEAT,String(Date.now()),{mode:0o600});
+    if(payload.data.length)console.log("Scheduler:",JSON.stringify(payload.data));
+    return true;
+  }catch(e){
+    console.error("Scheduler:",e instanceof Error?e.message:"error inesperado");
+    return false;
+  }
 }
-let pending=false;
-async function tick(){if(pending)return;pending=true;try{await dispatch();}finally{pending=false;}}
+let running=false;
+async function tick(){if(running)return;running=true;try{await dispatch();}finally{running=false;}}
 setInterval(()=>void tick(),5*60*1000);
 void tick();
