@@ -20,7 +20,7 @@ function api(fetch, extra = {}) {
 const cmd = { requestId: '13d16e21-0221-4f4d-9cd7-38c5f2b3b9c7', operation: 'tenant.status', input: { tenantId: 'fixture', version: '2026-01-01T00:00:00.000Z', status: 'SUSPENDED' } };
 test('protected products are rejected before any network call even if configured', async () => {
   let calls = 0; const sdk = api(async () => { calls++; throw Error(); });
-  for (const product of ['onlyfood', 'onlypadel', 'onlycars', 'onlyerp', 'onlymob', 'unknown']) {
+  for (const product of ['onlypadel', 'onlycars', 'onlyerp', 'onlymob', 'unknown']) {
     assert.equal(sdk.isManagementEnabled(product), false);
     await assert.rejects(sdk.callSaaSManagement(product, 'admin', new URLSearchParams()), error => error.status === 403);
   }
@@ -30,6 +30,22 @@ test('only configured products with separate management credentials are enabled'
   const sdk = api(() => { throw Error('Unexpected fetch'); }, { HUB_MANAGEMENT_ONLYGYM_TOKEN: '', HUB_SAAS_MANAGEMENT_PRODUCTS: 'onlygym' });
   assert.equal(sdk.isManagementEnabled('onlygym'), false); assert.equal(sdk.isManagementEnabled('onlyturn'), false);
   await assert.rejects(sdk.callSaaSManagement('onlygym', 'admin', new URLSearchParams()), error => error.status === 503);
+});
+test('OnlyFood requires explicit credentials and preserves its payment lifecycle payload', async () => {
+  const token = 'food-fixture-'.repeat(6);
+  const missing = api(() => { throw Error('Unexpected fetch'); });
+  assert.equal(missing.isManagementEnabled('onlyfood'), false);
+  let calls = 0;
+  const sdk = api(async (url, options) => {
+    calls++; assert.equal(url, 'https://onlyfood.nanoapps.ar/api/integrations/nanolabs/management');
+    const body = JSON.parse(options.body); assert.equal(body.operation, 'payment.status'); assert.equal(body.input.status, 'OVERDUE');
+    assert.equal(options.headers.Authorization, 'Bearer ' + token);
+    return Response.json({ success: true, contract: 'nanolabs.saas.management.v1', product: 'onlyfood', requestId: cmd.requestId, data: { tenantId: 'legacy-default-tenant' } });
+  }, { HUB_MANAGEMENT_ONLYFOOD_TOKEN: token });
+  assert.equal(sdk.isManagementEnabled('onlyfood'), true);
+  await sdk.callSaaSManagement('onlyfood', 'trusted-admin', new URLSearchParams(), { ...cmd, operation: 'payment.status', input: { tenantId: 'legacy-default-tenant', version: 'a'.repeat(64), paymentId: 'fixture', status: 'OVERDUE', paidAt: null } });
+  await assert.rejects(sdk.callSaaSManagement('onlygym', 'admin', new URLSearchParams(), { ...cmd, operation: 'payment.status' }), error => error.status === 400);
+  assert.equal(calls, 1);
 });
 test('writes use a fixed destination and bind actor, exact payload, path and timestamp', async () => {
   let count = 0;

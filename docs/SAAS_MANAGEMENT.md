@@ -1,8 +1,8 @@
-# Administración central de OnlyGym y OnlyTurn
+# Administración central de OnlyGym, OnlyTurn y OnlyFood
 
 El Hub administra estos dos productos desde `/saas/onlygym/manage` y
-`/saas/onlyturn/manage`. La lista permitida está fijada en código. OnlyFood,
-OnlyPadel, OnlyCars, OnlyERP y los demás productos no pueden utilizar este proxy,
+`/saas/onlyturn/manage` y `/saas/onlyfood/manage`. La lista permitida está fijada
+en código. OnlyPadel, OnlyCars, OnlyERP y los demás productos no pueden utilizar este proxy,
 incluso si se agregan por error a las variables de configuración.
 
 ## Contrato y autorización
@@ -17,7 +17,22 @@ Configurar en ejecución, fuera del repositorio y del contexto Docker:
 | --- | --- |
 | OnlyGym web | `HUB_MANAGEMENT_ENABLED=true`, `HUB_MANAGEMENT_TOKEN` |
 | OnlyTurn app | `HUB_MANAGEMENT_ENABLED=true`, `HUB_MANAGEMENT_TOKEN` |
+| OnlyFood app | `HUB_MANAGEMENT_ENABLED=true`, `HUB_MANAGEMENT_TOKEN` |
 | Hub web | `HUB_SAAS_MANAGEMENT_PRODUCTS=onlygym,onlyturn`, `HUB_MANAGEMENT_ONLYGYM_TOKEN`, `HUB_MANAGEMENT_ONLYTURN_TOKEN` |
+
+Para sumar OnlyFood, agregar `onlyfood` a la lista explícita e inyectar
+`HUB_MANAGEMENT_ONLYFOOD_TOKEN`. Su lectura requiere además
+`HUB_INTEGRATION_ONLYFOOD_TOKEN` y la selección explícita en
+`HUB_SAAS_INTEGRATION_PRODUCTS`. Sin ambas configuraciones no se habilita.
+
+OnlyFood usa MariaDB y capacidades propias: estado PAST_DUE, fin de prueba,
+acceso efectivo, dominios conservados, integraciones sanitizadas y ciclo de pagos
+PENDING/PAID/OVERDUE/REFUNDED/VOID. `payment.status` está permitida solo para
+OnlyFood. Los formularios se habilitan por su catálogo; los otros dos conectores
+conservan su contrato. Un reembolso registrado no envía dinero al proveedor.
+La versión de OnlyFood incluye filas administrativas relacionadas y timestamps
+nativos, y su PK de auditoría reclama el UUID en la misma transacción MariaDB.
+No se ejecutan locks de PostgreSQL ni se accede a MariaDB desde el Hub.
 
 Generar una clave distinta de al menos 32 bytes para cada producto. Debe ser
 distinta de su token de lectura. No inyectar claves nuevas en bases, migradores,
