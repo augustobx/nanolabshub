@@ -1,5 +1,6 @@
 import { getSessionUser } from "@/lib/auth";
 import { SAAS_PRODUCTS } from "@/lib/product-taxonomy";
+import { isSaaSIntegrationEnabled } from "@/lib/integration-settings";
 export const dynamic="force-dynamic";
 export const runtime="nodejs";
 const headers={"Cache-Control":"private, no-store"};
@@ -15,7 +16,7 @@ export async function GET(){
    switches:{backups:process.env.HUB_BACKUPS_ENABLED==="true",
      lifecycle:process.env.HUB_LIFECYCLE_ENABLED==="true",saasConnectors:connectorEnabled},
    connectors:SAAS_PRODUCTS.map(p=>({slug:p.slug,name:p.name,
-     enabled:connectorEnabled,credentialConfigured:
+     enabled:isSaaSIntegrationEnabled(p.slug),credentialConfigured:
        Buffer.byteLength(process.env["HUB_INTEGRATION_"+p.slug.toUpperCase()+"_TOKEN"]||"")>=32,
      safeWriteContract:false
    })),

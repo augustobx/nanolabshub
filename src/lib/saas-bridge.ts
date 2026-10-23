@@ -1,4 +1,5 @@
 import { SAAS_PRODUCTS } from "./product-taxonomy";
+import { isSaaSIntegrationEnabled } from "./integration-settings";
 import type { GovernanceOverview, SaaSSlug, UniversalTenant } from "./types";
 
 type WireTenant = {
@@ -28,7 +29,7 @@ function adaptTenant(saas: SaaSSlug, name: string, value: WireTenant): Universal
   };
 }
 async function readProduct(saas: SaaSSlug, name: string, domain: string): Promise<UniversalTenant[]> {
-  if (process.env.HUB_SAAS_INTEGRATION_ENABLED !== "true") {
+  if (!isSaaSIntegrationEnabled(saas)) {
     throw new Error("Integración segura todavía no habilitada");
   }
   const token = process.env["HUB_INTEGRATION_" + saas.toUpperCase() + "_TOKEN"] || "";
@@ -48,7 +49,8 @@ async function readProduct(saas: SaaSSlug, name: string, domain: string): Promis
     if (!wire.success || wire.contract !== "nanolabs.saas.tenants.v1" || wire.product !== saas ||
         !Array.isArray(wire.tenants) || wire.tenants.length > 100 ||
         wire.capabilities?.tenantsRead !== true ||
-        wire.capabilities?.tenantWrite !== false) throw new Error("Contrato de integración no válido");
+        wire.capabilities?.tenantWrite !== false ||
+        wire.capabilities?.moduleWrite !== false) throw new Error("Contrato de integración no válido");
     all.push(...wire.tenants.map(tenant => adaptTenant(saas, name, tenant)));
     if (wire.nextOffset === null) return all;
     if (!Number.isInteger(wire.nextOffset) || wire.nextOffset <= offset ||
@@ -67,11 +69,12 @@ export async function getUniversalGovernanceOverview(): Promise<GovernanceOvervi
     suspendedTenants: tenants.filter(t => t.status === "SUSPENDED" || t.status === "CANCELED").length,
     totalRecordsManaged: 0, saasCount: SAAS_PRODUCTS.length, tenants,
     sources: SAAS_PRODUCTS.map((p, i) => ({
-      saas: p.slug, status: results[i].status === "fulfilled" ? "available" : "unavailable",
+      saas: p.slug, status: !isSaaSIntegrationEnabled(p.slug) ? "disabled" :
+        results[i].status === "fulfilled" ? "available" : "unavailable",
       count: results[i].status === "fulfilled" ? results[i].value.length : null,
       checkedAt: new Date().toISOString(),
-      message: results[i].status === "rejected"
-        ? "Conector seguro deshabilitado, inaccesible o con contrato inválido" : null,
+      message: !isSaaSIntegrationEnabled(p.slug) ? "Conector pendiente de habilitación" :
+        results[i].status === "rejected" ? "Conector inaccesible o con contrato inválido" : null,
     })),
     legacyPanels: SAAS_PRODUCTS.map(p => ({
       saas: p.name, legacyAdminUrl: "https://" + p.domain + "/superadmin",
