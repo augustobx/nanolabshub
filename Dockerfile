@@ -35,6 +35,7 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/scripts/backup-engine.cjs /app/scripts/backup-engine.cjs
 COPY --from=builder /app/scripts/backup-scheduler.cjs /app/scripts/backup-scheduler.cjs
+COPY --from=builder /app/scripts/backup-scheduler-health.cjs /app/scripts/backup-scheduler-health.cjs
 
 EXPOSE 3000
 
