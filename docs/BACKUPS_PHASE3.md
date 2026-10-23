@@ -59,6 +59,36 @@ El segundo servicio solo consulta un endpoint interno autenticado. No requiere m
 
 **Conservar las mismas capas Compose** en despliegues posteriores para evitar perder `HUB_BACKUPS_ENABLED` y la clave de ejecución. La gestión de ciclo de vida sigue su propio interruptor `HUB_LIFECYCLE_ENABLED`.
 
+### Scheduler: revisión del healthcheck (22/10/2026)
+
+El programador usa la misma imagen que la web, pero **no** abre el puerto HTTP 3000.
+Antes heredaba el `HEALTHCHECK` web y podía aparecer `unhealthy` aun estando activo.
+
+Ahora `compose.backups.yml` usa `scripts/backup-scheduler-health.cjs`, que comprueba que
+el programador haya recibido una respuesta válida y autenticada del endpoint interno
+del Hub durante los últimos 35 minutos. El primer sondeo ocurre al iniciar el
+proceso y luego cada cinco minutos. Un `healthy` **no** significa que los dumps
+programados se restauraron ni que las bases están íntegras; solo confirma
+comunicación del programador con el backend.
+
+Para comprobar la causa del estado anterior sin modificar nada:
+
+```bash
+docker logs --tail 40 nanolabshub-backup-scheduler
+docker inspect --format='{{range .State.Health.Log}}{{.ExitCode}} {{.Output}}{{end}}' nanolabshub-backup-scheduler | tail -c 600
+```
+
+Para corregirlo **sin reiniciar el Hub ni otras aplicaciones**, actualizar solamente
+la rama de revisión y luego, tras verificar `docker compose ... config --quiet`,
+reconstruir la imagen `nanolabshub` y recrear únicamente el servicio
+`nanolabshub-backup-scheduler`, usando siempre las cinco capas Compose ya
+configuradas, incluida `compose.integrations.yml` con
+`HUB_SAAS_INTEGRATION_ENABLED=false`. No se tocan bases, volúmenes ni migraciones.
+
+Si después de recrear sigue `unhealthy`, verificar logs por credenciales del
+scheduler (no imprimir secretos), HTTP 403/503 y red Docker. No afirmar que
+los backups automáticos funcionan hasta revisar historial y horarios.
+
 ### Comprobación
 
 ```bash
