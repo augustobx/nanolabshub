@@ -1,10 +1,14 @@
 import { SAAS_PRODUCTS } from "./product-taxonomy";
 import { isSaaSIntegrationEnabled } from "./integration-settings";
+import { isManagementEnabled } from "./saas-management";
 import type { GovernanceOverview, SaaSSlug, UniversalTenant } from "./types";
 
 type WireTenant = {
   id: string; slug: string; name: string; status: string; rawStatus: string;
   createdAt: string; plan: string | null;
+  planExpiresAt?: string | null;
+  modules?: Record<string, boolean>;
+  metrics?: { totalRecords: number; recordLabel: string; available: boolean };
 };
 type WireResponse = {
   success: boolean; contract: string; product: SaaSSlug; capturedAt: string;
@@ -23,9 +27,11 @@ function adaptTenant(saas: SaaSSlug, name: string, value: WireTenant): Universal
     id: String(value.id), slug: String(value.slug), name: String(value.name),
     saas, saasName: name, status: normalizeStatus(value.status),
     rawStatus: value.rawStatus, plan: value.plan || "No informado",
-    createdAt: value.createdAt, domain: "",
-    metrics: { totalRecords: 0, recordLabel: "Métricas no disponibles", available: false },
-    modules: {},
+    createdAt: value.createdAt, domain: "", planExpiresAt: value.planExpiresAt ?? null,
+    metrics: value.metrics?.available === true && Number.isSafeInteger(value.metrics.totalRecords) && value.metrics.totalRecords >= 0 && typeof value.metrics.recordLabel === "string"
+      ? { totalRecords: value.metrics.totalRecords, recordLabel: value.metrics.recordLabel.slice(0, 80), available: true }
+      : { totalRecords: 0, recordLabel: "Métricas no disponibles", available: false },
+    modules: value.modules && typeof value.modules === "object" && !Array.isArray(value.modules) ? Object.fromEntries(Object.entries(value.modules).filter(([, enabled]) => typeof enabled === "boolean")) : {},
   };
 }
 async function readProduct(saas: SaaSSlug, name: string, domain: string): Promise<UniversalTenant[]> {
@@ -64,10 +70,11 @@ export async function getUniversalGovernanceOverview(): Promise<GovernanceOvervi
   const tenants = results.flatMap(result => result.status === "fulfilled" ? result.value : []);
   return {
     totalTenants: tenants.length,
+    managementProducts: SAAS_PRODUCTS.filter(p => isManagementEnabled(p.slug)).map(p => p.slug),
     activeTenants: tenants.filter(t => t.status === "ACTIVE").length,
     trialTenants: tenants.filter(t => t.status === "TRIAL").length,
     suspendedTenants: tenants.filter(t => t.status === "SUSPENDED" || t.status === "CANCELED").length,
-    totalRecordsManaged: 0, saasCount: SAAS_PRODUCTS.length, tenants,
+    totalRecordsManaged: tenants.reduce((total, t) => total + (t.metrics.available ? t.metrics.totalRecords : 0), 0), saasCount: SAAS_PRODUCTS.length, tenants,
     sources: SAAS_PRODUCTS.map((p, i) => ({
       saas: p.slug, status: !isSaaSIntegrationEnabled(p.slug) ? "disabled" :
         results[i].status === "fulfilled" ? "available" : "unavailable",
@@ -80,7 +87,7 @@ export async function getUniversalGovernanceOverview(): Promise<GovernanceOvervi
       saas: p.name, legacyAdminUrl: "https://" + p.domain + "/superadmin",
       sunsetStatus: "active_deprecated",
       replacementUrl: "https://hub.nanoapps.ar/saas/" + p.slug,
-      notes: "El Hub solo ofrece lectura segura. El superadmin original mantiene las funciones de edición.",
+      notes: isManagementEnabled(p.slug) ? "Gestión central autenticada y auditada disponible en el Hub." : "El Hub solo ofrece lectura segura. El superadmin original mantiene las funciones de edición.",
     })),
   };
 }
@@ -92,3 +99,4 @@ export async function updateTenantStatusInDB(): Promise<never> {
 export async function toggleTenantModuleInDB(): Promise<never> {
   throw new Error("Edición bloqueada: no existe contrato de escritura seguro");
 }
+

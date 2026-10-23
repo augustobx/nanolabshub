@@ -12,7 +12,9 @@ generan alertas de conectividad. Una fuente seleccionada que falla conserva
 Cada fuente necesita su token privado `HUB_INTEGRATION_<PRODUCTO>_TOKEN`, de al
 menos 32 bytes, inyectado en ejecución. No copiar `.env` al contexto de build.
 La API exige `tenantsRead=true`, `tenantWrite=false` y `moduleWrite=false`.
-Las operaciones de escritura del Hub continúan bloqueadas.
+Las operaciones de escritura de este contrato siguen bloqueadas. La gestión
+administrativa utiliza otro contrato, claves independientes y activación
+explícita; ver [SAAS_MANAGEMENT.md](SAAS_MANAGEMENT.md).
 
 Antes de desplegar: respaldar SQLite con la API de backup consistente, comprobar
 integridad, guardar imagen rollback y preservar las capas Compose vigentes.
@@ -26,3 +28,4 @@ global desactivado, recreando únicamente el Hub. No restaurar ni sobrescribir
 datos productivos como parte del rollback de esta integración de lectura.
 
 Pruebas: `node --test scripts/saas-bridge.test.cjs`, `npx tsc --noEmit` y build.
+
