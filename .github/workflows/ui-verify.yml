@@ -36,6 +36,9 @@ jobs:
       - name: Scheduler heartbeat healthcheck tests
         run: node --test scripts/backup-scheduler-health.test.cjs
 
+      - name: Isolated recovery validation tests
+        run: node --test scripts/recovery-engine.test.cjs
+
       - name: Production build
         run: npm run build
 
