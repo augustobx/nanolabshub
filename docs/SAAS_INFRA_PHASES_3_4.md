@@ -29,6 +29,22 @@ El Hub consume HTTPS y nunca sigue redirecciones. Valida producto, versión de c
 
 El Hub ya no contiene el código antiguo de acceso directo SQL con contraseñas incrustadas. **Las credenciales publicadas anteriormente pueden seguir presentes en el historial Git** y deberán rotarse en una ventana de mantenimiento con respaldos verificados, sin hacerlo como parte de esta rama.
 
+## Advertencia de despliegue (revisión de Compose, 22/10/2026)
+
+**No ejecutar `docker compose up -d` sin especificar un servicio en las cuatro SaaS críticas.** La revisión del código detectó que:
+- OnlyFood dispone de imágenes `database-migrate` / `database-init`; la segunda ejecuta seeds.
+- OnlyPadel tiene un servicio `migrate` vinculado a la app.
+- OnlyCars usa `prisma db push` y scripts de bootstrap en imágenes auxiliares.
+- OnlyERP tiene un servicio `migrate` que depende de la base y precede al web.
+
+Los cambios de integración NO requieren migraciones de esquema. Antes de desplegar alguno de esos PR es obligatorio comparar el contenedor actual y su revisión con la rama de Git, revisar `docker compose config`, y garantizar que **solo** se reconstruye y recrea el contenedor web sin activar migradores ni otros servicios. `--no-deps` es requisito, pero no sustituye una inspección de la configuración final.
+
+La primera etapa de despliegue se limita al **Hub**, con la bandera `HUB_SAAS_INTEGRATION_ENABLED=false`. Esta etapa tiene una consecuencia esperada: **los recuentos de tenants estarán como «sin conexión» hasta desplegar y configurar sus APIs**, sin consultar bases por SQL como antes. No se debe declarar Superadmin integrado solo por ver el rediseño.
+
+La comprobación de claves del Hub ahora detiene la expansión de Docker Compose si faltan `ADMIN_PASS` o `HUB_MASTER_KEY`; no hay valores por defecto seguros en el Compose de desarrollo. Conservar el estado de `HUB_LIFECYCLE_ENABLED` y `HUB_BACKUPS_ENABLED` y la clave del programador.
+
+Validaciones de GitHub: Hub compilación, TypeScript, backup engine y smoke en escritorio/móvil aprobados. OnlyFood, OnlyPadel y OnlyTurn CI aprobadas; OnlyCars, OnlyERP y OnlyGym tienen workflows de verificación de tipos recién incorporados y aprobados. OnlyMob queda bloqueada por auditoría de dependencias alta/crítica (no habilitar por fuerza).
+
 ## Activación gradual, sin afectar datos
 
 Los nuevos endpoints no entran en producción hasta revisar, fusionar y desplegar por separado el PR de cada SaaS.
