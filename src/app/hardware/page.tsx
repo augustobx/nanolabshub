@@ -27,6 +27,7 @@ export default function HardwarePage() {
   const [containers, setContainers] = useState<ContainerInfo[]>([]);
   const [history, setHistory] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error,setError]=useState<string|null>(null);
 
   // Terminal modal state
   const [terminalOpen, setTerminalOpen] = useState(false);
@@ -73,7 +74,7 @@ export default function HardwarePage() {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          setTerminalOutput((prev) => prev + decoder.decode(value, { stream: true }));
+          setTerminalOutput((prev) => (prev + decoder.decode(value, { stream: true })).slice(-200000));
         }
       }
     } catch (err: any) {
@@ -125,6 +126,8 @@ export default function HardwarePage() {
       const dataTelem = await resTelem.json();
       const dataHist = await resHist.json();
 
+      if (!resTelem.ok || !dataTelem.success || !resHist.ok || !dataHist.success) throw Error("No se pudo verificar la telemetría actual");
+      setError(null);
       if (dataTelem.success) {
         setMetrics(dataTelem.data.telemetry);
         setContainers(dataTelem.data.containers);
@@ -132,6 +135,7 @@ export default function HardwarePage() {
       if (dataHist.success) {
         setHistory(dataHist.data || []);
       }
+    } catch(e) { setMetrics(null);setContainers([]);setHistory([]);setError(e instanceof Error?e.message:"Lectura no disponible");
     } finally {
       setIsLoading(false);
     }
@@ -143,34 +147,6 @@ export default function HardwarePage() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleSafePrune = async () => {
-    if (
-      !confirm(
-        "🧹 LIMPIEZA SEGURA DE DOCKER:\n\nSe eliminarán únicamente imágenes huérfanas (<none>) y caché temporal de compilación anterior.\n\n⚠️ Los volúmenes persistentes y datos de bases de datos NO se tocan.\n\n¿Continuar?"
-      )
-    )
-      return;
-
-    setTerminalTitle("Limpieza Segura de Imágenes Docker");
-    setTerminalOutput("Ejecutando limpieza segura de imágenes huérfanas...\nPor favor espere...");
-    setTerminalLoading(true);
-    setTerminalOpen(true);
-
-    try {
-      const res = await fetch("/api/docker/prune", { method: "POST" });
-      const data = await res.json();
-      if (data.success) {
-        setTerminalOutput(`✅ LIMPIEZA SEGURA FINALIZADA:\n\n${data.data.output}`);
-        fetchMetrics();
-      } else {
-        setTerminalOutput(`❌ Error durante la limpieza:\n\n${data.error}`);
-      }
-    } catch (err: any) {
-      setTerminalOutput(`Error: ${err.message}`);
-    } finally {
-      setTerminalLoading(false);
-    }
-  };
 
   return (
     <div className="flex-1 flex flex-col pb-12">
@@ -186,13 +162,14 @@ export default function HardwarePage() {
               Supervisá el entorno sin salir del Hub.
             </p>
           </div>
-          <button type="button" onClick={handleSafePrune}
-            title="Elimina imágenes Docker huérfanas sin tocar volúmenes de datos"
+          <button type="button" disabled
+            title="Limpieza global bloqueada: requiere revisión fuera del Hub"
             className="inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-xl border border-amber-400/20 bg-amber-400/[0.07] px-4 py-3 text-xs font-semibold text-amber-200 transition-colors hover:bg-amber-400/10">
-            <Trash2 className="h-4 w-4" /> Limpiar imágenes Docker
+            <Trash2 className="h-4 w-4" /> Limpieza global bloqueada
           </button>
         </section>
 
+        {error&&<p role="alert" className="text-sm text-amber-200">{error}. Sin mediciones actuales.</p>}
         {/* Primary Hardware Gauges */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {/* CPU Card */}
@@ -266,10 +243,10 @@ export default function HardwarePage() {
                 </div>
                 <div className="flex justify-between text-[11px] font-mono text-gray-500">
                   <span>
-                    Usado: {metrics ? (metrics.memory.usedBytes / 1024 ** 3).toFixed(2) : "0"} GB
+                    Usado: {metrics ? (metrics.memory.usedBytes / 1024 ** 3).toFixed(2) : "—"} GB
                   </span>
                   <span>
-                    Total: {metrics ? (metrics.memory.totalBytes / 1024 ** 3).toFixed(2) : "0"} GB
+                    Total: {metrics ? (metrics.memory.totalBytes / 1024 ** 3).toFixed(2) : "—"} GB
                   </span>
                 </div>
               </div>
@@ -289,10 +266,10 @@ export default function HardwarePage() {
                 </div>
                 <div className="flex justify-between text-[11px] font-mono text-gray-500">
                   <span>
-                    Usado: {metrics ? (metrics.memory.swapUsedBytes / 1024 ** 3).toFixed(2) : "0"} GB
+                    Usado: {metrics ? (metrics.memory.swapUsedBytes / 1024 ** 3).toFixed(2) : "—"} GB
                   </span>
                   <span>
-                    Total: {metrics ? (metrics.memory.swapTotalBytes / 1024 ** 3).toFixed(2) : "0"} GB
+                    Total: {metrics ? (metrics.memory.swapTotalBytes / 1024 ** 3).toFixed(2) : "—"} GB
                   </span>
                 </div>
               </div>

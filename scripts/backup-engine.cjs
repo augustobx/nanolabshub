@@ -3,6 +3,8 @@ const fs=require("node:fs"),fsp=require("node:fs/promises"),path=require("node:p
 const {spawn}=require("node:child_process"),{pipeline}=require("node:stream/promises"),{Transform}=require("node:stream");
 const {createGzip,createGunzip}=require("node:zlib"),{DatabaseSync,backup:sqliteBackup}=require("node:sqlite");
 const ROOT="/opt/backups",DATA=process.env.DATA_DIR||"/app/data";
+const protectedProducts=new Set(["onlypadel","onlycars","onlyerp"]);
+function assertMutable(slug){if(protectedProducts.has(slug))throw Error("Producto protegido: operación de backup bloqueada");}
 function db(){const d=new DatabaseSync(path.join(DATA,"hub.sqlite"));d.exec("PRAGMA busy_timeout=5000;"+
 "CREATE TABLE IF NOT EXISTS backup_jobs(id TEXT PRIMARY KEY,slug TEXT NOT NULL,db_type TEXT NOT NULL,filename TEXT,status TEXT NOT NULL,created_at TEXT NOT NULL,finished_at TEXT,size_bytes INTEGER DEFAULT 0,checksum TEXT,error TEXT,trigger TEXT NOT NULL);"+
 "CREATE TABLE IF NOT EXISTS backup_schedules(slug TEXT PRIMARY KEY,enabled INTEGER DEFAULT 0,hour_local INTEGER DEFAULT 3,weekdays TEXT DEFAULT '0,1,2,3,4,5,6',last_run_day TEXT,updated_at TEXT NOT NULL);");return d;}
@@ -25,6 +27,7 @@ async function dockerDump(app,out){
  });
 }
 async function createBackup(apps,slug,trigger="manual",actor="admin"){
+ assertMutable(slug);
  if(process.env.HUB_BACKUPS_ENABLED!=="true")throw Error("Falta HUB_BACKUPS_ENABLED=true");
  const app=appOf(apps,slug);await fsp.mkdir(DATA,{recursive:true});const lock=path.join(DATA,"backup-"+slug+".lock");
  let h;try{h=await fsp.open(lock,"wx",0o600);}catch(e){throw Error(e.code==="EEXIST"?"Backup en curso o lock pendiente de revisión":e.message);}
@@ -48,10 +51,29 @@ async function createBackup(apps,slug,trigger="manual",actor="admin"){
   }catch(e){await fsp.rm(tmp,{force:true}).catch(()=>{});d.prepare("UPDATE backup_jobs SET status='failed',error=?,finished_at=? WHERE id=?").run(String(e.message).slice(0,300),new Date().toISOString(),id);throw e;}finally{d.close();}
  }finally{await h.close().catch(()=>{});await fsp.rm(lock,{force:true}).catch(()=>{});}
 }
-function list(apps){const d=db();try{return d.prepare("SELECT * FROM backup_jobs ORDER BY created_at DESC LIMIT 500").all().map(x=>({id:x.id,appSlug:x.slug,appName:apps.find(a=>a.slug===x.slug)?.name||x.slug,dbType:x.db_type,filename:x.filename||"—",path:x.filename?path.join(ROOT,x.slug,x.filename):"",sizeBytes:x.size_bytes||0,sizeFormatted:Math.round(x.size_bytes/1024)+" KB",createdAt:x.created_at,status:x.status==="integrity_ok"?"verified":x.status==="failed"?"failed":"unverified",integrityStatus:x.status,error:x.error,checksum:x.checksum,trigger:x.trigger,storageLocation:"local",restoreTested:false}));}finally{d.close();}}
+function list(apps){const d=db();try{return d.prepare("SELECT * FROM backup_jobs ORDER BY created_at DESC LIMIT 500").all().map(x=>{
+ let status=x.status==="integrity_ok"?"verified":x.status==="failed"?"failed":"unverified",error=x.error;
+ if(x.status==="integrity_ok")try{
+  const dir=path.join(ROOT,x.slug),file=path.join(dir,x.filename);
+  if(!/^[a-z0-9-]+$/.test(x.slug)||!x.filename?.startsWith(x.slug+"_")||!/^[_a-zA-Z0-9.-]+$/.test(x.filename))throw Error("Ruta de archivo inválida");
+  if(fs.lstatSync(dir).isSymbolicLink())throw Error("Directorio inseguro");
+  const st=fs.lstatSync(file);if(!st.isFile()||st.isSymbolicLink()||st.size!==x.size_bytes)throw Error("Archivo ausente o tamaño alterado");
+  if(st.mtimeMs>Date.parse(x.finished_at)+1000){status="unverified";error="El archivo cambió después de su comprobación de integridad";}
+ }catch{status="failed";error="La copia registrada no está disponible o cambió; no se contabiliza como íntegra";}
+ return {id:x.id,appSlug:x.slug,appName:apps.find(a=>a.slug===x.slug)?.name||x.slug,dbType:x.db_type,filename:x.filename||"—",path:x.filename?path.join(ROOT,x.slug,x.filename):"",sizeBytes:x.size_bytes||0,sizeFormatted:Math.round(x.size_bytes/1024)+" KB",createdAt:x.created_at,status,integrityStatus:x.status,integrityCheckedAt:x.finished_at,error,checksum:x.checksum,trigger:x.trigger,storageLocation:"local",restoreTested:false};
+ });}finally{d.close();}}
+function externalInventory(apps){
+ const d=db();let registered;try{registered=new Set(d.prepare("SELECT slug,filename FROM backup_jobs WHERE filename IS NOT NULL").all().map(x=>x.slug+"/"+x.filename));}finally{d.close();}
+ return apps.filter(a=>a.dbType!=="none").map(a=>{let count=0,totalBytes=0,lastModified=null;
+  try{const dir=path.join(ROOT,a.slug),st=fs.lstatSync(dir);if(!st.isDirectory()||st.isSymbolicLink())throw Error("unavailable");
+   for(const e of fs.readdirSync(dir,{withFileTypes:true})){if(!e.isFile()||!/[.](sql[.]gz|sqlite([.]gz)?|dump|backup)$/.test(e.name)||registered.has(a.slug+"/"+e.name))continue;const stat=fs.lstatSync(path.join(dir,e.name));count++;totalBytes+=stat.size;const modified=stat.mtime.toISOString();if(!lastModified||modified>lastModified)lastModified=modified;}
+   return {slug:a.slug,count,totalBytes,lastModified,status:"metadata_only"};
+  }catch{return {slug:a.slug,count:null,totalBytes:null,lastModified:null,status:"unavailable"};}
+ });
+}
 async function download(apps,id){if(!/^[a-f0-9-]{36}$/.test(id))throw Error("ID inválido");const d=db();let x;try{x=d.prepare("SELECT * FROM backup_jobs WHERE id=? AND status='integrity_ok'").get(id);}finally{d.close();}if(!x)throw Error("Backup no registrado");appOf(apps,x.slug);if(!/^[\w.-]+$/.test(x.filename)||!x.filename.startsWith(x.slug+"_"))throw Error("Archivo no permitido");const file=path.join(ROOT,x.slug,x.filename),v=await verify(file);if(v.sha!==x.checksum||v.size!==x.size_bytes)throw Error("Integridad alterada");return {file,name:x.filename,size:v.size};}
-function schedules(apps){const d=db();try{const rows=d.prepare("SELECT * FROM backup_schedules").all();return apps.filter(a=>a.dbType!=="none").map(a=>{const r=rows.find(x=>x.slug===a.slug);return {slug:a.slug,name:a.name,enabled:!!r?.enabled,hourLocal:r?.hour_local??3,weekdays:r?.weekdays??"0,1,2,3,4,5,6",lastRunDay:r?.last_run_day??null};});}finally{d.close();}}
-function schedule(apps,slug,cfg,actor){appOf(apps,slug);if(typeof cfg.enabled!=="boolean"||!Number.isInteger(cfg.hourLocal)||cfg.hourLocal<0||cfg.hourLocal>23||typeof cfg.weekdays!=="string"||!/^[0-6](?:,[0-6]){0,6}$/.test(cfg.weekdays)||new Set(cfg.weekdays.split(",")).size!==cfg.weekdays.split(",").length)throw Error("Horario inválido");const d=db();try{d.prepare("INSERT INTO backup_schedules(slug,enabled,hour_local,weekdays,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(slug) DO UPDATE SET enabled=excluded.enabled,hour_local=excluded.hour_local,weekdays=excluded.weekdays,updated_at=excluded.updated_at").run(slug,cfg.enabled?1:0,cfg.hourLocal,cfg.weekdays,new Date().toISOString());d.prepare("INSERT INTO audit_log(timestamp,user,action,target,details) VALUES(?,?,?,?,?)").run(new Date().toISOString(),actor,"BACKUP_SCHEDULE",slug,JSON.stringify(cfg));}finally{d.close();}}
+function schedules(apps){const d=db();try{const rows=d.prepare("SELECT * FROM backup_schedules").all();return apps.filter(a=>a.dbType!=="none").map(a=>{const r=rows.find(x=>x.slug===a.slug);return {slug:a.slug,name:a.name,protected:protectedProducts.has(a.slug),enabled:!protectedProducts.has(a.slug)&&!!r?.enabled,hourLocal:r?.hour_local??3,weekdays:r?.weekdays??"0,1,2,3,4,5,6",lastRunDay:r?.last_run_day??null};});}finally{d.close();}}
+function schedule(apps,slug,cfg,actor){assertMutable(slug);appOf(apps,slug);if(typeof cfg.enabled!=="boolean"||!Number.isInteger(cfg.hourLocal)||cfg.hourLocal<0||cfg.hourLocal>23||typeof cfg.weekdays!=="string"||!/^[0-6](?:,[0-6]){0,6}$/.test(cfg.weekdays)||new Set(cfg.weekdays.split(",")).size!==cfg.weekdays.split(",").length)throw Error("Horario inválido");const d=db();try{d.prepare("INSERT INTO backup_schedules(slug,enabled,hour_local,weekdays,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(slug) DO UPDATE SET enabled=excluded.enabled,hour_local=excluded.hour_local,weekdays=excluded.weekdays,updated_at=excluded.updated_at").run(slug,cfg.enabled?1:0,cfg.hourLocal,cfg.weekdays,new Date().toISOString());d.prepare("INSERT INTO audit_log(timestamp,user,action,target,details) VALUES(?,?,?,?,?)").run(new Date().toISOString(),actor,"BACKUP_SCHEDULE",slug,JSON.stringify(cfg));}finally{d.close();}}
 async function tick(apps,now=new Date()){if(process.env.HUB_BACKUPS_ENABLED!=="true")return [];
  const p=Object.fromEntries(new Intl.DateTimeFormat("en-GB",{timeZone:"America/Argentina/Buenos_Aires",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",hourCycle:"h23"}).formatToParts(now).map(z=>[z.type,z.value]));
  const day=p.year+"-"+p.month+"-"+p.day,w=new Date(day+"T12:00:00Z").getUTCDay(),result=[];
@@ -61,4 +83,4 @@ async function tick(apps,now=new Date()){if(process.env.HUB_BACKUPS_ENABLED!=="t
  }
  return result;
 }
-module.exports={createBackup,list,download,schedules,schedule,tick,verify,db};
+module.exports={createBackup,list,externalInventory,download,schedules,schedule,tick,verify,db};

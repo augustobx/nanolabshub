@@ -1,6 +1,8 @@
 import { KNOWN_APPS } from "./apps-registry";
 import { getDatabase } from "./db";
 import { executeRemoteCommand } from "./ssh";
+import { assertProductMutable, assertContainerMutable } from "./operational-policy";
+import { clearLiveCache } from "./live-cache";
 
 export type LifecycleState = "active" | "suspended" | "pending_retirement" | "archived";
 export type LifecycleAction = "suspend" | "resume" | "pending_retirement" | "archive";
@@ -38,13 +40,16 @@ export function getLifecycleRecords(): Map<string, LifecycleRecord> {
 }
 
 export function assertAppActive(slug: string) {
-  const state = getLifecycleRecords().get(slug)?.state || "active";
+  const record = getLifecycleRecords().get(slug);
+  const state = record?.state || "active";
+  if (state === "active" && record?.restorePlan) throw new Error("Recuperación pendiente: reactivá la aplicación antes de otras operaciones");
   if (state !== "active") {
     throw new Error("Operación bloqueada: aplicación " + state + ". Reactivala desde Productos antes de iniciar o desplegar contenedores.");
   }
 }
 
 export function assertContainerAppActive(containerName: string) {
+  assertContainerMutable(containerName);
   const owner = KNOWN_APPS.find((a) => a.containerNames.some((name) =>
     name === containerName || containerName.startsWith(name + "-")));
   if (!owner) throw new Error("Contenedor fuera del inventario permitido");
@@ -63,10 +68,12 @@ export function appLifecycle(slug: string, records: Map<string, LifecycleRecord>
     updatedAt: record?.updatedAt || null,
     updatedBy: record?.updatedBy || null,
     note: record?.note || "",
+    recoveryRequired: !!record?.restorePlan && record.state === "active",
   };
 }
 
 function ensureManaged(slug: string) {
+  assertProductMutable(slug);
   const app = KNOWN_APPS.find((a) => a.slug === slug);
   if (!app) throw new Error("Aplicación fuera del registro permitido");
   if (app.type === "infrastructure" || protectedSlugs.has(slug)) {
@@ -151,6 +158,7 @@ async function stopApp(slug: string, names: string[], actor: string, oldState: L
 async function startApp(names: string[], rawPlan: string | null) {
   const plan = validatePlan(rawPlan);
   if (!plan) throw new Error("No hay plan de recuperación: la app no fue suspendida por el Hub");
+  if (plan.some(item=>!names.includes(item.name))) throw new Error("Plan contiene contenedores no autorizados");
   const current = await inspect(names);
   const available = new Set(current.map((c) => c.Name.replace(/^\//, "")));
   if (plan.some((item) => !available.has(item.name))) {
@@ -199,9 +207,10 @@ export async function changeLifecycle(input: {
     const db = database();
     const record = getLifecycleRecords().get(app.slug);
     const previous: LifecycleState = record?.state || "active";
+    if (previous === "active" && record?.restorePlan && input.action !== "resume") throw new Error("Recuperación pendiente: primero reactivá la aplicación");
     if (previous === "archived" && input.action !== "resume") throw new Error("Ya se encuentra archivada");
     if (previous === "suspended" && input.action === "suspend") throw new Error("Ya está suspendida");
-    if (previous === "active" && input.action === "resume") throw new Error("Ya está activa");
+    if (previous === "active" && input.action === "resume" && !record?.restorePlan) throw new Error("Ya está activa");
     if (previous === "pending_retirement" && input.action === "pending_retirement") {
       throw new Error("Ya está marcada como baja pendiente");
     }
@@ -209,6 +218,7 @@ export async function changeLifecycle(input: {
     let next: LifecycleState = previous;
     let restorePlan = record?.restorePlan || null;
     let details = "";
+    db.logAudit(input.actor,"APP_LIFECYCLE_STARTED",app.slug,input.action);
     if (input.action === "pending_retirement") {
       next = "pending_retirement";
       details = "Baja pendiente: sin modificar Docker; se excluye de alertas web.";
@@ -239,6 +249,7 @@ export async function changeLifecycle(input: {
     });
     return { slug: app.slug, from: previous, to: next, label: stateLabels[next], details };
   } finally {
+    clearLiveCache();
     held.delete(app.slug);
   }
 }

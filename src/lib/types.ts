@@ -77,6 +77,7 @@ export interface AppInfo {
   };
   containers: ContainerInfo[];
   lifecycle?: {
+    recoveryRequired?: boolean;
     state: "active" | "suspended" | "pending_retirement" | "archived";
     updatedAt: string | null;
     updatedBy: string | null;
@@ -143,6 +144,7 @@ export interface UniversalTenant {
 }
 
 export interface GovernanceOverview {
+  managementSources?: Array<{saas:SaaSSlug;status:"available"|"unavailable"|"disabled";operations:string[]}>;
   managementProducts?: SaaSSlug[];
   totalTenants: number;
   activeTenants: number;

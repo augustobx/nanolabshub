@@ -21,6 +21,7 @@ export function getDatabase() {
     db.exec(`
       PRAGMA journal_mode = WAL;
       PRAGMA synchronous = NORMAL;
+      PRAGMA busy_timeout = 5000;
 
       CREATE TABLE IF NOT EXISTS metrics_history (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,6 +42,7 @@ export function getDatabase() {
         target TEXT NOT NULL,
         details TEXT NOT NULL
       );
+      CREATE INDEX IF NOT EXISTS metrics_history_timestamp ON metrics_history(timestamp);
 
       CREATE TABLE IF NOT EXISTS alerts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -69,10 +71,26 @@ export function getDatabase() {
         new_state TEXT NOT NULL,
         details TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS login_attempts (
+        bucket TEXT PRIMARY KEY, window_start INTEGER NOT NULL, attempts INTEGER NOT NULL
+      );
     `);
 
     dbInstance = {
       type: "sqlite",
+      persistentReady() { return db.prepare("SELECT 1 AS ok").get().ok === 1; },
+      allowLoginAttempt(bucket: string) {
+        const now = Date.now(), window = 15 * 60000;
+        const result = db.prepare(`INSERT INTO login_attempts(bucket,window_start,attempts) VALUES(?,?,1)
+          ON CONFLICT(bucket) DO UPDATE SET
+          attempts=CASE WHEN window_start<? THEN 1 ELSE attempts+1 END,
+          window_start=CASE WHEN window_start<? THEN excluded.window_start ELSE window_start END
+          RETURNING attempts`).get(bucket, now, now-window, now-window);
+        return result.attempts <= 10;
+      },
+      resetLoginAttempts(bucket: string) {
+        db.prepare("UPDATE login_attempts SET attempts=0 WHERE bucket=?").run(bucket);
+      },
       insertMetric(metric: {
         timestamp: string;
         cpu_usage: number;
@@ -84,7 +102,8 @@ export function getDatabase() {
       }) {
         const stmt = db.prepare(`
           INSERT INTO metrics_history (timestamp, cpu_usage, load1, ram_used_bytes, ram_total_bytes, disk_used_percent, containers_running)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
+          SELECT ?, ?, ?, ?, ?, ?, ? WHERE NOT EXISTS
+          (SELECT 1 FROM metrics_history WHERE timestamp >= ?)
         `);
         stmt.run(
           metric.timestamp,
@@ -93,7 +112,8 @@ export function getDatabase() {
           metric.ram_used_bytes,
           metric.ram_total_bytes,
           metric.disk_used_percent,
-          metric.containers_running
+          metric.containers_running,
+          new Date(Date.parse(metric.timestamp) - 30000).toISOString()
         );
       },
       getMetricsHistory(limit = 60) {
@@ -177,39 +197,7 @@ export function getDatabase() {
 
     return dbInstance;
   } catch (err) {
-    // In-memory fallback if node:sqlite isn't available
-    console.warn("node:sqlite not available, using in-memory store", err);
-    const memoryHistory: any[] = [];
-    const memoryAudit: any[] = [];
-    const memoryAlerts: any[] = [];
-
-    dbInstance = {
-      type: "memory",
-      insertMetric(metric: any) {
-        memoryHistory.push(metric);
-        if (memoryHistory.length > 300) memoryHistory.shift();
-      },
-      getMetricsHistory(limit = 60) {
-        return memoryHistory.slice(-limit);
-      },
-      logAudit(user: string, action: string, target: string, details: string) {
-        memoryAudit.unshift({ timestamp: new Date().toISOString(), user, action, target, details });
-      },
-      getAuditLogs(limit = 50) {
-        return memoryAudit.slice(0, limit);
-      },
-      addAlert(level: any, title: string, message: string) {
-        memoryAlerts.unshift({ id: Date.now(), timestamp: new Date().toISOString(), level, title, message, resolved: 0 });
-      },
-      getActiveAlerts() {
-        return memoryAlerts.filter((a) => !a.resolved);
-      },
-      resolveAlert(id: number) {
-        const a = memoryAlerts.find((al) => al.id === id);
-        if (a) a.resolved = 1;
-      },
-    };
-
-    return dbInstance;
+    console.error("Persistencia SQLite no disponible");
+    throw new Error("Persistencia del Hub no disponible; operación bloqueada.");
   }
 }

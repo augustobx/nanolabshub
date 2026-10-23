@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Header } from "@/components/Header";
 import { SAAS_PRODUCTS } from "@/lib/product-taxonomy";
+import { productCapabilities } from "@/lib/product-capabilities";
 import type { GovernanceOverview } from "@/lib/types";
 import { ShieldCheck, Users, ArrowUpRight, Layers3, KeyRound, ClipboardList, Settings2, ShieldAlert, CheckCircle2, AlertTriangle } from "lucide-react";
 
@@ -27,7 +28,7 @@ export default function SuperadminPage() {
       if(!response.ok||!json.success)throw Error(json.error||"Sin respuesta del conector");
       setOverview(json.data);
       setError(null);
-    }catch(e){setError(e instanceof Error?e.message:"Sin datos");}
+    }catch(e){setOverview(null);setError(e instanceof Error?e.message:"Sin datos");}
     finally{setLoading(false);}
   };
   useEffect(()=>{void load();},[]);
@@ -54,7 +55,7 @@ export default function SuperadminPage() {
           <thead><tr><th className="px-5">Plataforma</th>{CAPABILITIES.map(c=><th key={c.key}>{c.label}</th>)}</tr></thead>
           <tbody>{SAAS_PRODUCTS.map(product=><tr key={product.slug} className="border-t border-white/[0.07]">
             <td className="px-5"><Link className="font-semibold text-[#c6d8ff] hover:underline" href={"/saas/"+product.slug}>{product.name}</Link></td>
-            {CAPABILITIES.map(cap=>{const managed=overview?.managementProducts?.includes(product.slug)&&healthySources.has(product.slug);const available=cap.key==="tenantRead"?healthySources.has(product.slug):managed;return <td key={cap.key}><span className={available?"hub-state hub-state-good":"hub-state hub-state-neutral"}>{available?"Disponible":cap.key==="tenantRead"?"Sin conectar":LABELS[product.capabilities[cap.key]]}</span></td>;})}
+            {CAPABILITIES.map(cap=>{const available=productCapabilities(overview,product.slug)[cap.key];return <td key={cap.key}><span className={available?"hub-state hub-state-good":"hub-state hub-state-neutral"}>{available?"Disponible":"Sin conectar"}</span></td>;})}
           </tr>)}</tbody>
         </table></div>
       </section>

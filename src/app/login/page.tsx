@@ -7,7 +7,8 @@ import { Command, Lock, User, ShieldAlert, ArrowRight } from "lucide-react";
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const from = searchParams.get("from") || "/";
+  const requested = searchParams.get("from") || "/";
+  const from = requested.startsWith("/") && !requested.startsWith("//") && !/[\\\u0000-\u001f]/.test(requested) ? requested : "/";
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");

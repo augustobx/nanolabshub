@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Header } from "@/components/Header";
 import { SAAS_PRODUCTS } from "@/lib/product-taxonomy";
+import { productCapabilities } from "@/lib/product-capabilities";
 import type { GovernanceOverview, BackupRecord } from "@/lib/types";
 import type { OperationsSnapshot } from "@/lib/operations";
 import { ArrowLeft, ArrowUpRight, DatabaseBackup, ExternalLink, ServerCog, ShieldCheck, Users, Settings2, Activity, LayoutGrid, AlertCircle } from "lucide-react";
@@ -47,19 +48,19 @@ export default function SaaSWorkspacePage() {
       if(!r.ok||!j.success)throw Error("No disponible");
       return j.data;
     }));
-    if(response[0].status==="fulfilled")setOps(response[0].value);
-    if(response[1].status==="fulfilled")setGov(response[1].value);
-    if(response[2].status==="fulfilled")setBackups(response[2].value);
+    if(response[0].status==="fulfilled")setOps(response[0].value);else setOps(null);
+    if(response[1].status==="fulfilled")setGov(response[1].value);else setGov(null);
+    if(response[2].status==="fulfilled")setBackups(response[2].value);else setBackups(null);
     setErrors(response.flatMap((r,i)=>r.status==="rejected"?[urls[i]]:[]));
     setPending(false);
   };
   useEffect(()=>{void load();},[slug]);
-  if(!product)return <div className="min-w-0 flex-1"><Header/><div className="hub-content"><NotConnected title="Producto no registrado" explanation="El identificador solicitado no forma parte de las seis SaaS del portafolio."/><Link className="hub-text-link mt-4 inline-flex" href="/saas">Volver a SaaS</Link></div></div>;
+  if(!product)return <div className="min-w-0 flex-1"><Header/><div className="hub-content"><NotConnected title="Producto no registrado" explanation="El identificador solicitado no forma parte de las SaaS registradas del portafolio."/><Link className="hub-text-link mt-4 inline-flex" href="/saas">Volver a SaaS</Link></div></div>;
   const app=ops?.apps.find(a=>a.slug===slug);
   const tenants=gov?.tenants.filter(t=>t.saas===slug)||[];
   const source=gov?.sources?.find(item=>item.saas===slug);
   const sourceAvailable=source?.status==="available";
-  const management=gov?.managementProducts?.includes(product.slug) ?? false;
+  const capabilities=productCapabilities(gov,product.slug); const management=capabilities.available;
   const copies=(backups||[]).filter(b=>b.appSlug===slug);
   const last=copies.find(b=>b.status==="verified");
   const containers=app?.containers||[];
@@ -121,12 +122,12 @@ export default function SaaSWorkspacePage() {
         <Link href="/backups" className="hub-primary-action">Centro de backups <ArrowUpRight className="h-4 w-4"/></Link></section>}
       {tab==="settings"&&<section className="hub-card space-y-5 p-5 sm:p-6"><h2 className="hub-section-heading">Configuración e integraciones</h2>
         <div className="grid gap-3 sm:grid-cols-2">{[
-          {name:"Lectura de tenants",state:product.capabilities.tenantRead},
-          {name:"Estados y suscripciones",state:management?"connected":product.capabilities.statusWrite},
-          {name:"Módulos y planes",state:management?"connected":product.capabilities.moduleWrite},
-          {name:"Credenciales y sesiones",state:management?"connected":product.capabilities.impersonation},
-          {name:"Datos del tenant",state:management?"connected":product.capabilities.settings},
-          {name:"Actividad del tenant",state:management?"connected":product.capabilities.activity}
+          {name:"Lectura de tenants",state:capabilities.tenantRead?"connected":"pending"},
+          {name:"Estados y suscripciones",state:capabilities.statusWrite?"connected":"pending"},
+          {name:"Módulos y planes",state:capabilities.moduleWrite?"connected":"pending"},
+          {name:"Credenciales y sesiones",state:capabilities.impersonation?"connected":"pending"},
+          {name:"Datos del tenant",state:capabilities.settings?"connected":"pending"},
+          {name:"Actividad del tenant",state:capabilities.activity?"connected":"pending"}
         ].map(x=><div key={x.name} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 p-4"><span className="text-[13px] text-slate-200">{x.name}</span><span className={qualityClass(x.state)}>{connected(x.state)}</span></div>)}</div>
         {management?<Link href={"/saas/"+slug+"/manage"} className="hub-primary-action">Gestionar empresas, planes, suscripciones, módulos y accesos</Link>:<NotConnected title="Configuración central en preparación" explanation="Las opciones de gestión requieren endpoints autenticados y auditables en cada SaaS antes de habilitarse."/>}
       </section>}

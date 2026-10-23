@@ -1,11 +1,14 @@
 import { executeRemoteCommand } from "./ssh";
 import { KNOWN_APPS, AppDefinition } from "./apps-registry";
 import { ServerMetrics, ContainerInfo, AppInfo, BackupRecord } from "./types";
+import { assertDeploymentAllowed, assertContainerMutable, validateContainer } from "./operational-policy";
+import { liveValue, clearLiveCache } from "./live-cache";
 
 /**
  * Parses and returns live server hardware and system telemetry
  */
-export async function getServerTelemetry(): Promise<ServerMetrics> {
+export function getServerTelemetry(): Promise<ServerMetrics> { return liveValue("telemetry", readServerTelemetry); }
+async function readServerTelemetry(): Promise<ServerMetrics> {
   // A real host sample: never turn a failed read into a healthy-looking example value.
   // /host/proc is bind-mounted read-only from the dedicated Linux host.
   const script = String.raw`python3 - <<'PY'
@@ -95,7 +98,8 @@ PY`;
 /**
  * Fetches all live Docker containers on the server
  */
-export async function getContainers(): Promise<ContainerInfo[]> {
+export function getContainers(): Promise<ContainerInfo[]> { return liveValue("containers", readContainers); }
+async function readContainers(): Promise<ContainerInfo[]> {
   const cmd = `docker ps -a --format '{{.ID}}|||{{.Names}}|||{{.Image}}|||{{.Status}}|||{{.Ports}}|||{{.CreatedAt}}'`;
   const { stdout, stderr, code } = await executeRemoteCommand(cmd);
   if (code !== 0) throw new Error(`No se pudo consultar Docker: ${stderr || "error desconocido"}`);
@@ -115,7 +119,8 @@ export async function getContainers(): Promise<ContainerInfo[]> {
   return lines.map((line) => {
     const [id, name, image, status, ports, created] = line.split("|||");
     let state: ContainerInfo["state"] = "unknown";
-    if (status.toLowerCase().includes("up")) state = "running";
+    if (status.toLowerCase().includes("paused")) state = "paused";
+    else if (status.toLowerCase().includes("up")) state = "running";
     else if (status.toLowerCase().includes("exited")) state = "exited";
     else if (status.toLowerCase().includes("restarting")) state = "restarting";
     else if (status.toLowerCase().includes("paused")) state = "paused";
@@ -165,7 +170,7 @@ results = []
 for app in apps:
     p = app["path"]
     has_compose = any(os.path.isfile(os.path.join(p, filename))
-                      for filename in ("compose.yml", "docker-compose.yml", "docker-compose.yaml"))
+                      for filename in ("compose.yml", "compose.yaml", "compose.npm.yaml", "docker-compose.yml", "docker-compose.yaml"))
     is_repo = os.path.exists(os.path.join(p, ".git"))
     record = {"slug": app["slug"], "isRepo": is_repo, "branch": "",
               "commitHash": "", "commitMessage": "", "commitAuthor": "",
@@ -221,9 +226,12 @@ PY`;
 
     // Compute health
     let status: AppInfo["status"] = "operational";
-    if (appContainers.length === 0) {
+    const services = appContainers.filter(c=>!c.isJob);
+    if (services.length === 0) {
       status = "not_deployed";
-    } else if (appContainers.some((c) => c.state !== "running" || c.health === "unhealthy")) {
+    } else if (!services.some(c=>c.state==="running"&&(c.name===app.containerNames[0]||c.name.startsWith(app.containerNames[0]+"-")))) {
+      status = "down";
+    } else if (services.some((c) => c.state !== "running" || c.health === "unhealthy" || c.health === "starting")) {
       status = "degraded";
     }
 
@@ -262,42 +270,20 @@ PY`;
  * Triggers a deployment for a specific app: git pull && docker compose up -d --build
  */
 export async function deployApp(slug: string): Promise<string> {
-  const app = KNOWN_APPS.find((a) => a.slug === slug);
-  if (!app) throw new Error("Aplicación fuera del registro");
-
-  // Require an attached branch, a clean checkout, a default Compose manifest
-  // and a successful FF-only Git pull BEFORE any production rebuild.
-  const script = `
-    set -eu
-    cd ${JSON.stringify(app.path)}
-    GIT="git -c safe.directory=${app.path}"
-    test -d .git || { echo "Despliegue cancelado: sin repositorio Git"; exit 2; }
-    branch=$($GIT symbolic-ref --quiet --short HEAD) || {
-      echo "Despliegue cancelado: checkout detached"; exit 2;
-    }
-    test -n "$branch" || { echo "Despliegue cancelado: sin rama"; exit 2; }
-    test -z "$($GIT status --porcelain)" || {
-      echo "Despliegue cancelado: cambios locales pendientes"; exit 2;
-    }
-    docker compose config --services >/dev/null
-    GIT_TERMINAL_PROMPT=0 $GIT pull --ff-only origin "$branch"
-    docker compose up -d --build
-    docker compose ps
-  `;
-  const { stdout, stderr, code } = await executeRemoteCommand(script);
-  if (code !== 0) throw new Error(`Despliegue cancelado para ${app.name}: ${stderr || stdout}`);
-  return stdout;
+  assertDeploymentAllowed();
 }
 
 /**
  * Restarts a docker container
  */
 export async function restartContainer(containerName: string): Promise<string> {
+  assertContainerMutable(containerName);
   const cmd = `docker restart "${containerName}" && docker ps --filter "name=${containerName}"`;
   const { stdout, stderr, code } = await executeRemoteCommand(cmd);
   if (code !== 0) {
     throw new Error(`Error reiniciando contenedor ${containerName}: ${stderr}`);
   }
+  clearLiveCache();
   return stdout;
 }
 
@@ -305,7 +291,9 @@ export async function restartContainer(containerName: string): Promise<string> {
  * Streams tail logs of a container
  */
 export async function getContainerLogs(containerName: string, lines = 100): Promise<string> {
+  validateContainer(containerName, lines);
   const cmd = `docker logs --tail=${lines} --timestamps "${containerName}" 2>&1`;
-  const { stdout } = await executeRemoteCommand(cmd);
+  const { stdout, code } = await executeRemoteCommand(cmd);
+  if (code !== 0) throw new Error("No se pudieron consultar los logs del contenedor");
   return stdout || "No hay logs disponibles o el contenedor no ha generado salida.";
 }

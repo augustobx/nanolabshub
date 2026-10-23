@@ -1,17 +1,21 @@
+import { getSessionUser } from "@/lib/auth";
 import { getContainerLogs } from "@/lib/server-api";
+import { validateContainer } from "@/lib/operational-policy";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
+  if (!await getSessionUser()) return Response.json({ success: false, error: "Sesión requerida" }, { status: 401, headers: { "Cache-Control": "private, no-store" } });
   try {
     const { searchParams } = new URL(req.url);
     const container = searchParams.get("container");
-    const lines = parseInt(searchParams.get("lines") || "100", 10);
+    const lines = Number(searchParams.get("lines") || "100");
 
     if (!container) {
       return Response.json({ success: false, error: "container is required" }, { status: 400 });
     }
 
+    try { validateContainer(container, lines); } catch { return Response.json({ success:false,error:"Contenedor o límite inválido" },{status:400}); }
     const logs = await getContainerLogs(container, lines);
 
     return Response.json({

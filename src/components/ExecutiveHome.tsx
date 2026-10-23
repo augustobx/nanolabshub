@@ -50,9 +50,9 @@ export function ExecutiveHome() {
     }));
     if (signal?.aborted) return;
     const [ops, gov, backup] = results;
-    if (ops.status === "fulfilled") setSnapshot(ops.value.data);
-    if (gov.status === "fulfilled") setGovernance(gov.value.data);
-    if (backup.status === "fulfilled") setBackups(backup.value.data);
+    if (ops.status === "fulfilled") setSnapshot(ops.value.data); else setSnapshot(null);
+    if (gov.status === "fulfilled") setGovernance(gov.value.data); else setGovernance(null);
+    if (backup.status === "fulfilled") setBackups(backup.value.data); else setBackups(null);
     setErrors(results.flatMap((result, index) =>
       result.status === "rejected" ? [paths[index] + ": " + String(result.reason?.message || "sin respuesta")] : []));
     setLoading(false);
@@ -116,8 +116,8 @@ export function ExecutiveHome() {
           note={governance?.sources?.every(x=>x.status==="available") ? "Según conectores de las SaaS" : "Cobertura parcial o pendiente"} href="/governance" icon={Building2}/>
         <Tile title="Contenedores activos" value={running == null ? "—" : String(running)}
           note={snapshot ? String(snapshot.containers.length) + " detectados" : "Sin telemetría"} href="/operations" icon={ServerCog}/>
-        <Tile title="SaaS sin backup íntegro" value={missingBackups == null ? "—" : String(missingBackups)}
-          note="No equivale a restauración comprobada" href="/backups" icon={DatabaseBackup}/>
+        <Tile title="SaaS sin copia registrada" value={missingBackups == null ? "—" : String(missingBackups)}
+          note="Registro del Hub; puede haber copias externas" href="/backups" icon={DatabaseBackup}/>
       </section>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(300px,1fr)]">

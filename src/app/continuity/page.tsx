@@ -20,7 +20,7 @@ export default function ContinuityPage(){
      if(!r.ok||j.success!==true)throw Error(j.error||"Servicio no disponible");
      return j.data;
    }));
-   if(results[0].status==="fulfilled"){setBackups(results[0].value);setKnown(true);}
+   if(results[0].status==="fulfilled"){setBackups(results[0].value);setKnown(true);}else{setBackups([]);setKnown(false);}
    if(results[1].status==="fulfilled")setChecks(results[1].value);
    setErrors(results.flatMap((r,i)=>r.status==="rejected"?[sources[i]+": "+String(r.reason?.message||"sin respuesta")]:[]));
    setLoading(false);
@@ -68,7 +68,7 @@ export default function ContinuityPage(){
      <section aria-label="Resumen de continuidad" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
        {[
          {label:"Bases registradas",value:String(dbApps.length),note:"Según inventario del Hub",icon:DatabaseBackup},
-         {label:"Sin copia íntegra",value:known?String(missing):"—",note:"Archivos no verificados excluidos",icon:CircleAlert},
+         {label:"Sin copia registrada",value:known?String(missing):"—",note:"Archivos no verificados excluidos",icon:CircleAlert},
          {label:"SQLite aisladas aprobadas",value:known?String(isolated):"—",note:"Prueba de copia; no de aplicación",icon:FlaskConical},
          {label:"Copia externa verificada",value:"—",note:"No hay proveedor configurado",icon:CloudOff},
        ].map(x=>{const Icon=x.icon;return <div key={x.label} className="hub-card p-5">
@@ -94,7 +94,7 @@ export default function ContinuityPage(){
            </div>
            <div className="flex flex-wrap items-center gap-2">
              {!known?<span className="hub-state hub-state-neutral">Sin telemetría</span>:
-              !latest?<span className="hub-state hub-state-warn"><CircleAlert className="h-3 w-3"/> Falta copia íntegra</span>:
+              !latest?<span className="hub-state hub-state-warn"><CircleAlert className="h-3 w-3"/> Sin copia registrada en Hub</span>:
               validated?<span className="hub-state hub-state-good"><CheckCircle2 className="h-3.5 w-3.5"/> Copia SQLite validada</span>:
               <span className="hub-state hub-state-neutral">Integridad OK · recuperación sin prueba</span>}
              {latest&&<a href={"/api/backups/download?id="+encodeURIComponent(latest.id)}

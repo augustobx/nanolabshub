@@ -20,9 +20,11 @@ export async function evaluateSystemAlerts(): Promise<SystemAlert[]> {
   try {
     const [telemetry, containers] = await Promise.all([
       getServerTelemetry().catch(() => null),
-      getContainers().catch(() => []),
+      getContainers().catch(() => null),
     ]);
 
+    if (!telemetry) alerts.push({id:"alert-telemetry-unavailable",level:"warning",title:"Telemetría no disponible",message:"No se pudo comprobar CPU, memoria y disco. El estado del servidor es desconocido.",source:"Infraestructura",timestamp:now});
+    if (!containers) alerts.push({id:"alert-docker-unavailable",level:"warning",title:"Docker no disponible",message:"No se pudo consultar el inventario de contenedores. No equivale a cero incidencias.",source:"Docker Fleet",timestamp:now});
     if (telemetry) {
       // 1. Disk usage evaluation
       const mainDisk = telemetry.disks[0];
@@ -72,7 +74,7 @@ export async function evaluateSystemAlerts(): Promise<SystemAlert[]> {
     }
 
     // 4. Docker container health check
-    for (const c of containers) {
+    for (const c of containers || []) {
       if (c.health === "unhealthy") {
         alerts.push({
           id: `alert-container-${c.name}-unhealthy`,

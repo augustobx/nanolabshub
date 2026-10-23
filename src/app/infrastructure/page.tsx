@@ -33,7 +33,7 @@ export default function InfrastructurePage() {
       if(signal?.aborted)return;
       setInventory(result.data);
       setError(null);
-    }catch(e){if(!signal?.aborted)setError(e instanceof Error?e.message:"Error al consultar la plataforma");}
+    }catch(e){if(!signal?.aborted){setInventory(null);setError(e instanceof Error?e.message:"Error al consultar la plataforma");}}
     finally{if(!signal?.aborted)setLoading(false);}
   };
   useEffect(()=>{

@@ -83,7 +83,7 @@ export function OperationsDashboard() {
       setError(null);
     } catch (err) {
       if (signal?.aborted) return;
-      setError(err instanceof Error ? err.message : "No se pudieron actualizar las mediciones");
+      setSnapshot(null); setError(err instanceof Error ? err.message : "No se pudieron actualizar las mediciones");
     } finally {
       if (!signal?.aborted) setLoading(false);
     }
