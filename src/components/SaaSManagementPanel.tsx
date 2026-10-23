@@ -1,6 +1,6 @@
 "use client";
 import { OnlyFoodPayments } from "./OnlyFoodPayments";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { GovernanceOverview } from "@/lib/types";
 import type { ManagedSaaS, ManagedPlan, ManagedTenant, ManagementAudit, ManagementCatalog, ManagementCommand, ManagementOperation } from "@/lib/saas-management-types";
 
@@ -19,6 +19,7 @@ function Save({ children = "Guardar cambios" }: { children?: React.ReactNode }) 
 class ClientError extends Error { constructor(message: string, public uncertain: boolean) { super(message); } }
 
 export function SaaSManagementPanel({ product, initialTenantId, initialSection = "tenants" }: { product: ManagedSaaS; initialTenantId?: string; initialSection?: "tenants" | "plans" | "audit" }) {
+  const panelRef = useRef<HTMLDivElement>(null);
   const productName = {onlygym:"OnlyGym",onlyturn:"OnlyTurn",onlyfood:"OnlyFood"}[product];
   const api = "/api/saas-management/" + product;
   const [catalog, setCatalog] = useState<ManagementCatalog | null>(null), [plans, setPlans] = useState<ManagedPlan[]>([]);
@@ -51,6 +52,7 @@ export function SaaSManagementPanel({ product, initialTenantId, initialSection =
       catch { throw new ClientError("No se confirmó la respuesta. Reintentá la misma solicitud; no se duplicará.", true); }
       let json; try { json = await response.json(); } catch { throw new ClientError("No se confirmó la respuesta. Reintentá la misma solicitud.", true); }
       if (!response.ok || !json.success) throw new ClientError(json.error || "No se pudo completar el cambio.", response.status >= 500);
+      panelRef.current?.querySelectorAll<HTMLInputElement>('input[type="password"]').forEach(input => { input.value = ""; });
       setPending(null); setMessage("Cambio confirmado y registrado en la auditoría."); setCreating(false);
       if (command.operation === "tenant.create" && json.data.tenantId) { setTenant(null); setTenantId(json.data.tenantId); return; }
       await reload();
@@ -68,7 +70,7 @@ export function SaaSManagementPanel({ product, initialTenantId, initialSection =
   const base = () => ({ tenantId: tenant!.id, version: tenant!.version });
   const form = (operation: ManagementOperation, build: (f: FormData) => Record<string, unknown>) => (e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); try { submit(operation, build(new FormData(e.currentTarget))); } catch { setError("Revisá las fechas y los importes antes de guardar."); } };
   const p = plans.find(plan => plan.id === selectedPlan);
-  return <div className="saas-management space-y-5">
+  return <div ref={panelRef} className="saas-management space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="hub-section-heading">Administración de {productName}</h2><p className="mt-1 text-xs text-slate-400">Los cambios se aplican en la plataforma y quedan auditados. No se eliminan tenants, planes ni su historial.</p></div><button type="button" className="hub-secondary-action" disabled={busy || !!pending} onClick={() => { setBusy(true); reload().catch(e => setError(e.message)).finally(() => setBusy(false)); }}>Actualizar datos</button></div>
     {message && <p role="status" className="rounded-xl border border-emerald-400/30 p-3 text-sm text-emerald-200">{message}</p>}
     {error && <p role="alert" className="rounded-xl border border-amber-400/30 p-3 text-sm text-amber-100">{error}</p>}
