@@ -19,6 +19,10 @@ const owner=await call("/api/auth/mfa",{method:"POST",body:{challenge:l.data.cha
 assert.ok(token);
 await call("/api/auth/users",{method:"POST",token,origin:"https://untrusted.example.invalid",body:{},status:403});
 const users=await call("/api/auth/users",{token});assert(users.data.every(u=>!('password_hash' in u)&&!('mfa_secret' in u)));
+await call("/api/apps/deploy",{token,status:503}); // No approved catalog in this isolated HTTP runtime.
+await call("/api/apps/deploy",{method:"POST",token,origin:"https://untrusted.example.invalid",body:{slug:"nanolabshub"},status:403});
+await call("/api/apps/deploy",{method:"POST",token,body:{slug:"onlyfood",releaseId:"unapproved",requestId:randomUUID()},status:403});
+await call("/api/apps/deploy",{method:"POST",token,body:{slug:"nanolabshub",releaseId:"unapproved",requestId:randomUUID()},status:403});
 const requestId=randomUUID(),queued=await call("/api/backups",{method:"POST",token,body:{slug:"onlyfood",requestId},status:202});
 const repeated=await call("/api/backups",{method:"POST",token,body:{slug:"onlyfood",requestId},status:202});assert.equal(queued.data.jobId,repeated.data.jobId);
 assert.equal((await call("/api/jobs",{token})).data.length,1);
@@ -50,6 +54,8 @@ for(const role of ["viewer","operator"]){
   const enrolled=await call("/api/auth/account",{method:"POST",token:login.cookie,body:{operation:"mfa.confirm",code:fixtureTOTP(setup.data.secret)}});
   await call("/api/auth/account",{token:login.cookie,status:401});
   const active=enrolled.cookie;assert.ok(active);
+  await call("/api/apps/deploy",{token:active,status:403});
+  await call("/api/apps/deploy",{method:"POST",token:active,body:{slug:"nanolabshub",releaseId:"unapproved",requestId:randomUUID()},status:403});
   await call("/api/jobs",{token:active});
   const inventory=await call("/api/backups/import",{token:active,status:role==="viewer"?403:200});
   if(role==="operator")assert.deepEqual(inventory.data.map(s=>s.slug),["onlyfood"]);

@@ -1,7 +1,7 @@
 # Multi-stage Dockerfile for Next.js Standalone
 FROM node:22-alpine AS base
 WORKDIR /app
-RUN apk add --no-cache libc6-compat openssh-client git curl python3 docker-cli
+RUN apk add --no-cache libc6-compat openssh-client git curl python3 docker-cli docker-cli-compose
 
 # Dependencies stage
 FROM base AS deps
@@ -46,6 +46,10 @@ COPY --from=builder /app/scripts/backup-import.cjs /app/scripts/backup-import.cj
 COPY --from=builder /app/scripts/import-runner.cjs /app/scripts/import-runner.cjs
 COPY --from=builder /app/scripts/backup-scheduler.cjs /app/scripts/backup-scheduler.cjs
 COPY --from=builder /app/scripts/backup-scheduler-health.cjs /app/scripts/backup-scheduler-health.cjs
+COPY --from=builder /app/scripts/release-catalog.cjs /app/scripts/release-catalog.cjs
+COPY --from=builder /app/scripts/release-engine.cjs /app/scripts/release-engine.cjs
+COPY --from=builder /app/scripts/release-worker.cjs /app/scripts/release-worker.cjs
+COPY --from=builder /app/scripts/release-worker-health.cjs /app/scripts/release-worker-health.cjs
 
 EXPOSE 3000
 

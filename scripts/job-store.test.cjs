@@ -6,3 +6,20 @@ test("claim excludes unapproved resources and prevents overlapping work",()=>fix
 test("expired execution becomes uncertain and cannot be replayed by retry or new jobs",()=>fixture(({store,other,enqueue,advance})=>{const a=enqueue();const claimed=store.claim("backup",["onlyfood"]);advance(10001);assert.equal(other.expire(),1);assert.equal(store.get(a.id).state,"uncertain");assert.equal(store.heartbeat(a.id,claimed.lease_owner),false);assert.throws(()=>store.retry(a.id,"operator"),/confirmado/);enqueue("next");assert.equal(other.claim("backup",["onlyfood"]),null);store.reconcile(a.id,{result:{backupId:"confirmed"},evidence:"Verified archive checksum and persisted successful artifact"});assert(other.claim("backup",["onlyfood"]));}));
 test("bounded backoff survives restart and stops after max attempts",()=>fixture(({store,other,enqueue,advance})=>{const a=enqueue();for(let i=1;i<=3;i++){const c=store.claim("backup",["onlyfood"]);assert.equal(c.attempts,i);const x=store.fail(c.id,c.lease_owner,"transient",{retryable:true});assert.equal(x.state,i===3?"failed":"pending");assert.equal(other.claim("backup",["onlyfood"]),null);advance(15*60000);}assert.equal(store.get(a.id).state,"failed");assert.equal(store.events(a.id).length,7);}));
 test("cancel never stops an active process and permanent errors are not replayed",()=>fixture(({store,enqueue})=>{const a=enqueue();store.cancel(a.id,"operator");assert.equal(store.get(a.id).state,"cancelled");enqueue("other");const c=store.claim("backup",["onlyfood"]);assert.throws(()=>store.cancel(c.id,"operator"),/pendiente/);store.fail(c.id,c.lease_owner,"invalid input");assert.equal(store.get(c.id).state,"failed");}));
+test("release claims and expensive HTTP jobs exclude each other atomically",()=>fixture(({store,other,enqueue})=>{
+ enqueue();const backup=store.claim("backup",["onlyfood"]);
+ store.enqueue({kind:"release",resource:"nanolabshub",key:"release-a",actor:"owner",payload:{releaseId:"approved"}});
+ assert.equal(other.claim("release",["nanolabshub"]),null);
+ store.finish(backup.id,backup.lease_owner,{});
+ const release=other.claim("release",["nanolabshub"]);assert.ok(release);
+ enqueue("next");assert.equal(store.claim("backup",["onlyfood"]),null);
+ store.finish(release.id,release.lease_owner,{});assert.ok(store.claim("backup",["onlyfood"]));
+}));
+test("uncertain releases block expensive jobs until confirmed rollback; critical jobs remain visible",()=>fixture(({store,advance,enqueue})=>{
+ const release=store.enqueue({kind:"release",resource:"nanolabshub",key:"release-a",actor:"owner"});
+ store.claim("release",["nanolabshub"]);advance(10001);store.expire();
+ for(let i=0;i<205;i++){const j=store.enqueue({kind:"fixture",resource:"fixture",key:String(i),actor:"test"});store.cancel(j.id,"test");}
+ assert.equal(store.list()[0].id,release.id);enqueue();assert.equal(store.claim("backup",["onlyfood"]),null);
+ store.reconcile(release.id,{state:"failed",result:{rolledBack:true},evidence:"Original image and health verified, all neighbor IDs unchanged"});
+ assert.equal(store.get(release.id).state,"failed");assert.ok(store.claim("backup",["onlyfood"]));
+}));

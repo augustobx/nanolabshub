@@ -9,6 +9,22 @@ on:
       - 0.1.0
 
 jobs:
+  isolated-hub-release:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Build exact candidate with Compose support
+        run: docker build --build-arg BUILD_REVISION=${{ github.event.pull_request.head.sha || github.sha }} -t nanolabshub:release-fixture .
+      - name: Real isolated Hub release, failed health and image rollback
+        env:
+          HUB_RELEASE_FIXTURE_IMAGE: nanolabshub:release-fixture
+        run: node scripts/release-sandbox-smoke.cjs
   isolated-sql-restore:
     runs-on: ubuntu-24.04
     permissions:
@@ -56,7 +72,7 @@ jobs:
         run: node --test scripts/saas-bridge.test.cjs scripts/saas-management.test.cjs
 
       - name: Backup engine safety tests
-        run: node --test scripts/backup-engine.test.cjs scripts/job-store.test.cjs scripts/backup-runner.test.cjs
+        run: node --test scripts/backup-engine.test.cjs scripts/job-store.test.cjs scripts/backup-runner.test.cjs scripts/release-engine.test.cjs
       - name: Authentication, operations and truthfulness regressions
         run: node --test scripts/audit-security.test.cjs scripts/identity.test.cjs scripts/route-coverage.test.cjs
       - name: Production dependency audit
