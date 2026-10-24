@@ -10,3 +10,12 @@ export const recoveryRunner = require("../../scripts/recovery-runner.cjs").getRu
   tick(apps:typeof KNOWN_APPS):Promise<Array<Record<string,unknown>>>;
   reconcile(apps:typeof KNOWN_APPS,id:string):Promise<unknown>;
 };
+export interface ImportCandidate {slug:string;status:string;files:Array<{filename:string;supported:boolean;size?:number;mtimeMs?:number;reason?:string|null}>}
+export const backupImporter = require("../../scripts/backup-import.cjs").getImporter() as {
+  candidates(apps:typeof KNOWN_APPS,slugs:string[]):ImportCandidate[];
+};
+export const importRunner = require("../../scripts/import-runner.cjs").getRunner() as {
+  enqueue(apps:typeof KNOWN_APPS,slug:string,filename:string,requestId:string,actor:string):{id:string;state:string};
+  tick(apps:typeof KNOWN_APPS):Promise<Array<Record<string,unknown>>>;
+  reconcile(apps:typeof KNOWN_APPS,id:string):Promise<unknown>;
+};

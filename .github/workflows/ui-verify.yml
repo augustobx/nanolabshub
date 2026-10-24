@@ -25,6 +25,8 @@ jobs:
           docker pull postgres:16-alpine
           docker pull postgres:17-alpine
       - name: Native dump and restore, exact counts and invalid SQL rejection
+        env:
+          HUB_BACKUPS_ENABLED: "true"
         run: node scripts/restore-sandbox-smoke.cjs
   typecheck-build-and-visual-smoke:
     runs-on: ubuntu-24.04
@@ -64,7 +66,7 @@ jobs:
         run: node --test scripts/backup-scheduler-health.test.cjs
 
       - name: Isolated recovery validation tests
-        run: node --test scripts/recovery-engine.test.cjs scripts/restore-evidence.test.cjs scripts/restore-sandbox.test.cjs scripts/recovery-runner.test.cjs
+        run: node --test scripts/recovery-engine.test.cjs scripts/restore-evidence.test.cjs scripts/restore-sandbox.test.cjs scripts/recovery-runner.test.cjs scripts/backup-import.test.cjs
 
       - name: Production build
         run: npm run build

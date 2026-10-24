@@ -10,21 +10,21 @@ const LABEL = "ar.nanoapps.hub.restore";
 const ALLOWED = new Set(["onlyfood", "onlygym", "onlyturn"]);
 
 // No shell, no inherited production environment, no passwords in diagnostics.
-function docker(args, { input, timeout = 180000, maxOutput = 2 * 1024 ** 2 } = {}) {
+function docker(args, { input, timeout = 180000, maxOutput = 2 * 1024 ** 2, binary = false } = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn("docker", args, { stdio: [input ? "pipe" : "ignore", "pipe", "pipe"] });
-    let output = "", bytes = 0, settled = false;
+    let output = "", bytes = 0, settled = false;const chunks=[];
     const timer = setTimeout(() => done(Error("Tiempo agotado en el sandbox de restauración")), timeout);
     function done(error) {
       if (settled) return;
       settled = true; clearTimeout(timer);
-      if (error) { child.kill("SIGKILL"); reject(error); } else resolve(output.trim());
+      if (error) { child.kill("SIGKILL"); reject(error); } else resolve(binary?Buffer.concat(chunks):output.trim());
     }
     child.on("error", () => done(Error("Docker no disponible para la restauración aislada")));
     child.stdout.on("data", b => {
       bytes += b.length;
       if (bytes > maxOutput) done(Error("Respuesta del sandbox demasiado grande"));
-      else output += b.toString();
+      else if(binary)chunks.push(b);else output += b.toString();
     });
     child.stderr.resume(); // SQL errors can contain customer values: never persist stderr.
     child.on("close", code => done(code === 0 ? null : Error("El comando del sandbox falló; no se aprobó la restauración")));
@@ -67,9 +67,10 @@ function createSandboxRunner({ run: transport = docker, pause = ms => new Promis
       await transport(["rm", "--force", "--volumes", id],{timeout:30000});
     }catch{const error=Error("No se confirmó la limpieza del sandbox; requiere revisión antes de repetir");error.uncertain=true;throw error;}
   }
-  async function restore(app, file) {
+  async function restore(app, file, {format="sql"}={}) {
     if (running) throw Error("Ya hay una restauración SQL aislada en curso");
     if (!ALLOWED.has(app.slug) || !app.dbContainer || !app.containerNames?.includes(app.dbContainer) || !/^[\w.-]+$/.test(app.dbContainer)) throw Error("Base de origen fuera del alcance autorizado");
+    if(!["sql","postgres-custom"].includes(format)||format==="postgres-custom"&&app.dbType!=="postgres")throw Error("Formato de restauración no compatible");
     running = true;
     deadline=Date.now()+600000;
     let spec, id;
@@ -103,7 +104,8 @@ function createSandboxRunner({ run: transport = docker, pause = ms => new Promis
       const stream = new PassThrough();
       const bounded = new Transform({ transform(b, enc, cb) { bytes += b.length; cb(bytes > LIMIT ? Error("SQL descomprimido supera 512 MB") : null, b); } });
       const feeding = pipeline(fs.createReadStream(file), createGunzip(), bounded, stream).catch(error => { stream.destroy(error); throw error; });
-      await Promise.all([feeding, run(["exec", "-i", id, ...query], { input: stream })]);
+      const importCommand=format==="postgres-custom"?["pg_restore","--exit-on-error","--create","--no-owner","--no-privileges","-U",spec.role,"-d","postgres"]:query;
+      await Promise.all([feeding, run(["exec", "-i", id, ...importCommand], { input: stream })]);
       await owned();
       let manifest;
       if (pg) {
@@ -137,7 +139,7 @@ function createSandboxRunner({ run: transport = docker, pause = ms => new Promis
         if(fkResults.some(n=>!/^0$/.test(n)))throw Error("La copia contiene claves foráneas sin correspondencia");
         manifest = { tables: statements ? statements.split("\n").length : 0, rows, tableCheck: "passed",foreignKeysChecked:fkResults.length };
       }
-      return { engine: app.dbType, image: source, bytes, ...manifest, comparison: "restored-copy-only", applicationStarted: false };
+      return { engine: app.dbType, image: source, bytes, ...manifest, format,ownershipValidation:format==="postgres-custom"?"omitted-for-custom-archive":"dump-defined", comparison: "restored-copy-only", applicationStarted: false };
     } finally {
       try {
         await cleanup(id,spec); // Only this new container's anonymous scratch volumes.

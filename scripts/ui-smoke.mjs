@@ -103,6 +103,7 @@ const responses = {
     legacy:{dbCredentialsRotation:"not_verified",superadminMigration:"incomplete"}
   } },
   "/api/backups/restore-check": { success: true, data: [] },
+  "/api/backups/import": {success:true,data:[{slug:"nanolabshub",status:"available",files:[{filename:"hub-existing.sqlite",supported:true,size:94208,mtimeMs:1792840000000}]}]},
   "/api/jobs": { success: true, data: [] },
   "/api/alerts": { success: true, data: { alerts: [] } },
 };
@@ -123,6 +124,10 @@ try {
     await page.route("**/api/**", (route) => {
       const url = new URL(route.request().url());
       if (url.pathname.startsWith("/api/auth/")) return route.continue();
+      if(url.pathname==="/api/backups/import"&&route.request().method()==="POST"){
+        const body=route.request().postDataJSON();assert.equal(body.slug,"nanolabshub");assert.equal(body.filename,"hub-existing.sqlite");assert.match(body.requestId,/^[a-f0-9-]{36}$/);
+        return route.fulfill({status:202,contentType:"application/json",body:JSON.stringify({success:true,data:{jobId:"fixture-persisted-import-job",state:"pending"}})});
+      }
       if(url.pathname==="/api/backups"&&route.request().method()==="POST"){
         const body=route.request().postDataJSON();assert.match(body.requestId,/^[a-f0-9-]{36}$/);
         return route.fulfill({status:202,contentType:"application/json",body:JSON.stringify({success:true,data:{jobId:"fixture-persisted-job",state:"pending"}})});
@@ -259,6 +264,11 @@ try {
         await page.getByText("0 / 7").waitFor();
       }
       if (path === "/backups") {
+        const imports=page.getByRole("region",{name:"Importar copias existentes"});
+        await imports.waitFor();await imports.getByRole("combobox",{name:"Aplicación",exact:true}).selectOption("nanolabshub");
+        await imports.getByRole("combobox",{name:"Archivo",exact:true}).selectOption("hub-existing.sqlite");
+        await imports.getByRole("button",{name:"Importar y validar copia"}).click();
+        await imports.getByRole("status").filter({hasText:"fixture-persisted-import-job"}).waitFor();
         await page.getByRole("heading", { name: "Generar backup manual" }).waitFor();
         await page.getByRole("button", { name: "Seleccionar OnlyFood SaaS para backup" }).click();
         const appCard = page.getByRole("button", { name: "Seleccionar OnlyFood SaaS para backup" });

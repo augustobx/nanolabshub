@@ -13,7 +13,7 @@ export async function requireMutatingPrincipal(req: Request): Promise<Principal>
   if (!p || !authorizeRequest(p, pathname, req.method)) throw new Error("Sesión o permisos requeridos");
   if (!pathname.startsWith("/api/auth/") && p.authenticatedAt + 10 * 60000 <= Date.now()) throw new Error("Volvé a verificar tu identidad desde Mi cuenta");
   if (/^\/api\/saas-management\//.test(pathname)) authorizeResource(p, pathname.split("/").at(-1)!);
-  else if (["/api/apps/restart", "/api/apps/lifecycle", "/api/apps/deploy", "/api/apps/deploy/stream", "/api/backups", "/api/backups/schedule", "/api/backups/restore-check"].includes(pathname)) {
+  else if (["/api/apps/restart", "/api/apps/lifecycle", "/api/apps/deploy", "/api/apps/deploy/stream", "/api/backups", "/api/backups/schedule", "/api/backups/restore-check", "/api/backups/import"].includes(pathname)) {
     const body = JSON.parse(await limitedText(req.clone()));
     const slug = pathname === "/api/apps/restart" ? appForContainer(body.containerName) : pathname === "/api/backups/restore-check" ? getDatabase().getBackupSlug(body.backupId) : body.slug;
     if (typeof slug !== "string") throw Error("Aplicación o respaldo no registrado");
