@@ -2,6 +2,7 @@ import { createRequire } from "node:module";
 import assert from "node:assert/strict";
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_PACKAGE || "playwright");
 import { mkdir } from "node:fs/promises";
+import { fixtureTOTP, rememberRecovery, nextRecovery } from "./ui-auth.mjs";
 
 const origin = process.env.UI_BASE_URL || "http://127.0.0.1:3005";
 assert.ok(["127.0.0.1","localhost"].includes(new URL(origin).hostname),"Fixtures cannot run against a public deployment");
@@ -102,6 +103,7 @@ const responses = {
     legacy:{dbCredentialsRotation:"not_verified",superadminMigration:"incomplete"}
   } },
   "/api/backups/restore-check": { success: true, data: [] },
+  "/api/jobs": { success: true, data: [] },
   "/api/alerts": { success: true, data: { alerts: [] } },
 };
 
@@ -121,6 +123,10 @@ try {
     await page.route("**/api/**", (route) => {
       const url = new URL(route.request().url());
       if (url.pathname.startsWith("/api/auth/")) return route.continue();
+      if(url.pathname==="/api/backups"&&route.request().method()==="POST"){
+        const body=route.request().postDataJSON();assert.match(body.requestId,/^[a-f0-9-]{36}$/);
+        return route.fulfill({status:202,contentType:"application/json",body:JSON.stringify({success:true,data:{jobId:"fixture-persisted-job",state:"pending"}})});
+      }
       if (url.pathname === "/api/backups/schedule" && route.request().method() === "POST") {
         const input = route.request().postDataJSON();
         const schedule = responses["/api/backups"].schedules.find((item) => item.slug === input.slug);
@@ -148,9 +154,23 @@ try {
 
     await page.goto(`${origin}/login`, { waitUntil: "domcontentloaded" });
     await page.screenshot({ path: `ui-screenshots/${device.name}-login.png`, fullPage: true });
-    await page.locator('input[type="text"]').fill("ci_smoke");
-    await page.locator('input[type="password"]').fill("ci_smoke_password");
+    await page.locator('input[type="text"]').fill(process.env.UI_ADMIN_USER || "ci_smoke");
+    await page.locator('input[type="password"]').fill(process.env.UI_ADMIN_PASS || "ci_smoke_password");
     await page.locator('button[type="submit"]').click();
+    await page.waitForFunction(()=>location.pathname==="/account"||document.querySelector('input[name="code"]'));
+    if (new URL(page.url()).pathname === "/account") {
+      await page.getByRole("button", {name:"Comenzar configuración MFA"}).click();
+      await page.locator("code").first().waitFor();
+      const secret=await page.locator("code").first().innerText();
+      await page.locator('input[name="code"]').fill(fixtureTOTP(secret));
+      await page.getByRole("button",{name:"Confirmar segundo factor"}).click();
+      await page.getByRole("heading",{name:"Guardá tus códigos de recuperación"}).waitFor();
+      await rememberRecovery(origin,await page.locator("code").allTextContents());
+      await page.getByRole("button",{name:"Ya guardé mis códigos"}).click();
+    } else {
+      await page.locator('input[name="code"]').fill(await nextRecovery(origin));
+      await page.locator('button[type="submit"]').click();
+    }
     await page.waitForURL((url) => url.pathname === "/", { timeout: 15000 });
     await page.getByRole("heading", { name: "Toda tu operación, en orden." }).waitFor();
     await page.getByRole("heading", { name: "Productos SaaS" }).waitFor();
@@ -317,6 +337,12 @@ try {
       await page.screenshot({ path: "ui-screenshots/mobile-navigation.png", fullPage: false });
     }
     if (errors.length) throw new Error(`${device.name} browser errors: ${errors.join("; ")}`);
+    const oldCookie=(await context.cookies()).find(c=>c.name==="nanolabs_hub_session");
+    assert.ok(oldCookie);
+    const logout=await context.request.post(origin+"/api/auth/logout",{headers:{Origin:origin,Cookie:"nanolabs_hub_session="+oldCookie.value}});
+    assert.equal(logout.status(),200);
+    const revoked=await context.request.get(origin+"/api/operations",{headers:{Cookie:"nanolabs_hub_session="+oldCookie.value}});
+    assert.equal(revoked.status(),401,"Copied cookie must fail after logout");
     await context.close();
     console.log(`UI smoke OK: ${device.name}`);
   }

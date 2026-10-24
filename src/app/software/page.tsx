@@ -1,26 +1,23 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { AppLifecycleControls } from "@/components/AppLifecycleControls";
 import { Header } from "@/components/Header";
 import { TerminalModal } from "@/components/TerminalModal";
-import { AppLifecycleControls } from "@/components/AppLifecycleControls";
-import {
-  Boxes,
-  GitBranch,
-  Terminal,
-  Play,
-  RotateCw,
-  ExternalLink,
-  Search,
-  Filter,
-  CheckCircle2,
-  AlertTriangle,
-  FolderGit2,
-  Calendar,
-  User,
-} from "lucide-react";
+import { portfolioSegment,type PortfolioSegment } from "@/lib/product-taxonomy";
 import { AppInfo } from "@/lib/types";
-import { portfolioSegment, type PortfolioSegment } from "@/lib/product-taxonomy";
+import {
+AlertTriangle,
+Calendar,
+CheckCircle2,
+ExternalLink,
+FolderGit2,
+Play,
+RotateCw,
+Search,
+Terminal,
+User
+} from "lucide-react";
+import { useEffect,useRef,useState } from "react";
 
 export default function SoftwarePage() {
   const [apps, setApps] = useState<AppInfo[]>([]);

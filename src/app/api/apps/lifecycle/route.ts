@@ -1,4 +1,5 @@
 import { getSessionUser } from "@/lib/auth";
+import { requireMutatingSession } from "@/lib/action-security";
 import { changeLifecycle, getLifecycleHistory, type LifecycleAction } from "@/lib/app-lifecycle";
 
 export const dynamic = "force-dynamic";
@@ -42,8 +43,8 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const user = await getSessionUser();
-  if (!user) return Response.json({ success: false, error: "Sesión requerida" }, { status: 401, headers: noCache });
+  let user: string;
+  try { user = await requireMutatingSession(req); } catch { return Response.json({success:false,error:"Sesión, permisos o verificación reciente requeridos"},{status:403,headers:noCache}); }
   if (!sameOrigin(req) || !req.headers.get("content-type")?.startsWith("application/json")) {
     return Response.json({ success: false, error: "Origen o formato de solicitud no permitido" }, { status: 403, headers: noCache });
   }

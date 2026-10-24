@@ -2,6 +2,7 @@ import { getSessionUser } from "@/lib/auth";
 import { requireMutatingSession } from "@/lib/action-security";
 import { backupEngine, assertBackupSecurity } from "@/lib/backup-service";
 import { KNOWN_APPS } from "@/lib/apps-registry";
+import { backupRunner } from "@/lib/job-service";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -29,8 +30,8 @@ export async function POST(req: Request) {
     if(typeof body.slug!=="string"||!KNOWN_APPS.some(a=>a.slug===body.slug)) {
       return Response.json({success:false,error:"App no registrada"},{status:400,headers});
     }
-    const result=await backupEngine.createBackup(KNOWN_APPS,body.slug,"manual",actor);
-    return Response.json({success:true,data:result},{headers});
+    const result=backupRunner.enqueue(KNOWN_APPS,body.slug,body.requestId,actor);
+    return Response.json({success:true,data:{jobId:result.id,state:result.state}},{status:202,headers});
   } catch (error) {
     const msg=error instanceof Error?error.message:"Falló el respaldo";
     console.error("[backup] Falló una operación de respaldo",msg);

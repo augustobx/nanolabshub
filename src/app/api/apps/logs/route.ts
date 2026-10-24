@@ -1,6 +1,7 @@
 import { getSessionUser } from "@/lib/auth";
 import { getContainerLogs } from "@/lib/server-api";
 import { validateContainer } from "@/lib/operational-policy";
+import { requireResourceRead } from "@/lib/action-security";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,7 @@ export async function GET(req: Request) {
     }
 
     try { validateContainer(container, lines); } catch { return Response.json({ success:false,error:"Contenedor o límite inválido" },{status:400}); }
+    try { await requireResourceRead(req); } catch { return Response.json({success:false,error:"No tenés permiso sobre este contenedor"},{status:403}); }
     const logs = await getContainerLogs(container, lines);
 
     return Response.json({

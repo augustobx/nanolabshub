@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
 import { mkdir } from "node:fs/promises";
 import assert from "node:assert/strict";
+import { signInFixture } from "./ui-auth.mjs";
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_PACKAGE || "playwright");
 const origin = process.env.UI_BASE_URL || "http://127.0.0.1:3005";
@@ -12,8 +13,7 @@ let assertions = 0;
 const now = "2026-10-23T00:00:00.000Z", end = "2027-10-23T00:00:00.000Z";
 for (const device of [{ name: "desktop", viewport: { width: 1440, height: 1000 } }, { name: "mobile", viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }]) {
   const context = await browser.newContext(device);
-  const login = await context.request.post(origin + "/api/auth/login", { data: { username: process.env.UI_ADMIN_USER || "ci_smoke", password: process.env.UI_ADMIN_PASS || "ci_smoke_password" } });
-  assert.equal(login.status(), 200);
+  await signInFixture(context,origin);
   const page = await context.newPage(), errors = [], commands = [], receipts = new Map();
   const capture = async name => {
     await page.waitForFunction(() => !document.querySelector("fieldset")?.disabled);

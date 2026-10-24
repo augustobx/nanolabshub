@@ -5,6 +5,21 @@ const os=require("node:os");
 const path=require("node:path");
 const crypto=require("node:crypto");
 const {gzipSync}=require("node:zlib");
+const {gunzipSync}=require("node:zlib"),{DatabaseSync}=require("node:sqlite");
+
+test("native SQLite snapshot preserves rows and source bytes, including Node without sqlite.backup",async()=>{
+ const temp=await fs.mkdtemp(path.join(os.tmpdir(),"hub-snapshot-test-"));
+ const oldDir=process.env.DATA_DIR;process.env.DATA_DIR=temp;
+ try{
+  const source=path.join(temp,"source.sqlite"),copy=path.join(temp,"copy.sqlite"),gz=path.join(temp,"snapshot.sqlite.gz");
+  const db=new DatabaseSync(source);db.exec("CREATE TABLE fixture(id INTEGER PRIMARY KEY,value TEXT); INSERT INTO fixture(value) VALUES('saved'),('second'),('third')");db.close();
+  const before=await fs.readFile(source);
+  await require("./backup-engine.cjs").snapshotSQLite({sqlitePath:source},gz);
+  await fs.writeFile(copy,gunzipSync(await fs.readFile(gz)));
+  const restored=new DatabaseSync(copy,{readOnly:true});try{assert.equal(restored.prepare("SELECT COUNT(*) AS n FROM fixture").get().n,3);assert.equal(restored.prepare("PRAGMA integrity_check").get().integrity_check,"ok");}finally{restored.close();}
+  assert.deepEqual(await fs.readFile(source),before);
+ }finally{if(oldDir===undefined)delete process.env.DATA_DIR;else process.env.DATA_DIR=oldDir;delete require.cache[require.resolve("./backup-engine.cjs")];await fs.rm(temp,{recursive:true,force:true});}
+});
 
 test("backup integrity and safe schedules without touching any production DB",async()=>{
  const temp=await fs.mkdtemp(path.join(os.tmpdir(),"nano-backup-test-"));

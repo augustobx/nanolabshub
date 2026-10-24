@@ -8,26 +8,21 @@ function modules(env={},stubs={}) {
   file=path.resolve(file);if(Object.hasOwn(stubs,file))return stubs[file];if(cache.has(file))return cache.get(file).exports;
   const module={exports:{}};cache.set(file,module);
   const output=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText;
-  const ctx={module,exports:module.exports,process:{env},Buffer,TextEncoder,TextDecoder,atob,btoa,crypto:webcrypto,URL,URLSearchParams,Request,Response,ReadableStream,AbortSignal,console,setTimeout,clearTimeout,
-   require(name){if(Object.hasOwn(stubs,name))return stubs[name];if(name==='next/headers')return {cookies:async()=>({get:()=>undefined})};if(name==='next/server')return {NextResponse:{next:()=>new Response('next'),json:Response.json,redirect:url=>new Response(null,{status:307,headers:{location:String(url)}})}};if(name.startsWith('@/'))return load(path.join(root,name.slice(2)+'.ts'));if(name.startsWith('.'))return load(path.resolve(path.dirname(file),name+'.ts'));return require(name);}};
+  const ctx={module,exports:module.exports,process:{env,cwd:()=>path.resolve(root,"..")},Buffer,TextEncoder,TextDecoder,atob,btoa,crypto:webcrypto,URL,URLSearchParams,Request,Response,ReadableStream,AbortSignal,console,setTimeout,clearTimeout,
+   require(name){if(Object.hasOwn(stubs,name))return stubs[name];if(name==='next/headers')return {cookies:async()=>({get:()=>undefined})};if(name==='next/server')return {NextResponse:{next:()=>new Response('next'),json:Response.json,redirect:url=>new Response(null,{status:307,headers:{location:String(url)}})}};if(name.startsWith('@/'))return load(path.join(root,name.slice(2)+'.ts'));if(name.startsWith('.')){const target=path.resolve(path.dirname(file),name);return name.endsWith('.cjs')?require(target):load(target+'.ts');}return require(name);}};
   vm.runInNewContext(output,ctx,{filename:file});return module.exports;
  }
  return file=>load(path.join(root,file));
 }
 function sign(payload){return Buffer.from(payload).toString('base64url')+'.'+createHmac('sha256',configured.HUB_MASTER_KEY+'\n'+configured.ADMIN_PASS).update(payload).digest('hex');}
 function request(url,cookie,method='GET'){return {url,nextUrl:new URL(url),method,cookies:{get:()=>cookie?{value:cookie}:undefined}};}
-test('Node and Edge agree: signed identity and finite expiry are mandatory',async()=>{
- const load=modules(configured),auth=load('lib/auth.ts'),edge=load('lib/session-policy.ts');
- const good=auth.createSessionToken(configured.ADMIN_USER);assert.equal(auth.verifySessionToken(good).valid,true);assert.equal(await edge.verifyEdgeSession(good),true);
- for(const token of [undefined,'bad.token',good.slice(0,-1)+'x',sign('fixture_admin:NaN'),sign('fixture_admin:'+(Date.now()-1000)),sign('other_user:'+(Date.now()+100000)),sign('fixture_admin:'+(Date.now()+30*86400000))]){
-  assert.equal(auth.verifySessionToken(token).valid,false);assert.equal(await edge.verifyEdgeSession(token),false);
- }
- assert.equal(auth.validateCredentials(configured.ADMIN_USER,configured.ADMIN_PASS),true);
- assert.equal(auth.validateCredentials(configured.ADMIN_USER,' '+configured.ADMIN_PASS),false);
- assert.equal(auth.validateCredentials({},null),false);
+test('legacy signatures and malformed cookies no longer authenticate',()=>{
+ const auth=modules(configured)('lib/auth.ts');
+ for(const token of [undefined,'bad.token',sign('fixture_admin:NaN'),sign('fixture_admin:'+(Date.now()+100000))])assert.equal(auth.verifySessionToken(token).valid,false);
 });
 test('middleware rejects forged cookies and dot-path bypasses, permits only the exact scheduler POST',async()=>{
- const load=modules(configured),{middleware}=load('middleware.ts');const cookie=sign('fixture_admin:'+(Date.now()+60000));
+ const principal={username:'fixture_admin',role:'owner',scopes:[],mfaReady:true};
+ const load=modules(configured,{[path.join(root,'lib/auth.ts')]:{SESSION_COOKIE_NAME:'nanolabs_hub_session',verifySessionToken:token=>({valid:token==='fixture-token',principal:token==='fixture-token'?principal:null})}}),{middleware}=load('middleware.ts');const cookie='fixture-token';
  for(const url of ['/api/apps','/api/telemetry/history?limit=1','/api/apps/logs/file.log','/api/health.extra','/api/backups/schedule/run/extra']){
   assert.equal((await middleware(request('http://localhost'+url,'forged.signature'))).status,401);
   assert.equal((await middleware(request('http://localhost'+url,cookie))).status,200);
@@ -88,11 +83,16 @@ test('scheduler endpoint still requires its distinct key after middleware bypass
  assert.equal((await POST(new Request('http://fixture',{method:'POST'}))).status,403);assert.equal(calls,0);
  assert.equal((await POST(new Request('http://fixture',{method:'POST',headers:{authorization:'Bearer '+'s'.repeat(64)}}))).status,200);assert.equal(calls,1);
 });
-test('password changes invalidate existing signed sessions in both runtimes',async()=>{
- const token=modules(configured)('lib/auth.ts').createSessionToken(configured.ADMIN_USER);
- const changed=modules({...configured,ADMIN_PASS:configured.ADMIN_PASS+'changed'});
- assert.equal(changed('lib/auth.ts').verifySessionToken(token).valid,false);
- assert.equal(await changed('lib/session-policy.ts').verifyEdgeSession(token),false);
+test('authorization denies viewer writes, protected products and unassigned operator apps',()=>{
+ const {authorizeRequest,authorizeResource}=modules(configured)('lib/authorization-policy.ts');
+ const viewer={role:'viewer',scopes:[],mfaReady:true},operator={role:'operator',scopes:['onlyfood'],mfaReady:true},owner={role:'owner',scopes:[],mfaReady:true};
+ for(const p of ['/api/backups','/api/saas-management/onlyfood','/api/apps/lifecycle'])assert.equal(authorizeRequest(viewer,p,'POST'),false);
+ assert.equal(authorizeRequest(viewer,'/api/apps/logs','GET'),false);assert.equal(authorizeRequest(operator,'/api/auth/users','POST'),false);
+ assert.equal(authorizeRequest(operator,'/api/unknown-new-mutation','POST'),false);
+ assert.equal(authorizeRequest({...owner,mfaReady:false},'/api/apps','GET'),false);
+ assert.doesNotThrow(()=>authorizeResource(operator,'onlyfood'));assert.throws(()=>authorizeResource(operator,'onlygym'),/permiso/);
+ for(const slug of ['onlypadel','onlycars','onlyerp'])assert.throws(()=>authorizeResource(owner,slug),/protegido/);
+ assert.throws(()=>authorizeResource(viewer,'onlyfood'),/consulta/);
 });
 test('protected backup schedules are blocked even when a legacy row enables them',async()=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'hub-backup-policy-'));const module={exports:{}};

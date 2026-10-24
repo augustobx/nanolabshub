@@ -43,7 +43,8 @@ export function SaaSManagementPanel({ product, initialTenantId, initialSection =
     setCatalog(c); setPlans(allPlans); setTenants(overview.tenants.filter(t => t.saas === product).map(t => ({ id: t.id, name: t.name })));
     setTenant(detail);
   }, [fetchData, tenantId, product]);
-  useEffect(() => { let active = true; setBusy(true); setError(""); setTenant(null); reload().catch(e => { if (active) { setCatalog(null); setError(e.message); } }).finally(() => { if (active) setBusy(false); }); return () => { active = false; loadGeneration.current++; }; }, [reload]);
+  const invalidateLoad = useCallback(() => { loadGeneration.current++; }, []);
+  useEffect(() => { let active = true; setBusy(true); setError(""); setTenant(null); reload().catch(e => { if (active) { setCatalog(null); setError(e.message); } }).finally(() => { if (active) setBusy(false); }); return () => { active = false; invalidateLoad(); }; }, [reload, invalidateLoad]);
   useEffect(() => { if (!busy && !pending) return; const listener = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; }; window.addEventListener("beforeunload", listener); return () => window.removeEventListener("beforeunload", listener); }, [busy, pending]);
   const audit = useCallback(async (offset = 0) => { setBusy(true); setError(""); try { const page = await fetchData<{ items: ManagementAudit[]; nextOffset: number | null }>("audit", { ...(tenantId ? { tenantId } : {}), offset: String(offset) }); setEvents(old => offset ? [...old, ...page.items] : page.items); setNextAudit(page.nextOffset); } catch (e) { setError(e instanceof Error ? e.message : "No se pudo consultar la auditoría."); } finally { setBusy(false); } }, [fetchData, tenantId]);
   const catalogLoaded = !!catalog;

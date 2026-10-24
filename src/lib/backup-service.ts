@@ -10,7 +10,6 @@ export function assertBackupSecurity() {
 }
 
 // Node-only engine shared with the scheduled worker. No shell interpolation of user inputs.
-// eslint-disable-next-line @typescript-eslint/no-var-requires
 export const backupEngine = require("../../scripts/backup-engine.cjs") as {
   createBackup(apps: typeof KNOWN_APPS, slug: string, trigger?: string, actor?: string): Promise<{id:string;filename:string;sizeBytes:number;checksum:string}>;
   list(apps: typeof KNOWN_APPS): Array<Record<string,unknown>>;

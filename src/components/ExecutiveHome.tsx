@@ -1,15 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { Header } from "./Header";
 import type { OperationsSnapshot } from "@/lib/operations";
-import type { GovernanceOverview, BackupRecord, AppInfo } from "@/lib/types";
-import { SAAS_PRODUCTS, portfolioSegment } from "@/lib/product-taxonomy";
+import { SAAS_PRODUCTS,portfolioSegment } from "@/lib/product-taxonomy";
+import type { AppInfo,BackupRecord,GovernanceOverview } from "@/lib/types";
 import {
-  ArrowUpRight, ShieldCheck, DatabaseBackup, LayoutGrid, Building2,
-  Activity, AlertTriangle, ServerCog, ChevronRight, RefreshCw, GitBranch
+Activity,AlertTriangle,
+ArrowUpRight,
+Building2,
+ChevronRight,
+DatabaseBackup,LayoutGrid,
+RefreshCw,
+ServerCog,
+ShieldCheck
 } from "lucide-react";
+import Link from "next/link";
+import { useCallback,useEffect,useMemo,useState } from "react";
+import { Header } from "./Header";
 
 function OperationalState({ app }: { app?: AppInfo }) {
   if (!app) return <span className="hub-state hub-state-neutral">Sin datos</span>;

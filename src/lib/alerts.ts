@@ -108,7 +108,7 @@ export async function evaluateSystemAlerts(): Promise<SystemAlert[]> {
           disk_used_percent: telemetry.disks[0]?.usedPercent || 0,
           containers_running: telemetry.docker.containersRunning,
         });
-      } catch {}
+      } catch { alerts.push({ id: "metrics-write-failed", level: "warning", title: "Historial no actualizado", message: "No se pudo guardar la muestra de telemetría.", source: "persistence", timestamp: now }); }
     }
   } catch (err: any) {
     alerts.push({

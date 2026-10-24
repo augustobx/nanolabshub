@@ -1,11 +1,11 @@
 "use client";
-import { useEffect, useState } from "react";
-import Link from "next/link";
 import { Header } from "@/components/Header";
-import { SAAS_PRODUCTS } from "@/lib/product-taxonomy";
 import type { OperationsSnapshot } from "@/lib/operations";
+import { SAAS_PRODUCTS } from "@/lib/product-taxonomy";
 import type { GovernanceOverview } from "@/lib/types";
-import { Layers3, ArrowRight, Search, Users, Box, AlertTriangle, ChevronRight } from "lucide-react";
+import { AlertTriangle,ArrowRight,ChevronRight,Search,Users } from "lucide-react";
+import Link from "next/link";
+import { useEffect,useState } from "react";
 
 export default function SaaSCatalogPage() {
   const [operations, setOperations] = useState<OperationsSnapshot | null>(null);
@@ -49,7 +49,7 @@ export default function SaaSCatalogPage() {
           <label className="relative block w-full sm:w-60"><span className="sr-only">Buscar SaaS</span><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/><input type="search" placeholder="Buscar SaaS" value={query} onChange={e => setQuery(e.target.value)} className="hub-field w-full pl-10"/></label>
         </div>
         <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3 sm:p-5">
-          {products.map((p,index) => {
+          {products.map((p) => {
             const app = operations?.apps.find(a => a.slug === p.slug);
             const source = governance?.sources?.find(item => item.saas === p.slug);
             const count = source?.status === "available" ? source.count : null;

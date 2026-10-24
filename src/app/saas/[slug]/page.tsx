@@ -1,14 +1,14 @@
 "use client";
 
-import { useParams } from "next/navigation";
-import Link from "next/link";
-import { useEffect, useState } from "react";
 import { Header } from "@/components/Header";
-import { SAAS_PRODUCTS } from "@/lib/product-taxonomy";
-import { productCapabilities } from "@/lib/product-capabilities";
-import type { GovernanceOverview, BackupRecord } from "@/lib/types";
 import type { OperationsSnapshot } from "@/lib/operations";
-import { ArrowLeft, ArrowUpRight, DatabaseBackup, ExternalLink, ServerCog, ShieldCheck, Users, Settings2, Activity, LayoutGrid, AlertCircle } from "lucide-react";
+import { productCapabilities } from "@/lib/product-capabilities";
+import { SAAS_PRODUCTS } from "@/lib/product-taxonomy";
+import type { BackupRecord,GovernanceOverview } from "@/lib/types";
+import { Activity,AlertCircle,ArrowLeft,ArrowUpRight,DatabaseBackup,ServerCog,Settings2,Users } from "lucide-react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useEffect,useState } from "react";
 
 const TABS = [
   { id:"overview",label:"Resumen" }, { id:"tenants",label:"Tenants" },
