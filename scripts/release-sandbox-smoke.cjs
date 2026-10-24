@@ -10,7 +10,7 @@ async function main(){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),"hub-release-qa-"));fs.writeFileSync(path.join(root,".owned-release-fixture"),"release-smoke");
   const code=path.resolve(__dirname,".."),name="hub-release-qa-runner-"+crypto.randomBytes(5).toString("hex");
   try{
-   execFileSync("docker",["run","--rm","--name",name,"--label","nanohub.qa=release","--network","none","--read-only","--cap-drop","ALL","--cap-add","DAC_OVERRIDE","--cap-add","CHOWN","--security-opt","no-new-privileges","--tmpfs","/tmp:rw,nosuid,nodev,size=256m","--tmpfs","/opt/backups:rw,nosuid,nodev,size=128m","-v","/var/run/docker.sock:/var/run/docker.sock","-v",code+":/qa:ro","-v",root+":"+root,"-e","HUB_RELEASE_FIXTURE_INNER=true","-e","HUB_RELEASE_FIXTURE_ROOT="+root,"-e","HUB_RELEASE_FIXTURE_IMAGE="+image,"--entrypoint","node",image,"/qa/scripts/release-sandbox-smoke.cjs"],{stdio:"inherit",timeout:300000});
+   execFileSync("docker",["run","--rm","--name",name,"--label","nanohub.qa=release","--network","none","--read-only","--cap-drop","ALL","--cap-add","DAC_OVERRIDE","--cap-add","CHOWN","--security-opt","no-new-privileges","--tmpfs","/tmp:rw,nosuid,nodev,size=256m","--tmpfs","/opt/backups:rw,nosuid,nodev,size=2g","-v","/var/run/docker.sock:/var/run/docker.sock","-v",code+":/qa:ro","-v",root+":"+root,"-e","HUB_RELEASE_FIXTURE_INNER=true","-e","HUB_RELEASE_FIXTURE_ROOT="+root,"-e","HUB_RELEASE_FIXTURE_IMAGE="+image,"--entrypoint","node",image,"/qa/scripts/release-sandbox-smoke.cjs"],{stdio:"inherit",timeout:300000});
   }finally{
    const names=execFileSync("docker",["ps","-aq","--filter","name=^/"+name+"$"],{encoding:"utf8"}).trim();if(names)execFileSync("docker",["rm","-f",names],{stdio:"ignore"});
    if(root.startsWith(os.tmpdir()+path.sep)&&fs.readFileSync(path.join(root,".owned-release-fixture"),"utf8")==="release-smoke")fs.rmSync(root,{recursive:true,force:true});
@@ -44,6 +44,11 @@ async function main(){
   // Remove only the two unique containers created above, and our own tagged fixture images.
   for(const name of [prefix,neighbor]){try{const c=JSON.parse(await docker(["inspect",name]))[0];if(c.Name==="/"+name&&(name===prefix?c.Config.Labels?.["com.docker.compose.project"]===prefix:c.Config.Labels?.["nanohub.qa"]==="release"))await docker(["rm","-f",c.Id]);}catch{/* Creation may have failed. */}}
   for(const tag of images)try{await docker(["image","rm",tag]);}catch{/* No force and no shared image deletion. */}
+  // Files were created by container root. Return only this owned fixture tree
+  // to the invoking host user so cleanup also works on an unprivileged CI runner.
+  const owner=fs.statSync(root);
+  function returnOwnership(dir){for(const e of fs.readdirSync(dir,{withFileTypes:true})){const file=path.join(dir,e.name);if(e.isSymbolicLink())continue;if(e.isDirectory())returnOwnership(file);fs.chownSync(file,owner.uid,owner.gid);}fs.chownSync(dir,owner.uid,owner.gid);}
+  returnOwnership(root);
  }
 }
 main().catch(e=>{console.error(e.message);process.exitCode=1;});
