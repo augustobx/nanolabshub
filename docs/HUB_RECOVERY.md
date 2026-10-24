@@ -74,6 +74,7 @@ sintéticas, hace dumps nativos y restaura en otros sandboxes. Comprueba 2 tabla
 5 filas, relaciones y rechazo de SQL inválido y de claves foráneas huérfanas.
 Nunca inspecciona ni inicia un contenedor productivo. El CI ejecuta esta prueba.
 
-Pendientes del plan general: importación verificada de archivos externos, réplica
+La importación verificada está descrita en `HUB_BACKUP_IMPORT.md`.
+Pendientes del plan general: réplica
 cifrada y recuperación desde un destino independiente aún no disponible, agendas
 y evidencia por recurso, despliegue desde Hub, retención y aceptación final.

@@ -23,6 +23,10 @@ const requestId=randomUUID(),queued=await call("/api/backups",{method:"POST",tok
 const repeated=await call("/api/backups",{method:"POST",token,body:{slug:"onlyfood",requestId},status:202});assert.equal(queued.data.jobId,repeated.data.jobId);
 assert.equal((await call("/api/jobs",{token})).data.length,1);
 await call("/api/backups",{token}); // Initialize and exercise the actual registry/schema migration.
+await call("/api/backups/import",{token});
+await call("/api/backups/import",{method:"POST",token,origin:"https://untrusted.example.invalid",body:{slug:"onlyfood",filename:"fixture.sql.gz",requestId:randomUUID()},status:403});
+await call("/api/backups/import",{method:"POST",token,body:{slug:"onlyfood",filename:"../hub.sqlite",requestId:randomUUID()},status:422});
+await call("/api/backups/import",{method:"POST",token,body:{slug:"onlypadel",filename:"fixture.sql.gz",requestId:randomUUID()},status:403});
 // Seed only the explicitly selected ephemeral Hub DB. No archive is produced or executed.
 const dataDir=fs.realpathSync(process.env.UI_DATA_DIR||"");
 assert.ok([os.tmpdir(),process.env.RUNNER_TEMP].filter(Boolean).some(root=>{const rel=path.relative(fs.realpathSync(root),dataDir);return rel&&!rel.startsWith("..")&&!path.isAbsolute(rel);}),"Fixture data must be inside the OS/CI temporary directory");
@@ -47,6 +51,9 @@ for(const role of ["viewer","operator"]){
   await call("/api/auth/account",{token:login.cookie,status:401});
   const active=enrolled.cookie;assert.ok(active);
   await call("/api/jobs",{token:active});
+  const inventory=await call("/api/backups/import",{token:active,status:role==="viewer"?403:200});
+  if(role==="operator")assert.deepEqual(inventory.data.map(s=>s.slug),["onlyfood"]);
+  await call("/api/backups/import",{method:"POST",token:active,body:{slug:"onlygym",filename:"fixture.sql.gz",requestId:randomUUID()},status:403});
   await call("/api/jobs",{method:"POST",token:active,body:{id:queued.data.jobId,operation:"cancel"},status:role==="viewer"?403:200});
   await call("/api/jobs",{method:"POST",token:active,body:{id:restore.data.jobId,operation:"cancel"},status:role==="viewer"?403:200});
   await call("/api/backups/restore-check",{method:"POST",token:active,body:{backupId:restoreIds.onlygym,requestId:randomUUID()},status:403});

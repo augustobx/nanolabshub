@@ -33,7 +33,7 @@ async function checkIsolated(apps,id,actor,metadata={}){
   let folder="",slug="",checksum=null,lock=null,lockPath="",retainLock=false;
   try{
     const registry=backup.db();let archive;
-    try{archive=registry.prepare("SELECT slug,db_type,checksum FROM backup_jobs WHERE id=? AND status='integrity_ok'").get(id);}finally{registry.close();}
+    try{archive=registry.prepare("SELECT slug,db_type,checksum FROM backup_jobs WHERE id=? AND (status='integrity_ok' OR (?=1 AND status='import_testing'))").get(id,metadata.importValidation===true?1:0);}finally{registry.close();}
     if(!archive||!["nanolabshub","onlyfood","onlygym","onlyturn"].includes(archive.slug))throw Error("Respaldo fuera del alcance autorizado");
     slug=archive.slug;checksum=archive.checksum;
     const app=apps.find(a=>a.slug===slug&&a.dbType===archive.db_type);
@@ -44,12 +44,12 @@ async function checkIsolated(apps,id,actor,metadata={}){
     lockPath=path.join(root,"isolated-restore.lock");
     try{lock=await fsp.open(lockPath,"wx",0o600);}catch{throw Error("Restauración en curso o lock pendiente de revisión; no se inicia otro sandbox");}
     await lock.writeFile(JSON.stringify({pid:process.pid,host:require("node:os").hostname(),jobId:metadata.jobId||null,backupId:id,createdAt:new Date().toISOString()}));
-    const b=await backup.download(apps,id); // Rechecks checksum and gzip integrity.
+    const b=await backup.download(apps,id,{importValidation:metadata.importValidation===true,maxExpandedBytes:LIMIT}); // Internal staging is never downloadable through HTTP.
     if(b.size>LIMIT)throw Error("El archivo supera el límite de 512 MB");
     if(app.dbType!=="sqlite"){
-      const manifest=await sandbox.restore(app,b.file);
+      const manifest=await sandbox.restore(app,b.file,{format:b.name.endsWith(".dump.gz")?"postgres-custom":"sql"});
       if((await backup.verify(b.file)).sha!==checksum)throw Error("El archivo cambió durante la restauración");
-      return record(id,slug,actor,"passed",`${app.dbType}: restauración aislada, ${manifest.tables} tablas y ${manifest.rows} filas. Conteos de la copia restaurada; no comparados con producción. La aplicación no se inició.`,checksum,manifest,metadata.jobId);
+      return record(id,slug,actor,"passed",`${app.dbType}: restauración aislada, ${manifest.tables} tablas y ${manifest.rows} filas. Conteos de la copia restaurada; no comparados con producción. ${manifest.format==="postgres-custom"?"Dump de una base: propietarios y privilegios omitidos en el sandbox. ":""}La aplicación no se inició.`,checksum,manifest,metadata.jobId);
     }
     if(!b.name.endsWith(".sqlite.gz"))throw Error("Extensión SQLite incorrecta");
     await fsp.mkdir(root,{recursive:true,mode:0o700});

@@ -12,7 +12,7 @@ export function authorizeRequest(principal: Principal, pathname: string, method:
     return true;
   }
   if (principal.role === "viewer") return false;
-  const operatorRoutes = ["/api/apps/restart", "/api/apps/lifecycle", "/api/backups", "/api/backups/schedule", "/api/backups/restore-check", "/api/jobs"];
+  const operatorRoutes = ["/api/apps/restart", "/api/apps/lifecycle", "/api/backups", "/api/backups/schedule", "/api/backups/restore-check", "/api/backups/import", "/api/jobs"];
   return principal.role === "owner" || operatorRoutes.includes(pathname) || /^\/api\/saas-management\/(onlyfood|onlygym|onlyturn)$/.test(pathname);
 }
 export function authorizeResource(principal: Principal, slug: string, mutate = true): void {
