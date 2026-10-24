@@ -70,8 +70,7 @@ export function Header({ onRefresh, isRefreshing = false }: HeaderProps) {
     try {
       const res = await fetch("/api/auth/logout", { method: "POST" });
       if (!res.ok) throw new Error("No se pudo cerrar la sesión");
-      router.push("/login");
-      router.refresh();
+      window.location.replace("/login");
     } catch {
       window.alert("No se pudo cerrar la sesión. Volvé a intentarlo.");
     }

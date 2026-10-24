@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Command, Lock, User, ShieldAlert, ArrowRight } from "lucide-react";
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const requested = searchParams.get("from") || "/";
   const from = requested.startsWith("/") && !requested.startsWith("//") && !requested.includes("\\") && !Array.from(requested).some(c => c.charCodeAt(0) < 32) ? requested : "/";
@@ -32,8 +31,7 @@ function LoginForm() {
       const data = await res.json();
       if (data.success) {
         if (data.data?.mfaRequired) { setChallenge(data.data.challenge); setPassword(""); return; }
-        router.push(data.data?.enrollmentRequired ? "/account" : from);
-        router.refresh();
+        window.location.assign(data.data?.enrollmentRequired ? "/account" : from);
       } else {
         setError(data.error || "Credenciales incorrectas");
       }

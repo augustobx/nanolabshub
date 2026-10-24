@@ -1,13 +1,11 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Header } from "@/components/Header";
 type Account = {userId:string;username:string;role:string;enrollmentRequired:boolean;mfaReady:boolean;authenticatedAt:number;sessions:Array<{id:string;createdAt:number;lastSeen:number;expiresAt:number;revokedAt:number|null;current:boolean}>};
 type User = {id:string;username:string;role:string;scopes:string[];active:boolean;mfaReady:boolean};
 const inputClass="w-full rounded-lg border border-white/15 bg-[#101a2c] px-3 py-2 text-sm text-white";
 function Input({name,label,type="text",required=true}:{name:string;label:string;type?:string;required?:boolean}) {return <label className="block space-y-1 text-xs text-slate-300"><span>{label}</span><input className={inputClass} name={name} type={type} required={required} autoComplete={type==="password"?"new-password":"off"}/></label>;}
 export default function AccountPage(){
-  const router=useRouter();
   const [account,setAccount]=useState<Account|null>(null),[users,setUsers]=useState<User[]>([]),[setup,setSetup]=useState<{secret:string;uri:string}|null>(null),[codes,setCodes]=useState<string[]>([]),[busy,setBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState("");
   const load=useCallback(async()=>{
     const r=await fetch("/api/auth/account",{cache:"no-store"}),j=await r.json();if(!r.ok||!j.success)throw Error(j.error||"Cuenta no disponible");setAccount(j.data);
@@ -21,7 +19,7 @@ export default function AccountPage(){
       const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(operation==="user.save"?fields:{operation,...fields})}),j=await r.json();if(!r.ok||!j.success)throw Error(j.error||"No se pudo completar la operación");
       if(operation==="mfa.begin")setSetup(j.data);
       if(operation==="mfa.confirm"){setSetup(null);setCodes(j.data.recoveryCodes);}
-      if(j.data?.signInRequired||(operation==="user.save"&&fields.id===account?.userId)||(operation==="session.revoke"&&(fields.all||fields.sessionId===account?.sessions.find(s=>s.current)?.id))){router.push("/login");router.refresh();return;}
+      if(j.data?.signInRequired||(operation==="user.save"&&fields.id===account?.userId)||(operation==="session.revoke"&&(fields.all||fields.sessionId===account?.sessions.find(s=>s.current)?.id))){window.location.replace("/login");return;}
       await load();setMessage("Operación completada.");
     }catch(e){setError(e instanceof Error?e.message:"Error de cuenta");}finally{setBusy(false);}
   };
@@ -34,7 +32,7 @@ export default function AccountPage(){
     {(account?.enrollmentRequired||setup)&&<section className="hub-card space-y-4 p-5"><h2 className="hub-section-heading">Configurar segundo factor</h2><p className="hub-description">Agregá esta cuenta a tu aplicación autenticadora. Al reemplazar un factor, el anterior se conserva hasta confirmar el nuevo. La clave se muestra solo durante la configuración.</p>
       {!setup?<button className="hub-primary-action" onClick={()=>void send("mfa.begin")}>Comenzar configuración MFA</button>:<><p className="text-xs text-slate-300">Agregá una cuenta TOTP de NanoHub con esta clave manual, seis dígitos y período de 30 segundos:</p><code className="block break-all rounded-lg bg-black/30 p-4 text-sm text-white">{setup.secret}</code><form className="max-w-sm space-y-3" onSubmit={submit("mfa.confirm",f=>({code:f.get("code")}))}><Input name="code" label="Código de seis dígitos"/><button className="hub-primary-action">Confirmar segundo factor</button></form></>}
     </section>}
-    {codes.length>0&&<section className="hub-card space-y-4 p-5"><h2 className="hub-section-heading">Guardá tus códigos de recuperación</h2><p className="hub-description">Cada código sirve una sola vez. Guardalos fuera del servidor y de este navegador; no se podrán consultar nuevamente.</p><div className="grid gap-2 sm:grid-cols-2">{codes.map(code=><code key={code} className="break-all bg-black/20 p-2 text-xs text-white">{code}</code>)}</div><button className="hub-primary-action" onClick={()=>{setCodes([]);router.push("/");router.refresh();}}>Ya guardé mis códigos</button></section>}
+    {codes.length>0&&<section className="hub-card space-y-4 p-5"><h2 className="hub-section-heading">Guardá tus códigos de recuperación</h2><p className="hub-description">Cada código sirve una sola vez. Guardalos fuera del servidor y de este navegador; no se podrán consultar nuevamente.</p><div className="grid gap-2 sm:grid-cols-2">{codes.map(code=><code key={code} className="break-all bg-black/20 p-2 text-xs text-white">{code}</code>)}</div><button className="hub-primary-action" onClick={()=>window.location.assign("/")}>Ya guardé mis códigos</button></section>}
     {account?.mfaReady&&<>
       {!setup&&<section className="hub-card space-y-4 p-5"><h2 className="hub-section-heading">Reemplazar dispositivo o códigos MFA</h2><p className="hub-description">Requiere contraseña y un código actual o de recuperación. Al confirmar el nuevo factor se revocan las sesiones y los códigos anteriores.</p><form className="grid gap-3 md:grid-cols-3" onSubmit={submit("mfa.begin",f=>({password:f.get("password"),code:f.get("code")}))}><Input name="password" label="Contraseña actual" type="password"/><Input name="code" label="Segundo factor actual o recuperación"/><button className="hub-primary-action self-end">Preparar nuevo segundo factor</button></form></section>}
       <section className="hub-card space-y-4 p-5"><h2 className="hub-section-heading">Verificación para acciones sensibles</h2><p className="hub-description">Última verificación: {new Date(account.authenticatedAt).toLocaleString("es-AR")}. Las acciones sensibles requieren una verificación de los últimos diez minutos.</p><form className="grid gap-3 md:grid-cols-3" onSubmit={submit("session.verify",f=>({password:f.get("password"),code:f.get("code")}))}><Input name="password" label="Contraseña actual" type="password"/><Input name="code" label="Código TOTP nuevo o de recuperación"/><button className="hub-primary-action self-end">Verificar identidad</button></form></section>
