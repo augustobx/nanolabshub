@@ -105,6 +105,7 @@ const responses = {
   "/api/backups/restore-check": { success: true, data: [] },
   "/api/backups/import": {success:true,data:[{slug:"nanolabshub",status:"available",files:[{filename:"hub-existing.sqlite",supported:true,size:94208,mtimeMs:1792840000000}]}]},
   "/api/jobs": { success: true, data: [] },
+  "/api/apps/deploy":{success:true,data:{slug:"nanolabshub",currentImageId:"sha256:"+"1".repeat(64),currentRevision:"a".repeat(40),configurationMatches:true,workerHealthy:true,ready:true,releases:[{id:"fixture-approved",revision:"b".repeat(40),imageId:"sha256:"+"2".repeat(64),available:true,ci:{runId:123,conclusion:"success"}}],services:["nanolabshub"],backupRequired:true,isolatedRestoreRequired:true,automaticDatabaseRestore:false}},
   "/api/alerts": { success: true, data: { alerts: [] } },
 };
 
@@ -124,6 +125,10 @@ try {
     await page.route("**/api/**", (route) => {
       const url = new URL(route.request().url());
       if (url.pathname.startsWith("/api/auth/")) return route.continue();
+      if(url.pathname==="/api/apps/deploy"&&route.request().method()==="POST"){
+        const body=route.request().postDataJSON();assert.equal(body.slug,"nanolabshub");assert.equal(body.releaseId,"fixture-approved");assert.match(body.requestId,/^[a-f0-9-]{36}$/);
+        return route.fulfill({status:202,contentType:"application/json",body:JSON.stringify({success:true,data:{id:"fixture-persisted-release-job",state:"pending"}})});
+      }
       if(url.pathname==="/api/backups/import"&&route.request().method()==="POST"){
         const body=route.request().postDataJSON();assert.equal(body.slug,"nanolabshub");assert.equal(body.filename,"hub-existing.sqlite");assert.match(body.requestId,/^[a-f0-9-]{36}$/);
         return route.fulfill({status:202,contentType:"application/json",body:JSON.stringify({success:true,data:{jobId:"fixture-persisted-import-job",state:"pending"}})});
@@ -293,6 +298,11 @@ try {
         await page.getByRole("link", { name: "Descargar" }).count();
       }
       if (path === "/software") {
+        const release=page.getByRole("region",{name:"Despliegue seguro de NanoHub"});await release.waitFor();
+        await release.getByRole("combobox",{name:"Versión aprobada de NanoHub"}).selectOption("fixture-approved");
+        page.once("dialog",dialog=>dialog.accept());await release.getByRole("button",{name:"Programar actualización del Hub"}).click();
+        await release.getByRole("status").filter({hasText:"fixture-persisted-release-job"}).waitFor();
+        await page.screenshot({path:`ui-screenshots/${device.name}-hub-release.png`,fullPage:true,animations:"disabled"});
         const archived = page.getByText("Aplicación archivada demo");
         if (await archived.isVisible().catch(() => false)) throw new Error("An archived app appeared in active catalog");
         await page.getByRole("button", { name: /Mostrar archivadas/ }).click();

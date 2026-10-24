@@ -1,6 +1,7 @@
 "use client";
 
 import { AppLifecycleControls } from "@/components/AppLifecycleControls";
+import { ReleasePanel } from "@/components/ReleasePanel";
 import { Header } from "@/components/Header";
 import { TerminalModal } from "@/components/TerminalModal";
 import { portfolioSegment,type PortfolioSegment } from "@/lib/product-taxonomy";
@@ -140,50 +141,6 @@ export default function SoftwarePage() {
     }
   };
 
-  const handleStreamingDeploy = async (app: AppInfo) => {
-    if (!confirm(`¿Desplegar ${app.name}? (git pull && docker compose up -d --build)`)) return;
-
-    handleStopStream();
-    setTerminalTitle(`Desplegando en Vivo: ${app.name}`);
-    setTerminalOutput("");
-    setTerminalLoading(true);
-    setIsStreaming(true);
-    setTerminalOpen(true);
-
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-
-    try {
-      const res = await fetch(`/api/apps/deploy/stream?slug=${encodeURIComponent(app.slug)}`, {
-        method: "POST", signal: controller.signal,
-      });
-
-      if (!res.ok) {
-        throw new Error(await res.text());
-      }
-
-      const reader = res.body?.getReader();
-      const decoder = new TextDecoder();
-      setTerminalLoading(false);
-
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          setTerminalOutput((prev) => prev + decoder.decode(value, { stream: true }));
-        }
-      }
-      fetchApps();
-    } catch (err: any) {
-      if (err.name !== "AbortError") {
-        setTerminalOutput((prev) => `${prev}\n[ERROR]: ${err.message}`);
-      }
-    } finally {
-      setIsStreaming(false);
-      setTerminalLoading(false);
-    }
-  };
-
   const filteredApps = apps.filter((app) => {
     if (showArchived && app.lifecycle?.state !== "archived") return false;
     if (!showArchived && app.lifecycle?.state === "archived") return false;
@@ -208,9 +165,11 @@ export default function SoftwarePage() {
           <h1 className="hub-hero-title">Aplicaciones, por categoría.</h1>
           <p className="hub-description">
             Cada instancia está en su grupo correcto: productos SaaS, herramientas internas,
-            clientes dedicados e infraestructura. Las acciones Docker y Git siguen disponibles aquí.
+            clientes dedicados e infraestructura. Consultá su estado y las acciones disponibles.
           </p>
         </section>
+
+        <ReleasePanel />
 
         {/* Filters and Search Bar */}
         <div className="hub-card p-4 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
@@ -351,8 +310,7 @@ export default function SoftwarePage() {
                     <button
                       type="button"
                       disabled
-                      onClick={() => handleStreamingDeploy(app)}
-                      title="Despliegue genérico deshabilitado: requiere composición efectiva y rollback verificados"
+                      title="Las actualizaciones del Hub se gestionan con versiones aprobadas en el panel superior"
                       className="px-3 py-1.5 rounded-lg bg-brand-cyan/15 hover:bg-brand-cyan/25 text-brand-cyan border border-brand-cyan/30 text-xs font-mono font-semibold flex items-center gap-1.5 transition-all shadow-glow disabled:cursor-not-allowed disabled:border-slate-700 disabled:bg-slate-700/20 disabled:text-slate-400 disabled:shadow-none"
                     >
                       <Play className="w-3.5 h-3.5 fill-current" />
