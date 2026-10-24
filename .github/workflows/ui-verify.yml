@@ -9,6 +9,23 @@ on:
       - 0.1.0
 
 jobs:
+  isolated-sql-restore:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Fetch official fixture images
+        run: |
+          docker pull mariadb:11.8.9
+          docker pull postgres:16-alpine
+          docker pull postgres:17-alpine
+      - name: Native dump and restore, exact counts and invalid SQL rejection
+        run: node scripts/restore-sandbox-smoke.cjs
   typecheck-build-and-visual-smoke:
     runs-on: ubuntu-24.04
     permissions:
@@ -47,7 +64,7 @@ jobs:
         run: node --test scripts/backup-scheduler-health.test.cjs
 
       - name: Isolated recovery validation tests
-        run: node --test scripts/recovery-engine.test.cjs
+        run: node --test scripts/recovery-engine.test.cjs scripts/restore-evidence.test.cjs scripts/restore-sandbox.test.cjs scripts/recovery-runner.test.cjs
 
       - name: Production build
         run: npm run build
@@ -92,6 +109,7 @@ jobs:
           UI_BASE_URL: http://127.0.0.1:3005
           UI_ADMIN_USER: ci_smoke
           UI_ADMIN_PASS: ci_smoke_password
+          UI_DATA_DIR: ${{ runner.temp }}/nanohub-ui-data
         run: node scripts/identity-api-smoke.mjs
 
       - name: Attach screenshot fixtures

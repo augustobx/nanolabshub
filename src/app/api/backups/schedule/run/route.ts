@@ -1,6 +1,7 @@
 import { backupEngine, assertBackupSecurity } from "@/lib/backup-service";
 import { KNOWN_APPS } from "@/lib/apps-registry";
 import { timingSafeEqual } from "node:crypto";
+import { recoveryRunner } from "@/lib/job-service";
 export const dynamic="force-dynamic";
 export const runtime="nodejs";
 export async function POST(req: Request) {
@@ -14,7 +15,9 @@ export async function POST(req: Request) {
   }
   try {
     assertBackupSecurity();
-    return Response.json({success:true,data:await backupEngine.tick(KNOWN_APPS)});
+    const backups=await backupEngine.tick(KNOWN_APPS);
+    const restores=await recoveryRunner.tick(KNOWN_APPS);
+    return Response.json({success:true,data:[...backups,...restores]});
   } catch(error) {
     console.error("[scheduler]",error);
     return Response.json({success:false,error:"Error ejecutando tareas programadas"},{status:503});

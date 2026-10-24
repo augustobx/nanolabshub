@@ -114,6 +114,8 @@ export interface BackupRecord {
   error?: string | null;
   trigger?: "manual" | "scheduled";
   restoreTested?: boolean;
+  restoreStatus?: "passed" | "failed" | "untested";
+  restoreCheckedAt?: string | null;
 }
 
 export type SaaSSlug = "onlyfood" | "onlypadel" | "onlycars" | "onlygym" | "onlyturn" | "onlyerp" | "onlymob";

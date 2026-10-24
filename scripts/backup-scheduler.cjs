@@ -9,7 +9,7 @@ async function dispatch() {
     const response=await fetch("http://nanolabshub:3000/api/backups/schedule/run",{
       method:"POST",
       headers:{Authorization:"Bearer "+key},
-      signal:AbortSignal.timeout(22*60*1000)
+      signal:AbortSignal.timeout(32*60*1000)
     });
     if(!response.ok){console.error("Scheduler: Hub HTTP",response.status);return false;}
     const payload=await response.json();
