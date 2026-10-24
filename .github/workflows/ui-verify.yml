@@ -25,6 +25,8 @@ jobs:
           docker pull postgres:16-alpine
           docker pull postgres:17-alpine
       - name: Native dump and restore, exact counts and invalid SQL rejection
+        env:
+          HUB_BACKUPS_ENABLED: "true"
         run: node scripts/restore-sandbox-smoke.cjs
   typecheck-build-and-visual-smoke:
     runs-on: ubuntu-24.04
