@@ -6,6 +6,7 @@ const runtime=path.join(folder,"runtime"),origin="http://127.0.0.1:3105";
 const env=Object.fromEntries(Object.entries(process.env).filter(([k])=>!/^(ADMIN_|HUB_|DATA_DIR|SSH|DATABASE_URL)/i.test(k)));
 Object.assign(env,{NODE_ENV:"production",HOSTNAME:"127.0.0.1",PORT:"3105",DATA_DIR:path.join(folder,"data"),HUB_PUBLIC_ORIGIN:origin,ADMIN_USER:"ci_smoke",ADMIN_PASS:crypto.randomBytes(24).toString("hex"),HUB_MASTER_KEY:crypto.randomBytes(32).toString("hex"),HUB_BACKUPS_ENABLED:"true",HUB_LIFECYCLE_ENABLED:"false",HUB_SAAS_INTEGRATION_ENABLED:"false",HUB_SAAS_INTEGRATION_PRODUCTS:"",HUB_SAAS_MANAGEMENT_PRODUCTS:"",UI_BASE_URL:origin});
 env.UI_ADMIN_USER=env.ADMIN_USER;env.UI_ADMIN_PASS=env.ADMIN_PASS;
+env.UI_DATA_DIR=env.DATA_DIR;
 fs.cpSync(path.join(root,".next/standalone"),runtime,{recursive:true,filter:file=>!path.basename(file).startsWith(".env")});
 fs.cpSync(path.join(root,".next/static"),path.join(runtime,".next/static"),{recursive:true});
 if(fs.existsSync(path.join(root,"public")))fs.cpSync(path.join(root,"public"),path.join(runtime,"public"),{recursive:true});

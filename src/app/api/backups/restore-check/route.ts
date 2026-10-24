@@ -3,6 +3,8 @@ import { requireMutatingSession } from "@/lib/action-security";
 import { assertBackupSecurity } from "@/lib/backup-service";
 import { recoveryEngine } from "@/lib/recovery-service";
 import { KNOWN_APPS } from "@/lib/apps-registry";
+import { recoveryRunner } from "@/lib/job-service";
+import { limitedText } from "@/lib/request-body";
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
 const noCache={"Cache-Control":"private, no-store"};
@@ -20,10 +22,10 @@ export async function POST(req:Request){
   try{
     assertBackupSecurity();
     if(!req.headers.get("content-type")?.startsWith("application/json"))throw Error("Se requiere JSON");
-    const body=await req.json();
+    const body=JSON.parse(await limitedText(req,4096));
     if(typeof body?.backupId!=="string")throw Error("Falta ID de respaldo");
-    const result=await recoveryEngine.checkIsolated(KNOWN_APPS,body.backupId,actor);
-    return Response.json({success:true,data:result},{headers:noCache});
+    const result=recoveryRunner.enqueue(KNOWN_APPS,body.backupId,body.requestId,actor);
+    return Response.json({success:true,data:{jobId:result.id,state:result.state}},{status:202,headers:noCache});
   }catch(e){
     const msg=e instanceof Error?e.message:"Error de comprobación";
     console.error("[restore-check] Error de validación aislada:",msg.slice(0,180));

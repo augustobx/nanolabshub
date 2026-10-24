@@ -518,7 +518,7 @@ export default function BackupsPage() {
                         className="ml-2 inline-flex items-center gap-1 text-brand-cyan hover:underline">
                         <Download className="h-3.5 w-3.5" /> Descargar
                       </a>}
-                      <span className="mt-1 block text-[10px] text-slate-500">Restauración no probada</span>
+                      <span className="mt-1 block text-[10px] text-slate-500">{b.restoreTested ? "Restauración aislada aprobada" : b.restoreStatus === "failed" ? "Prueba de restauración fallida" : "Restauración no probada"}{b.restoreCheckedAt ? " · " + new Date(b.restoreCheckedAt).toLocaleString("es-AR") : ""}</span>
                     </td>
                   </tr>
                 ))}

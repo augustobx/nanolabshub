@@ -2,20 +2,20 @@
 
 Seguimiento del plan aprobado el 23/10/2026. Un casillero pendiente no acredita
 funcionalidad terminada. Los hallazgos H01–H27 están documentados en
-`AUDIT_NANOHUB_20261023.md`; el release de auditoría permanece como base productiva.
+`AUDIT_NANOHUB_20261023.md`. PR #6 desplegado con revisión `18cdcfae`: identidad, permisos y cola de backups; CI 40054237580 aprobado.
 
 ## Nueve pendientes de la auditoría
 
 | ID | Entregable | Evidencia exigida | Estado |
 | --- | --- | --- | --- |
-| C01 | Usuarios, roles, MFA | Bootstrap único, hash resistente, TOTP/recovery de un uso, autorización por recurso y UI real | Implementación local; validación en curso |
-| C02 | Revocación persistente | Cookie copiada rechazada tras logout, revocación, cambio de contraseña/permisos; idle/TTL | Pruebas de motor aprobadas; integración en curso |
+| C01 | Usuarios, roles, MFA | Bootstrap único, hash resistente, TOTP/recovery de un uso, autorización por recurso y UI real | Desplegado y probado en aislamiento; falta enrolamiento MFA del propietario real |
+| C02 | Revocación persistente | Cookie copiada rechazada tras logout, revocación, cambio de contraseña/permisos; idle/TTL | Desplegado; cookie revocada rechazada en producción y en API aislada |
 | C03 | Deploy seguro desde Hub | Manifest efectivo, imagen, backup, CI, salud, rollback, vecinos intactos | Pendiente |
-| C04 | Réplica externa automática | Copia cifrada independiente y recuperación desde el remoto | Pendiente; destino por comprobar |
-| C05 | Restore MariaDB/PostgreSQL | Instancias temporales aisladas y evidencia por motor | Pendiente |
-| C06 | Jobs recuperables | Claim atómico, lease, reintento, resultado incierto y reconciliación | Motor y cola de backups implementados; validación en curso |
+| C04 | Réplica externa automática | Copia cifrada independiente y recuperación desde el remoto | Preparación pendiente; el usuario confirmó que todavía no tiene destino |
+| C05 | Restore MariaDB/PostgreSQL | Instancias temporales aisladas y evidencia por motor | Implementado; dumps sintéticos nativos restaurados con versiones locales oficiales, cola y evidencia por hash; release de esta rama pendiente |
+| C06 | Jobs recuperables | Claim atómico, lease, reintento, resultado incierto y reconciliación | Backups desplegados y probados; esta rama extiende cola a restores sin repetición incierta |
 | C07 | Retención | Política explícita, archivo íntegro y recuperación antes de purga | Pendiente |
-| C08 | Lint obligatorio | ESLint CLI sin interacción ni warnings; gate en CI | Local aprobado; CI de esta rama pendiente |
+| C08 | Lint obligatorio | ESLint CLI sin interacción ni warnings; gate en CI | Gate obligatorio aprobado en PR #6; se conserva para cada release |
 | C09 | Importación de backups | Pertenencia, hash, formato, restore y deduplicación | Pendiente |
 
 ## Cobertura de módulos

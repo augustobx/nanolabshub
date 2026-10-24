@@ -3,39 +3,55 @@
 const fs=require("node:fs"),fsp=require("node:fs/promises"),path=require("node:path"),crypto=require("node:crypto");
 const {pipeline}=require("node:stream/promises"),{Transform}=require("node:stream"),{createGunzip}=require("node:zlib");
 const {DatabaseSync}=require("node:sqlite"),backup=require("./backup-engine.cjs");
+const {ensureRestoreSchema}=require("./restore-evidence.cjs");
+const sandbox=require("./restore-sandbox.cjs").createSandboxRunner();
 const LIMIT=512*1024*1024,busy=new Set();
-const SCHEMA="CREATE TABLE IF NOT EXISTS backup_restore_checks (id TEXT PRIMARY KEY,backup_id TEXT NOT NULL,slug TEXT NOT NULL,checked_at TEXT NOT NULL,actor TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('passed','failed')),details TEXT NOT NULL)";
 function listChecks(slug){
   const db=backup.db();try{
-    db.exec(SCHEMA);
-    return slug?db.prepare("SELECT id,backup_id AS backupId,slug,checked_at AS checkedAt,status,details FROM backup_restore_checks WHERE slug=? ORDER BY checked_at DESC LIMIT 150").all(slug):
-      db.prepare("SELECT id,backup_id AS backupId,slug,checked_at AS checkedAt,status,details FROM backup_restore_checks ORDER BY checked_at DESC LIMIT 250").all();
+    ensureRestoreSchema(db);
+    return slug?db.prepare("SELECT id,backup_id AS backupId,slug,checked_at AS checkedAt,status,details,checksum FROM backup_restore_checks WHERE slug=? ORDER BY checked_at DESC,rowid DESC LIMIT 150").all(slug):
+      db.prepare("SELECT id,backup_id AS backupId,slug,checked_at AS checkedAt,status,details,checksum FROM backup_restore_checks ORDER BY checked_at DESC,rowid DESC LIMIT 250").all();
   }finally{db.close();}
 }
-function record(id,slug,actor,status,details){
+function record(id,slug,actor,status,details,checksum,manifest=null,jobId=null){
   const db=backup.db(),checkedAt=new Date().toISOString(),uid=crypto.randomUUID();
   try{
-    db.exec(SCHEMA);
-    db.prepare("INSERT INTO backup_restore_checks(id,backup_id,slug,checked_at,actor,status,details) VALUES(?,?,?,?,?,?,?)")
-      .run(uid,id,slug,checkedAt,actor,status,details);
+    ensureRestoreSchema(db);
+    db.prepare("INSERT INTO backup_restore_checks(id,backup_id,slug,checked_at,actor,status,details,checksum,manifest,job_id) VALUES(?,?,?,?,?,?,?,?,?,?)")
+      .run(uid,id,slug,checkedAt,actor,status,details,checksum,manifest?JSON.stringify(manifest):null,jobId);
     db.prepare("INSERT INTO audit_log(timestamp,user,action,target,details) VALUES(?,?,?,?,?)")
-      .run(checkedAt,actor,status==="passed"?"BACKUP_SQLITE_CHECK_PASSED":"BACKUP_SQLITE_CHECK_FAILED",slug,id);
-    return {id:uid,backupId:id,slug,checkedAt,status,details};
+      .run(checkedAt,actor,status==="passed"?"BACKUP_RESTORE_CHECK_PASSED":"BACKUP_RESTORE_CHECK_FAILED",slug,id);
+    return {id:uid,backupId:id,slug,checkedAt,status,details,checksum};
   }finally{db.close();}
 }
-async function checkIsolated(apps,id,actor){
+async function checkIsolated(apps,id,actor,metadata={}){
   if(process.env.HUB_BACKUPS_ENABLED!=="true")throw Error("Backups deshabilitados");
   if(typeof id!=="string"||!/^[a-f0-9-]{36}$/.test(id))throw Error("Identificador inválido");
+  if(metadata.jobId&&!/^[a-f0-9-]{36}$/.test(metadata.jobId))throw Error("ID de trabajo inválido");
   if(busy.has(id))throw Error("Ya hay una validación en curso");
   busy.add(id);
-  let folder="",slug="";
+  let folder="",slug="",checksum=null,lock=null,lockPath="",retainLock=false;
   try{
-    const b=await backup.download(apps,id); // Rechecks checksum and gzip integrity.
-    if(!b.name.endsWith(".sqlite.gz"))throw Error("La comprobación aislada solo está habilitada para SQLite");
-    slug=b.name.split("_")[0];
-    if(!apps.some(a=>a.slug===slug&&a.dbType==="sqlite"))throw Error("La aplicación no está registrada como SQLite");
-    if(b.size>LIMIT)throw Error("El archivo supera el límite de 512 MB");
+    const registry=backup.db();let archive;
+    try{archive=registry.prepare("SELECT slug,db_type,checksum FROM backup_jobs WHERE id=? AND status='integrity_ok'").get(id);}finally{registry.close();}
+    if(!archive||!["nanolabshub","onlyfood","onlygym","onlyturn"].includes(archive.slug))throw Error("Respaldo fuera del alcance autorizado");
+    slug=archive.slug;checksum=archive.checksum;
+    const app=apps.find(a=>a.slug===slug&&a.dbType===archive.db_type);
+    if(!app)throw Error("El motor registrado no coincide con la aplicación");
     const root=process.env.DATA_DIR||"/app/data";
+    await fsp.mkdir(root,{recursive:true,mode:0o700});
+    const rootStat=await fsp.lstat(root);if(!rootStat.isDirectory()||rootStat.isSymbolicLink())throw Error("Ruta temporal insegura");
+    lockPath=path.join(root,"isolated-restore.lock");
+    try{lock=await fsp.open(lockPath,"wx",0o600);}catch{throw Error("Restauración en curso o lock pendiente de revisión; no se inicia otro sandbox");}
+    await lock.writeFile(JSON.stringify({pid:process.pid,host:require("node:os").hostname(),jobId:metadata.jobId||null,backupId:id,createdAt:new Date().toISOString()}));
+    const b=await backup.download(apps,id); // Rechecks checksum and gzip integrity.
+    if(b.size>LIMIT)throw Error("El archivo supera el límite de 512 MB");
+    if(app.dbType!=="sqlite"){
+      const manifest=await sandbox.restore(app,b.file);
+      if((await backup.verify(b.file)).sha!==checksum)throw Error("El archivo cambió durante la restauración");
+      return record(id,slug,actor,"passed",`${app.dbType}: restauración aislada, ${manifest.tables} tablas y ${manifest.rows} filas. Conteos de la copia restaurada; no comparados con producción. La aplicación no se inició.`,checksum,manifest,metadata.jobId);
+    }
+    if(!b.name.endsWith(".sqlite.gz"))throw Error("Extensión SQLite incorrecta");
     await fsp.mkdir(root,{recursive:true,mode:0o700});
     const st=await fsp.lstat(root);
     if(!st.isDirectory()||st.isSymbolicLink())throw Error("Ruta temporal insegura");
@@ -58,14 +74,17 @@ async function checkIsolated(apps,id,actor){
       const integrity=db.prepare("PRAGMA integrity_check").all();
       if(integrity.length!==1||Object.values(integrity[0])[0]!=="ok")throw Error("integrity_check falló");
       if(db.prepare("PRAGMA foreign_key_check").all().length)throw Error("foreign_key_check detectó errores");
-      const tables=db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table'").get().n;
-      return record(id,slug,actor,"passed","Copia SQLite aislada: "+bytes+" bytes, "+tables+" tablas; integrity_check=ok; foreign_key_check=0. No se inició la app.");
+      const tables=db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all().map(t=>({table:t.name,rows:db.prepare('SELECT count(*) AS n FROM "'+t.name.replaceAll('"','""')+'"').get().n}));
+      if((await backup.verify(b.file)).sha!==checksum)throw Error("El archivo cambió durante la restauración");
+      return record(id,slug,actor,"passed","Copia SQLite aislada: "+bytes+" bytes, "+tables.length+" tablas; integrity_check=ok; foreign_key_check=0. Conteos de la copia; sin comparación con producción. No se inició la app.",checksum,{engine:"sqlite",bytes,tables,comparison:"restored-copy-only",applicationStarted:false},metadata.jobId);
     }finally{db?.close();}
   }catch(err){
-    if(slug)record(id,slug,actor,"failed",(err instanceof Error?err.message:"Error de prueba").slice(0,220));
+    retainLock=!!err.uncertain;
+    if(slug)record(id,slug,actor,"failed",(err instanceof Error?err.message:"Error de prueba").slice(0,220),checksum,null,metadata.jobId);
     throw err;
   }finally{
     if(folder)await fsp.rm(folder,{recursive:true,force:true}).catch(()=>{});
+    if(lock){await lock.close();if(!retainLock)await fsp.rm(lockPath,{force:true});}
     busy.delete(id);
   }
 }

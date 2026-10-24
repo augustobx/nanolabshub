@@ -1,10 +1,11 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Header } from "@/components/Header";
+import { JobPanel } from "@/components/JobPanel";
 import { KNOWN_APPS } from "@/lib/apps-registry";
 import { ArrowUpRight, CheckCircle2, CircleAlert, DatabaseBackup, Download, ShieldCheck, RefreshCw, FlaskConical, HardDrive, CloudOff } from "lucide-react";
-type Backup = {id:string;appSlug:string;filename:string;status:string;createdAt:string;sizeFormatted:string;checksum?:string;error?:string;dbType:string};
+type Backup = {id:string;appSlug:string;filename:string;status:string;createdAt:string;sizeFormatted:string;checksum?:string;error?:string;dbType:string;restoreTested?:boolean;restoreCheckedAt?:string|null;restoreStatus?:string};
 type Check = {id:string;backupId:string;slug:string;status:"passed"|"failed";checkedAt:string;details:string};
 function time(date?:string){return date?new Date(date).toLocaleString("es-AR"):"Sin registro";}
 export default function ContinuityPage(){
@@ -12,7 +13,11 @@ export default function ContinuityPage(){
  const [known,setKnown]=useState(false),[errors,setErrors]=useState<string[]>([]);
  const [loading,setLoading]=useState(true),[running,setRunning]=useState<string|null>(null);
  const [feedback,setFeedback]=useState<string|null>(null);
+ const generation=useRef(0);
+ const invalidate=useCallback(()=>{generation.current++;},[]);
+ const [permission,setPermission]=useState<{role:string;scopes:string[]}|null>(null);
  const load=useCallback(async()=>{
+   const current=++generation.current;
    setLoading(true);
    const sources=["/api/backups","/api/backups/restore-check"];
    const results=await Promise.allSettled(sources.map(async u=>{
@@ -20,32 +25,36 @@ export default function ContinuityPage(){
      if(!r.ok||j.success!==true)throw Error(j.error||"Servicio no disponible");
      return j.data;
    }));
+   if(current!==generation.current)return;
    if(results[0].status==="fulfilled"){setBackups(results[0].value);setKnown(true);}else{setBackups([]);setKnown(false);}
-   if(results[1].status==="fulfilled")setChecks(results[1].value);
+   if(results[1].status==="fulfilled")setChecks(results[1].value);else setChecks([]);
    setErrors(results.flatMap((r,i)=>r.status==="rejected"?[sources[i]+": "+String(r.reason?.message||"sin respuesta")]:[]));
    setLoading(false);
  },[]);
- useEffect(()=>{void load();},[load]);
+ useEffect(()=>{void load();const timer=setInterval(()=>void load(),15000);return()=>{clearInterval(timer);invalidate();};},[load,invalidate]);
+ useEffect(()=>{let active=true;fetch("/api/auth/account",{cache:"no-store"}).then(r=>r.json()).then(j=>{if(active&&j.success&&j.data?.mfaReady)setPermission(j.data);}).catch(()=>{});return()=>{active=false;};},[]);
  const dbApps=KNOWN_APPS.filter(a=>a.dbType!=="none");
  const summary=dbApps.map(app=>{
    const copies=backups.filter(b=>b.appSlug===app.slug&&b.status==="verified")
      .sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
    const latest=copies[0];
-   const validated=latest?checks.find(c=>c.backupId===latest.id&&c.status==="passed"):undefined;
+   const validated=latest?.restoreTested?checks.find(c=>c.backupId===latest.id&&c.status==="passed"&&c.checkedAt===latest.restoreCheckedAt):undefined;
    return {app,latest,validated};
  });
  const missing=known?summary.filter(x=>!x.latest).length:0;
  const isolated=known?summary.filter(x=>!!x.validated).length:0;
  async function runCheck(id:string){
    if(running)return;
-   if(!window.confirm("Se abrirá una copia SQLite aislada para comprobar integridad y claves foráneas. No se modificará la base original. ¿Continuar?"))return;
    setRunning(id);setFeedback(null);
    try{
+     const key="hub.restore.request."+id;
+     const requestId=sessionStorage.getItem(key)||crypto.randomUUID();sessionStorage.setItem(key,requestId);
      const r=await fetch("/api/backups/restore-check",{method:"POST",
-       headers:{"Content-Type":"application/json"},body:JSON.stringify({backupId:id})});
+       headers:{"Content-Type":"application/json"},body:JSON.stringify({backupId:id,requestId})});
      const j=await r.json();
      if(!r.ok||!j.success)throw Error(j.error||"Falló la prueba");
-     setFeedback("Comprobación SQLite aprobada en copia aislada. No equivale al arranque completo de la SaaS.");
+     sessionStorage.removeItem(key);
+     setFeedback("Solicitud guardada en la cola: "+j.data.jobId+". El resultado aparecerá en el historial cuando termine la prueba.");
      await load();
    }catch(e){setFeedback("No se pudo validar: "+(e instanceof Error?e.message:"Error"));}
    finally{setRunning(null);}
@@ -69,7 +78,7 @@ export default function ContinuityPage(){
        {[
          {label:"Bases registradas",value:String(dbApps.length),note:"Según inventario del Hub",icon:DatabaseBackup},
          {label:"Sin copia registrada",value:known?String(missing):"—",note:"Archivos no verificados excluidos",icon:CircleAlert},
-         {label:"SQLite aisladas aprobadas",value:known?String(isolated):"—",note:"Prueba de copia; no de aplicación",icon:FlaskConical},
+         {label:"Restauraciones aisladas aprobadas",value:known?String(isolated):"—",note:"Prueba de copia; no de aplicación",icon:FlaskConical},
          {label:"Copia externa verificada",value:"—",note:"No hay proveedor configurado",icon:CloudOff},
        ].map(x=>{const Icon=x.icon;return <div key={x.label} className="hub-card p-5">
          <div className="flex items-center justify-between gap-2 text-xs text-slate-400"><span>{x.label}</span><Icon className="h-4 w-4 text-[#b6ccfa]"/></div>
@@ -90,28 +99,29 @@ export default function ContinuityPage(){
                <span className="hub-state hub-state-neutral">{app.dbType.toUpperCase()}</span>
              </div>
              <p className="mt-1 text-[11px] text-slate-400">Último backup con integridad OK: {known?time(latest?.createdAt):"Sin lectura"}</p>
-             {validated&&<p className="mt-1 text-[11px] text-emerald-300">Validación SQLite aislada: {time(validated.checkedAt)}</p>}
+             {validated&&<p className="mt-1 text-[11px] text-emerald-300">Restauración aislada: {time(validated.checkedAt)}</p>}
            </div>
            <div className="flex flex-wrap items-center gap-2">
              {!known?<span className="hub-state hub-state-neutral">Sin telemetría</span>:
               !latest?<span className="hub-state hub-state-warn"><CircleAlert className="h-3 w-3"/> Sin copia registrada en Hub</span>:
-              validated?<span className="hub-state hub-state-good"><CheckCircle2 className="h-3.5 w-3.5"/> Copia SQLite validada</span>:
+              validated?<span className="hub-state hub-state-good"><CheckCircle2 className="h-3.5 w-3.5"/> Restauración aislada validada</span>:
               <span className="hub-state hub-state-neutral">Integridad OK · recuperación sin prueba</span>}
              {latest&&<a href={"/api/backups/download?id="+encodeURIComponent(latest.id)}
                className="hub-secondary-action"><Download className="h-4 w-4"/> Descargar</a>}
-             {latest&&app.dbType==="sqlite"&&<button type="button" disabled={!!running}
+             {latest&&["nanolabshub","onlyfood","onlygym","onlyturn"].includes(app.slug)&&(permission?.role==="owner"||permission?.role==="operator"&&permission.scopes.includes(app.slug))&&<button type="button" disabled={!!running}
                onClick={()=>void runCheck(latest.id)} className="hub-primary-action">
-               <FlaskConical className="h-4 w-4"/> {running===latest.id?"Comprobando…":"Comprobar copia SQLite"}</button>}
+               <FlaskConical className="h-4 w-4"/> {running===latest.id?"Comprobando…":"Probar restauración aislada"}</button>}
              {!latest&&<Link href="/backups" className="hub-text-link">Abrir backups <ArrowUpRight className="h-4 w-4"/></Link>}
            </div>
          </div>)}
        </div>
      </section>
+     <JobPanel/>
      <section className="grid gap-4 lg:grid-cols-3">
        <div className="hub-card p-5"><ShieldCheck className="h-5 w-5 text-[#abc2fa]"/><h2 className="mt-3 text-sm font-semibold text-white">Integridad</h2>
          <p className="mt-2 text-xs leading-6 text-slate-400">Gzip y SHA-256 comprueban el archivo. No validan procesos de negocio.</p></div>
-       <div className="hub-card p-5"><FlaskConical className="h-5 w-5 text-[#abc2fa]"/><h2 className="mt-3 text-sm font-semibold text-white">Copia aislada SQLite</h2>
-         <p className="mt-2 text-xs leading-6 text-slate-400">Extrae a un directorio temporal y verifica SQLite y claves foráneas. No arranca la aplicación.</p></div>
+       <div className="hub-card p-5"><FlaskConical className="h-5 w-5 text-[#abc2fa]"/><h2 className="mt-3 text-sm font-semibold text-white">Restauración aislada</h2>
+         <p className="mt-2 text-xs leading-6 text-slate-400">SQLite verifica integridad y claves foráneas en una copia temporal. MariaDB y PostgreSQL se importan en contenedores sin red ni volúmenes productivos. Se registran tablas y filas de la copia; no se inicia la aplicación.</p></div>
        <div className="hub-card p-5"><HardDrive className="h-5 w-5 text-[#abc2fa]"/><h2 className="mt-3 text-sm font-semibold text-white">Almacenamiento externo</h2>
          <p className="mt-2 text-xs leading-6 text-slate-400">Aún no configurado. Una copia en el mismo disco no protege ante su pérdida.</p></div>
      </section>

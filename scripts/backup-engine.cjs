@@ -2,6 +2,7 @@
 const fs=require("node:fs"),fsp=require("node:fs/promises"),path=require("node:path"),crypto=require("node:crypto");
 const {spawn}=require("node:child_process"),{pipeline}=require("node:stream/promises"),{Transform}=require("node:stream");
 const {createGzip,createGunzip}=require("node:zlib"),{DatabaseSync,backup:sqliteBackup}=require("node:sqlite");
+const {ensureRestoreSchema,latestEvidence}=require("./restore-evidence.cjs");
 const ROOT="/opt/backups",DATA=process.env.DATA_DIR||"/app/data";
 const protectedProducts=new Set(["onlypadel","onlycars","onlyerp"]);
 function assertMutable(slug){if(protectedProducts.has(slug))throw Error("Producto protegido: operación de backup bloqueada");}
@@ -57,7 +58,7 @@ async function createBackup(apps,slug,trigger="manual",actor="admin",metadata={}
   }catch(e){retainLock=!!e.uncertain;if(!retainLock)await fsp.rm(tmp,{force:true}).catch(()=>{});d.prepare("UPDATE backup_jobs SET status=?,error=?,finished_at=? WHERE id=? AND status<>'integrity_ok'").run(retainLock?"uncertain":"failed",String(e.message).slice(0,300),new Date().toISOString(),id);throw e;}finally{d.close();}
  }finally{await h.close().catch(()=>{});if(!retainLock)await fsp.rm(lock,{force:true}).catch(()=>{});}
 }
-function list(apps){const d=db();try{return d.prepare("SELECT * FROM backup_jobs ORDER BY created_at DESC LIMIT 500").all().map(x=>{
+function list(apps){const d=db();try{ensureRestoreSchema(d);return d.prepare("SELECT * FROM backup_jobs ORDER BY created_at DESC LIMIT 500").all().map(x=>{
  let status=x.status==="integrity_ok"?"verified":x.status==="failed"?"failed":"unverified",error=x.error;
  if(x.status==="integrity_ok")try{
   const dir=path.join(ROOT,x.slug),file=path.join(dir,x.filename);
@@ -66,7 +67,9 @@ function list(apps){const d=db();try{return d.prepare("SELECT * FROM backup_jobs
   const st=fs.lstatSync(file);if(!st.isFile()||st.isSymbolicLink()||st.size!==x.size_bytes)throw Error("Archivo ausente o tamaño alterado");
   if(st.mtimeMs>Date.parse(x.finished_at)+1000){status="unverified";error="El archivo cambió después de su comprobación de integridad";}
  }catch{status="failed";error="La copia registrada no está disponible o cambió; no se contabiliza como íntegra";}
- return {id:x.id,appSlug:x.slug,appName:apps.find(a=>a.slug===x.slug)?.name||x.slug,dbType:x.db_type,filename:x.filename||"—",path:x.filename?path.join(ROOT,x.slug,x.filename):"",sizeBytes:x.size_bytes||0,sizeFormatted:Math.round(x.size_bytes/1024)+" KB",createdAt:x.created_at,status,integrityStatus:x.status,integrityCheckedAt:x.finished_at,error,checksum:x.checksum,trigger:x.trigger,storageLocation:"local",restoreTested:false};
+ const evidence=latestEvidence(d,x);
+ if(status!=="verified"){evidence.restoreTested=false;evidence.restoreStatus="untested";evidence.restoreCheckedAt=null;}
+ return {id:x.id,appSlug:x.slug,appName:apps.find(a=>a.slug===x.slug)?.name||x.slug,dbType:x.db_type,filename:x.filename||"—",path:x.filename?path.join(ROOT,x.slug,x.filename):"",sizeBytes:x.size_bytes||0,sizeFormatted:Math.round(x.size_bytes/1024)+" KB",createdAt:x.created_at,status,integrityStatus:x.status,integrityCheckedAt:x.finished_at,error,checksum:x.checksum,trigger:x.trigger,storageLocation:"local",...evidence};
  });}finally{d.close();}}
 function externalInventory(apps){
  const d=db();let registered;try{registered=new Set(d.prepare("SELECT slug,filename FROM backup_jobs WHERE filename IS NOT NULL").all().map(x=>x.slug+"/"+x.filename));}finally{d.close();}
