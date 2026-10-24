@@ -1,41 +1,30 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
 import { Header } from "@/components/Header";
-import {
-  Crown,
-  Layers,
-  Users,
-  Settings2,
-  DollarSign,
-  Shield,
-  Key,
-  ExternalLink,
-  ChevronRight,
-  Sparkles,
-  ToggleLeft,
-  ToggleRight,
-  Lock,
-  ArrowRight,
-  CheckCircle2,
-  AlertCircle,
-  Building2,
-  UtensilsCrossed,
-  Gamepad2,
-  Car,
-  Dumbbell,
-  Clock,
-  RotateCw,
-  Search,
-  Filter,
-  Check,
-  X,
-  FileSpreadsheet,
-  AlertTriangle,
-} from "lucide-react";
-import { UniversalTenant, GovernanceOverview, SaaSSlug } from "@/lib/types";
 import { SAAS_PRODUCTS } from "@/lib/product-taxonomy";
+import { GovernanceOverview,SaaSSlug,UniversalTenant } from "@/lib/types";
+import {
+Building2,
+Car,
+CheckCircle2,
+Clock,
+Dumbbell,
+ExternalLink,
+FileSpreadsheet,
+Gamepad2,
+Key,
+Layers,
+RotateCw,
+Search,
+Settings2,
+Shield,
+Sparkles,
+Users,
+UtensilsCrossed,
+X
+} from "lucide-react";
 import Link from "next/link";
+import { useEffect,useRef,useState } from "react";
 
 export default function GovernancePage() {
   const [data, setData] = useState<GovernanceOverview | null>(null);
@@ -64,6 +53,7 @@ export default function GovernancePage() {
       }
       setData(json.data);
     } catch (error) {
+      setData(null);
       setLoadError(error instanceof Error ? error.message : "No se pudieron consultar los clientes");
     } finally {
       setIsLoading(false);
@@ -114,7 +104,7 @@ export default function GovernancePage() {
       document.body.style.overflow = previousOverflow;
       previouslyFocused?.focus();
     };
-  }, [activeTenant?.id, isUpdating]);
+  }, [activeTenant, isUpdating]);
 
   const openTenant = (tenant: UniversalTenant) => {
     setTenantTab("status");
@@ -719,11 +709,11 @@ export default function GovernancePage() {
                       Los módulos se muestran en todas las SaaS con el mismo formato. El cambio solo está disponible cuando existe integración real; los demás se presentan en modo consulta.
                     </p>
                   </div>
-                  {true && (
-                    <p className="rounded-lg border border-amber-300/20 bg-amber-300/[0.045] p-3 text-xs text-amber-100">
-                      Los módulos existentes se muestran en modo consulta. La edición central permanece bloqueada para proteger las bases productivas.
-                    </p>
-                  )}
+                  <p className="rounded-lg border border-amber-300/20 bg-amber-300/[0.045] p-3 text-xs text-amber-100">
+                    {data?.managementProducts?.includes(activeTenant.saas)
+                      ? <Link href={`/saas/${activeTenant.saas}/manage?tenantId=${encodeURIComponent(activeTenant.id)}`} className="underline">Administrar los módulos desde la ficha del producto.</Link>
+                      : "Los módulos se muestran en consulta porque este producto no tiene gestión central disponible."}
+                  </p>
                   {Object.keys(activeTenant.modules).length === 0 ? (
                     <div className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-center text-xs text-slate-400">
                       No hay módulos configurables para este cliente.

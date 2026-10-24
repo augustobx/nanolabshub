@@ -79,6 +79,10 @@ export function getDatabase() {
     dbInstance = {
       type: "sqlite",
       persistentReady() { return db.prepare("SELECT 1 AS ok").get().ok === 1; },
+      getBackupSlug(id: string): string | null {
+        if (!db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='backup_jobs'").get()) return null;
+        return db.prepare("SELECT slug FROM backup_jobs WHERE id=?").get(id)?.slug || null;
+      },
       allowLoginAttempt(bucket: string) {
         const now = Date.now(), window = 15 * 60000;
         const result = db.prepare(`INSERT INTO login_attempts(bucket,window_start,attempts) VALUES(?,?,1)
@@ -198,6 +202,6 @@ export function getDatabase() {
     return dbInstance;
   } catch (err) {
     console.error("Persistencia SQLite no disponible");
-    throw new Error("Persistencia del Hub no disponible; operación bloqueada.");
+    throw new Error("Persistencia del Hub no disponible; operación bloqueada.", { cause: err });
   }
 }

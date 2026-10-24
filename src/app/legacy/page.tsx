@@ -1,11 +1,11 @@
 "use client";
-import {useEffect,useState} from "react";
-import Link from "next/link";
-import {Header} from "@/components/Header";
-import {SAAS_PRODUCTS} from "@/lib/product-taxonomy";
+import { Header } from "@/components/Header";
 import { productCapabilities } from "@/lib/product-capabilities";
-import type {GovernanceOverview} from "@/lib/types";
-import {ArrowUpRight,ClipboardList,Layers3,TriangleAlert,CheckCircle2,ShieldAlert} from "lucide-react";
+import { SAAS_PRODUCTS } from "@/lib/product-taxonomy";
+import type { GovernanceOverview } from "@/lib/types";
+import { ArrowUpRight } from "lucide-react";
+import Link from "next/link";
+import { useEffect,useState } from "react";
 export default function LegacyPage(){
  const [gov,setGov]=useState<GovernanceOverview|null>(null),[error,setError]=useState<string|null>(null),[loading,setLoading]=useState(true);
  const load=async()=>{setLoading(true);try{const r=await fetch("/api/governance",{cache:"no-store"}),j=await r.json();if(!r.ok||!j.success)throw Error(j.error||"Conectores no disponibles");setGov(j.data);setError(null);}catch(e){setGov(null);setError(e instanceof Error?e.message:"Error de consulta");}finally{setLoading(false);}};

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import Link from "next/link";
 import { Bell, RefreshCw, LogOut, X, AlertCircle, CheckCircle2, ChevronRight, Shield } from "lucide-react";
 import { SystemAlert } from "@/lib/alerts";
 
@@ -40,6 +41,7 @@ export function Header({ onRefresh, isRefreshing = false }: HeaderProps) {
     const loadAlerts = async () => {
       try {
         const res = await fetch("/api/alerts");
+        if(res.status===401){router.replace("/login");return;}
         if (!res.ok) throw new Error("No se pudieron consultar las alertas");
         const data = await res.json();
         if (active && data.success && Array.isArray(data.data?.alerts)) {
@@ -53,7 +55,14 @@ export function Header({ onRefresh, isRefreshing = false }: HeaderProps) {
     void loadAlerts();
     const interval = setInterval(loadAlerts, 30000);
     return () => { active = false; clearInterval(interval); };
-  }, []);
+  }, [router]);
+
+  useEffect(()=>{
+    let lastTouched=0;
+    const touch=()=>{const now=Date.now();if(now-lastTouched<60000)return;lastTouched=now;fetch("/api/auth/account",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({operation:"session.touch"})}).then(r=>{if(r.status===401)router.replace("/login");}).catch(()=>{/* A failed heartbeat does not extend server-side expiry. */});};
+    window.addEventListener("pointerdown",touch);window.addEventListener("keydown",touch);
+    return()=>{window.removeEventListener("pointerdown",touch);window.removeEventListener("keydown",touch);};
+  },[router]);
 
   useEffect(() => setAlertsOpen(false), [pathname]);
 
@@ -127,7 +136,7 @@ export function Header({ onRefresh, isRefreshing = false }: HeaderProps) {
         </div>
         <div className="ml-1 flex items-center gap-2 border-l border-white/10 pl-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#273451] text-[#b0c1ff]" title="Administrador"><Shield className="h-[17px] w-[17px]" /></div>
-          <span className="hidden text-xs font-medium text-slate-300 xl:block">Administrador</span>
+          <Link href="/account" className="text-xs font-medium text-slate-300">Mi cuenta</Link>
           <button type="button" onClick={logout} title="Cerrar sesión" aria-label="Cerrar sesión"
             className="hub-icon-button !border-transparent !bg-transparent hover:!bg-rose-500/10 hover:!text-rose-300"><LogOut className="h-4 w-4" /></button>
         </div>

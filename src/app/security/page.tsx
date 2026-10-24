@@ -39,12 +39,12 @@ export default function SecurityPage(){
     </section>
     <section className="grid gap-4 md:grid-cols-3">
       {[
-       {title:"Permisos por rol",desc:"Pendiente: el Hub todavía no tiene RBAC granular ni autorización por tenant.",state:data?.access.roleBasedPermissionsAvailable,icon:KeyRound},
-       {title:"Segundo factor",desc:"Pendiente: el login central todavía no implementa MFA.",state:data?.access.multiFactorAvailable,icon:LockKeyhole},
+       {title:"Permisos por rol",desc:"Propietario, operador y consulta, con autorización de servidor por operación y aplicación.",state:data?.access.roleBasedPermissionsAvailable,icon:KeyRound},
+       {title:"Segundo factor",desc:"TOTP obligatorio, códigos de recuperación de un solo uso y sesiones revocables. Configuración desde Mi cuenta.",state:data?.access.multiFactorAvailable,icon:LockKeyhole},
        {title:"Respaldo externo",desc:"Pendiente: no existe réplica automática fuera del servidor verificada.",state:data?.offsite.providerConfigured,icon:CloudOff},
       ].map(x=>{const Icon=x.icon;return <div key={x.title} className="hub-card p-5"><Icon className="h-5 w-5 text-[#b8cbfb]"/><h3 className="mt-3 text-sm font-semibold text-white">{x.title}</h3><p className="mt-2 text-xs leading-6 text-slate-400">{x.desc}</p><div className="mt-4"><State ready={!!x.state}/></div></div>})}
     </section>
-    <div className="flex flex-wrap items-start gap-3 rounded-xl border border-amber-300/20 bg-amber-300/[0.04] p-5"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-300"/><div className="min-w-0 flex-1"><p className="text-sm font-semibold text-white">Riesgos que siguen abiertos</p><p className="mt-2 text-xs leading-6 text-slate-400">Rotación de credenciales heredadas sin verificar, permisos de Superadmin todavía incompletos y backups externos no configurados. No se rotarán credenciales ni se alterarán bases productivas durante este rediseño.</p></div><Link href="/audit" className="hub-text-link">Ver auditoría <ArrowUpRight className="h-4 w-4"/></Link></div>
+    <div className="flex flex-wrap items-start gap-3 rounded-xl border border-amber-300/20 bg-amber-300/[0.04] p-5"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-300"/><div className="min-w-0 flex-1"><p className="text-sm font-semibold text-white">Protección y recuperación</p><p className="mt-2 text-xs leading-6 text-slate-400">Consultá el estado real del respaldo externo y sus pruebas de recuperación. Las credenciales heredadas de cada SaaS conservan su estado de verificación independiente.</p></div><Link href="/account" className="hub-text-link">Mi cuenta <ArrowUpRight className="h-4 w-4"/></Link><Link href="/audit" className="hub-text-link">Ver auditoría <ArrowUpRight className="h-4 w-4"/></Link></div>
   </div>
  </div>;
 }

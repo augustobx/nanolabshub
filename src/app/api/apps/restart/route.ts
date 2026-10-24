@@ -6,8 +6,10 @@ import { getDatabase } from "@/lib/db";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+  let actor: string;
+  try { actor = await requireMutatingSession(req); }
+  catch { return Response.json({success:false,error:"Sesión, permisos o verificación reciente requeridos"},{status:403}); }
   try {
-    const actor = await requireMutatingSession(req);
     const body = await req.json();
     const { containerName } = body;
 
@@ -22,7 +24,7 @@ export async function POST(req: Request) {
 
     try {
       db.logAudit(actor, "CONTAINER_RESTART", containerName, `Reinicio exitoso de contenedor ${containerName}`);
-    } catch {}
+    } catch { /* Best-effort cleanup or fallback; primary operation owns its result. */ }
 
     return Response.json({
       success: true,

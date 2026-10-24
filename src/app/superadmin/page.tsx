@@ -1,11 +1,11 @@
 "use client";
-import Link from "next/link";
-import { useEffect, useState } from "react";
 import { Header } from "@/components/Header";
-import { SAAS_PRODUCTS } from "@/lib/product-taxonomy";
 import { productCapabilities } from "@/lib/product-capabilities";
+import { SAAS_PRODUCTS } from "@/lib/product-taxonomy";
 import type { GovernanceOverview } from "@/lib/types";
-import { ShieldCheck, Users, ArrowUpRight, Layers3, KeyRound, ClipboardList, Settings2, ShieldAlert, CheckCircle2, AlertTriangle } from "lucide-react";
+import { ArrowUpRight,ClipboardList,Layers3,Settings2,ShieldAlert,ShieldCheck,Users } from "lucide-react";
+import Link from "next/link";
+import { useEffect,useState } from "react";
 
 const CAPABILITIES = [
   {key:"tenantRead",label:"Lectura de tenants"},
@@ -15,7 +15,7 @@ const CAPABILITIES = [
   {key:"settings",label:"Configuración"},
   {key:"activity",label:"Auditoría externa"},
 ] as const;
-const LABELS = {connected:"Disponible",legacy_review:"Legado · revisar",pending:"Pendiente"};
+
 export default function SuperadminPage() {
   const [overview,setOverview] = useState<GovernanceOverview|null>(null);
   const [loading,setLoading] = useState(true);

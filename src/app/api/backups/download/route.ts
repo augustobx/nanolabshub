@@ -1,4 +1,5 @@
 import { getSessionUser } from "@/lib/auth";
+import { requireResourceRead } from "@/lib/action-security";
 import { backupEngine, assertBackupSecurity } from "@/lib/backup-service";
 import { KNOWN_APPS } from "@/lib/apps-registry";
 import { createReadStream } from "node:fs";
@@ -7,6 +8,7 @@ export const dynamic="force-dynamic";
 export const runtime="nodejs";
 export async function GET(req: Request) {
   if (!await getSessionUser()) return Response.json({success:false,error:"Sesión requerida"},{status:401});
+  try { await requireResourceRead(req); } catch { return Response.json({success:false,error:"No tenés permiso sobre este respaldo"},{status:403}); }
   const id=new URL(req.url).searchParams.get("id");
   if (!id) return Response.json({success:false,error:"Falta ID"},{status:400});
   try {

@@ -8,10 +8,12 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const requested = searchParams.get("from") || "/";
-  const from = requested.startsWith("/") && !requested.startsWith("//") && !/[\\\u0000-\u001f]/.test(requested) ? requested : "/";
+  const from = requested.startsWith("/") && !requested.startsWith("//") && !requested.includes("\\") && !Array.from(requested).some(c => c.charCodeAt(0) < 32) ? requested : "/";
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [challenge, setChallenge] = useState("");
+  const [code, setCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,15 +23,16 @@ function LoginForm() {
     setError(null);
 
     try {
-      const res = await fetch("/api/auth/login", {
+      const res = await fetch(challenge ? "/api/auth/mfa" : "/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify(challenge ? { challenge, code } : { username, password }),
       });
 
       const data = await res.json();
       if (data.success) {
-        router.push(from);
+        if (data.data?.mfaRequired) { setChallenge(data.data.challenge); setPassword(""); return; }
+        router.push(data.data?.enrollmentRequired ? "/account" : from);
         router.refresh();
       } else {
         setError(data.error || "Credenciales incorrectas");
@@ -61,7 +64,7 @@ function LoginForm() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-1.5 font-mono text-xs">
+        {!challenge && <div className="space-y-1.5 font-mono text-xs">
           <label className="text-gray-400 text-[11px] uppercase tracking-wider">
             Usuario
           </label>
@@ -77,9 +80,9 @@ function LoginForm() {
               className="w-full bg-surface-100/90 border border-white/10 rounded-lg pl-9 pr-3 py-2 text-xs text-gray-200 placeholder-gray-600 focus:outline-none focus:border-brand-cyan/50 focus:ring-1 focus:ring-brand-cyan/30 transition-all font-mono"
             />
           </div>
-        </div>
+        </div>}
 
-        <div className="space-y-1.5 font-mono text-xs">
+        {!challenge && <div className="space-y-1.5 font-mono text-xs">
           <label className="text-gray-400 text-[11px] uppercase tracking-wider">
             Contraseña
           </label>
@@ -95,7 +98,9 @@ function LoginForm() {
               className="w-full bg-surface-100/90 border border-white/10 rounded-lg pl-9 pr-3 py-2 text-xs text-gray-200 placeholder-gray-600 focus:outline-none focus:border-brand-cyan/50 focus:ring-1 focus:ring-brand-cyan/30 transition-all font-mono"
             />
           </div>
-        </div>
+        </div>}
+
+        {challenge && <label className="block space-y-2 text-sm text-slate-300"><span>Código de segundo factor o recuperación</span><input name="code" value={code} onChange={e=>setCode(e.target.value.trim())} autoComplete="one-time-code" required autoFocus className="w-full rounded-lg border border-white/10 bg-surface-100 p-3"/><button type="button" className="hub-text-link" onClick={()=>{setChallenge("");setCode("");}}>Volver al ingreso</button></label>}
 
         <button
           type="submit"

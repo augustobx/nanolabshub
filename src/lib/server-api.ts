@@ -1,8 +1,8 @@
+import { KNOWN_APPS } from "./apps-registry";
+import { clearLiveCache,liveValue } from "./live-cache";
+import { assertContainerMutable,assertDeploymentAllowed,validateContainer } from "./operational-policy";
 import { executeRemoteCommand } from "./ssh";
-import { KNOWN_APPS, AppDefinition } from "./apps-registry";
-import { ServerMetrics, ContainerInfo, AppInfo, BackupRecord } from "./types";
-import { assertDeploymentAllowed, assertContainerMutable, validateContainer } from "./operational-policy";
-import { liveValue, clearLiveCache } from "./live-cache";
+import { AppInfo,ContainerInfo,ServerMetrics } from "./types";
 
 /**
  * Parses and returns live server hardware and system telemetry
@@ -123,7 +123,6 @@ async function readContainers(): Promise<ContainerInfo[]> {
     else if (status.toLowerCase().includes("up")) state = "running";
     else if (status.toLowerCase().includes("exited")) state = "exited";
     else if (status.toLowerCase().includes("restarting")) state = "restarting";
-    else if (status.toLowerCase().includes("paused")) state = "paused";
 
     let health: ContainerInfo["health"] = "none";
     if (status.includes("(healthy)")) health = "healthy";
@@ -269,7 +268,7 @@ PY`;
 /**
  * Triggers a deployment for a specific app: git pull && docker compose up -d --build
  */
-export async function deployApp(slug: string): Promise<string> {
+export async function deployApp(_slug: string): Promise<string> {
   assertDeploymentAllowed();
 }
 

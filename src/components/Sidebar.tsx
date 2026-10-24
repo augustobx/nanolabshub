@@ -1,12 +1,27 @@
 "use client";
+import {
+Activity,
+Archive,
+Boxes,
+Building2,
+ChevronRight,
+DatabaseBackup,
+Globe2,
+HeartPulse,History,
+Layers3,
+LayoutDashboard,
+Menu,
+Package,
+PanelLeftClose,PanelLeftOpen,
+ScrollText,
+ServerCog,
+ShieldAlert,
+ShieldCheck,
+X
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
-import {
-  LayoutDashboard, Layers3, Building2, Package, ServerCog, DatabaseBackup,
-  Globe2, Menu, X, PanelLeftClose, PanelLeftOpen, ShieldCheck,
-  Workflow, Boxes, Archive, Activity, ChevronRight, ShieldAlert, ScrollText, HeartPulse, History
-} from "lucide-react";
+import { useEffect,useState } from "react";
 
 export const NAV_GROUPS = [
   { title: "Gobierno", items: [
@@ -41,11 +56,11 @@ export function Sidebar() {
   const [currentSearch, setCurrentSearch] = useState("");
   useEffect(() => { setMobileOpen(false); setCurrentSearch(window.location.search); }, [pathname]);
   useEffect(() => {
-    try { setCollapsed(window.localStorage.getItem("hub-sidebar-collapsed") === "1"); } catch {}
+    try { setCollapsed(window.localStorage.getItem("hub-sidebar-collapsed") === "1"); } catch { /* Best-effort cleanup or fallback; primary operation owns its result. */ }
   }, []);
   const toggleCollapsed = () => {
     setCollapsed((previous) => {
-      try { window.localStorage.setItem("hub-sidebar-collapsed", previous ? "0" : "1"); } catch {}
+      try { window.localStorage.setItem("hub-sidebar-collapsed", previous ? "0" : "1"); } catch { /* Best-effort cleanup or fallback; primary operation owns its result. */ }
       return !previous;
     });
   };

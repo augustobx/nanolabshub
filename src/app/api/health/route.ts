@@ -2,7 +2,7 @@ import { getDatabase } from "@/lib/db";
 export const dynamic = "force-dynamic";
 export async function GET() {
   let ready = false;
-  try { ready = getDatabase().persistentReady() === true; } catch {}
+  try { ready = getDatabase().persistentReady() === true; } catch { /* Best-effort cleanup or fallback; primary operation owns its result. */ }
   return Response.json({
     status: ready ? "healthy" : "degraded",
     service: "nanolabshub",

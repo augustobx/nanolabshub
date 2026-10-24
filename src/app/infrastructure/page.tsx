@@ -1,9 +1,9 @@
 "use client";
-import { useEffect, useState } from "react";
-import Link from "next/link";
 import { Header } from "@/components/Header";
 import type { getInfrastructureInventory } from "@/lib/infrastructure-inventory";
-import { Server, Database, Boxes, Workflow, Globe2, ArrowUpRight, AlertTriangle, Network, Activity, Cpu, HardDrive, RefreshCw } from "lucide-react";
+import { Activity,AlertTriangle,ArrowUpRight,Boxes,Cpu,Database,HardDrive,Network,RefreshCw,Server,Workflow } from "lucide-react";
+import Link from "next/link";
+import { useEffect,useState } from "react";
 type Inventory = Awaited<ReturnType<typeof getInfrastructureInventory>>;
 type Kind = keyof Inventory["groups"];
 const kinds: Array<{id:Kind;name:string;desc:string;icon:typeof Server}> = [

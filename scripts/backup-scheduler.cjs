@@ -29,5 +29,5 @@ async function dispatch() {
 }
 let running=false;
 async function tick(){if(running)return;running=true;try{await dispatch();}finally{running=false;}}
-setInterval(()=>void tick(),5*60*1000);
+setInterval(()=>void tick(),30*1000);
 void tick();

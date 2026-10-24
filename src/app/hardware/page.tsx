@@ -1,26 +1,19 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
 import { Header } from "@/components/Header";
 import { TerminalModal } from "@/components/TerminalModal";
+import { ContainerInfo,ServerMetrics } from "@/lib/types";
 import {
-  Cpu,
-  Layers,
-  HardDrive,
-  Boxes,
-  Activity,
-  Server,
-  Clock,
-  CheckCircle2,
-  AlertTriangle,
-  RotateCw,
-  Terminal,
-  Trash2,
-  TrendingUp,
-  Sparkles,
-  Play,
+Boxes,
+Cpu,
+HardDrive,
+Layers,
+RotateCw,
+Terminal,
+Trash2,
+TrendingUp
 } from "lucide-react";
-import { ServerMetrics, ContainerInfo } from "@/lib/types";
+import { useEffect,useRef,useState } from "react";
 
 export default function HardwarePage() {
   const [metrics, setMetrics] = useState<ServerMetrics | null>(null);

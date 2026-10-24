@@ -1,4 +1,5 @@
-import { getSessionUser } from "@/lib/auth";
+import { getSessionUser, getPrincipal } from "@/lib/auth";
+import { authorizeResource } from "@/lib/authorization-policy";
 import { requireMutatingSession } from "@/lib/action-security";
 import { callSaaSManagement, SaaSManagementError } from "@/lib/saas-management";
 import type { ManagementCommand } from "@/lib/saas-management-types";
@@ -15,6 +16,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ slug: st
   const { slug } = await params;
   const user = await getSessionUser();
   if (!user) return Response.json({ success: false, error: "Sesión requerida" }, { status: 401, headers });
+  try { authorizeResource((await getPrincipal())!,slug,false); }
+  catch { return Response.json({success:false,error:"No tenés permiso sobre esta aplicación"},{status:403,headers}); }
   try {
     const query = new URL(req.url).searchParams;
     if (Array.from(query.keys()).some(key => !["resource", "tenantId", "offset"].includes(key))) throw new SaaSManagementError(400, "QUERY", "Consulta inválida.");

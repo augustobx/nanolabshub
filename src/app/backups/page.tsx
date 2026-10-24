@@ -1,29 +1,26 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { Header } from "@/components/Header";
+import { JobPanel } from "@/components/JobPanel";
 import { TerminalModal } from "@/components/TerminalModal";
-import {
-  Database,
-  Download,
-  Play,
-  RotateCw,
-  HardDrive,
-  ShieldCheck,
-  CheckCircle2,
-  AlertTriangle,
-  FileArchive,
-  Cloud,
-  Clock,
-  Sparkles,
-  Search,
-  ArrowRight,
-  X,
-  LoaderCircle,
-  CalendarClock,
-} from "lucide-react";
-import { BackupRecord } from "@/lib/types";
 import { KNOWN_APPS } from "@/lib/apps-registry";
+import { BackupRecord } from "@/lib/types";
+import {
+AlertTriangle,
+ArrowRight,
+CheckCircle2,
+Cloud,
+Database,
+Download,
+FileArchive,
+HardDrive,
+LoaderCircle,
+Play,
+Search,
+ShieldCheck,
+X
+} from "lucide-react";
+import { useEffect,useState,useRef,useCallback } from "react";
 
 export default function BackupsPage() {
   const [backups, setBackups] = useState<BackupRecord[]>([]);
@@ -39,6 +36,8 @@ export default function BackupsPage() {
   const [manualAppSlug, setManualAppSlug] = useState("nanolabshub");
   const [manualSearch, setManualSearch] = useState("");
   const [confirmBackupSlug, setConfirmBackupSlug] = useState<string | null>(null);
+  const pendingRequests=useRef(new Map<string,string>());
+  const loadGeneration=useRef(0);
 
   // Terminal modal
   const [terminalOpen, setTerminalOpen] = useState(false);
@@ -46,26 +45,32 @@ export default function BackupsPage() {
   const [terminalOutput, setTerminalOutput] = useState("");
   const [terminalLoading, setTerminalLoading] = useState(false);
 
-  const fetchBackups = async () => {
+  const fetchBackups = useCallback(async () => {
+    const generation=++loadGeneration.current;
     setIsLoading(true);
     setPageError(null);
     try {
       const res = await fetch("/api/backups", { cache: "no-store" });
       const data = await res.json();
+      if(generation!==loadGeneration.current)return;
       if (!res.ok || !data.success) throw new Error(data.error || "No se pudo cargar el historial");
       setBackups(data.data);
       setExternalCopies(data.externalCopies || []);
       setSchedules(data.schedules || []);
     } catch (error) {
+      if(generation!==loadGeneration.current)return;
+      setBackups([]);setSchedules([]);setExternalCopies([]);
       setPageError(error instanceof Error ? error.message : "Error al consultar backups");
     } finally {
-      setIsLoading(false);
+      if(generation===loadGeneration.current)setIsLoading(false);
     }
-  };
+  },[]);
 
   useEffect(() => {
-    fetchBackups();
-  }, []);
+    void fetchBackups();
+    const timer=setInterval(()=>void fetchBackups(),15000);
+    return()=>clearInterval(timer);
+  }, [fetchBackups]);
 
   const handleTriggerBackup = async (slug: string) => {
     const appDef = KNOWN_APPS.find((a) => a.slug === slug);
@@ -73,25 +78,33 @@ export default function BackupsPage() {
     setConfirmBackupSlug(null);
     setIsTriggering(slug);
     setTerminalTitle(`Generando Backup: ${appDef.name}`);
-    setTerminalOutput(`Iniciando respaldo de ${appDef.name} (${appDef.dbType}).\nGenerando ${appDef.dbType === "sqlite" ? ".sqlite.gz" : ".sql.gz"} en /opt/backups/${slug}/...\nNo cierres la operación mientras se genera el archivo.`);
+    setTerminalOutput(`Solicitando respaldo de ${appDef.name} (${appDef.dbType}).\nLa solicitud queda persistida; podés seguir su estado en Trabajos persistentes.`);
     setTerminalLoading(true);
     setTerminalOpen(true);
 
     try {
+      let savedRequest:string|null=null;
+      try{savedRequest=sessionStorage.getItem("hub.backup.request:"+slug);}catch{/* The in-memory request remains usable when browser storage is unavailable. */}
+      const requestId=pendingRequests.current.get(slug)||(savedRequest&&/^[a-f0-9-]{36}$/.test(savedRequest)?savedRequest:crypto.randomUUID());
+      pendingRequests.current.set(slug,requestId);
+      try{sessionStorage.setItem("hub.backup.request:"+slug,requestId);}catch{/* Request still lives in this tab's memory. */}
       const res = await fetch("/api/backups", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug }),
+        body: JSON.stringify({ slug, requestId }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setTerminalOutput(`Backup creado y validado (gzip + SHA-256).\n\nArchivo: ${data.data.filename}\n\nSHA-256: ${data.data.checksum}\n\nNota: todavía no se probó una restauración en un entorno aislado.`);
+        pendingRequests.current.delete(slug);
+        try{sessionStorage.removeItem("hub.backup.request:"+slug);}catch{/* A stale request key stays idempotent on the server. */}
+        setTerminalOutput(`Solicitud registrada.\n\nTrabajo: ${data.data.jobId}\nEstado: ${data.data.state}\n\nEl worker genera y verifica la copia. Podés cerrar esta ventana y consultar el resultado en Trabajos persistentes; aún no se afirma que exista un archivo íntegro.`);
         void fetchBackups();
       } else {
+        if(res.status<500){pendingRequests.current.delete(slug);try{sessionStorage.removeItem("hub.backup.request:"+slug);}catch{/* No operation was accepted. */}}
         setTerminalOutput(`❌ Error generando backup:\n\n${data.error}`);
       }
     } catch (err: any) {
-      setTerminalOutput(`Error: ${err.message}`);
+      setTerminalOutput(`No se confirmó la respuesta del servidor: ${err.message}.\nRevisá Trabajos persistentes antes de repetir; se conservará el mismo ID de solicitud para un reintento.`);
     } finally {
       setIsTriggering(null);
       setTerminalLoading(false);
@@ -117,7 +130,7 @@ export default function BackupsPage() {
   };
 
   const manualApps = KNOWN_APPS.filter((app) =>
-    app.dbType !== "none" && !["onlypadel","onlycars","onlyerp"].includes(app.slug) &&
+    app.dbType !== "none" && ["nanolabshub","onlyfood","onlygym","onlyturn"].includes(app.slug) &&
     (app.name.toLowerCase().includes(manualSearch.trim().toLowerCase()) ||
      app.slug.toLowerCase().includes(manualSearch.trim().toLowerCase()))
   );
@@ -198,6 +211,7 @@ export default function BackupsPage() {
           </div>
         </div>
 
+        <JobPanel/>
         {/* A single primary manual action: select an application, review it, then confirm. */}
         <section aria-labelledby="manual-backup-title" className="hub-card overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.07] px-5 py-5 sm:px-6">
@@ -392,7 +406,7 @@ export default function BackupsPage() {
                     onChange={(e) => setSchedules((prev) => prev.map((s) => s.slug === schedule.slug ? { ...s, enabled: e.target.checked } : s))} />
                   Activa
                 </label>
-                <button type="button" disabled={["onlypadel","onlycars","onlyerp"].includes(schedule.slug) || scheduleSaving === schedule.slug}
+                <button type="button" disabled={!["nanolabshub","onlyfood","onlygym","onlyturn"].includes(schedule.slug) || scheduleSaving === schedule.slug}
                   onClick={() => void handleSchedule(schedule.slug, schedule.enabled, schedule.hourLocal, schedule.weekdays)}
                   className="rounded-lg border border-brand-cyan/40 px-3 py-2 text-xs font-semibold text-brand-cyan disabled:opacity-50">
                   {scheduleSaving === schedule.slug ? "Guardando…" : "Guardar"}
