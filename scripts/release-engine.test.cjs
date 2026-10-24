@@ -24,7 +24,7 @@ async function fixture(fn){
   }
   if(args[0]==="exec")return "";throw Error("Unexpected Docker call: "+args[0]);
  }
- const backup={createBackup:async(apps,slug,trigger,actor,meta)=>{assert.equal(apps.length,1);assert.equal(slug,POLICY.slug);assert.equal(meta.jobId,job.id);return {id:job.id,checksum:"f".repeat(64)};},download:async()=>({file:"fixture"}),verify:async()=>({sha:"f".repeat(64)})};
+ const backup={db:()=>new (require("node:sqlite").DatabaseSync)(path.join(dir,"hub.sqlite")),createBackup:async(apps,slug,trigger,actor,meta)=>{assert.equal(apps.length,1);assert.equal(slug,POLICY.slug);assert.equal(meta.jobId,job.id);return {id:job.id,checksum:"f".repeat(64)};},download:async()=>({file:"fixture"}),verify:async()=>({sha:"f".repeat(64)})};
  const restore={checkIsolated:async()=>({status:restorePassed?"passed":"failed",checksum:"f".repeat(64)})};
  const store=createJobStore({dataDir:dir,clock:()=>now,leaseMs:10000});const pending=store.enqueue({kind:"release",resource:POLICY.slug,key:crypto.randomUUID(),actor:"owner",payload:{releaseId:"approved"},maxAttempts:1}),job=store.claim("release",[POLICY.slug]);
  const engine=createReleaseEngine({run,dataDir:dir,configurationPath,runtimeDir,load,backup,restore,validateActor:()=>actorAllowed,clock:()=>now,sleep:async()=>{},healthAttempts:2});

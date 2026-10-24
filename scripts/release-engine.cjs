@@ -5,6 +5,7 @@ const {POLICY,IMAGE,UUID,docker,readFile,hash,runtimeFingerprint,loadCatalog}=re
 function escapeCompose(value){if(typeof value==="string")return value.replace(/\$/g,()=>"$$");if(Array.isArray(value))return value.map(escapeCompose);if(value&&typeof value==="object")return Object.fromEntries(Object.entries(value).map(([k,v])=>[k,escapeCompose(v)]));return value;}
 function createReleaseEngine({run=docker,policy=POLICY,dataDir=process.env.DATA_DIR||"/app/data",configurationPath=process.env.HUB_RELEASE_CONFIGURATION_PATH,runtimeDir=process.env.HUB_RELEASE_RUNTIME_DIR,load=()=>loadCatalog(),backup,restore,validateActor,clock=Date.now,sleep=ms=>new Promise(r=>setTimeout(r,ms)),healthAttempts=30}={}){
  const lockPath=path.join(dataDir,"release.lock");
+ function audit(job,action,details){const d=backup.db();try{d.exec("CREATE TABLE IF NOT EXISTS audit_log(id INTEGER PRIMARY KEY AUTOINCREMENT,timestamp TEXT NOT NULL,user TEXT NOT NULL,action TEXT NOT NULL,target TEXT NOT NULL,details TEXT NOT NULL)");d.prepare("INSERT INTO audit_log(timestamp,user,action,target,details) VALUES(?,?,?,?,?)").run(new Date(clock()).toISOString(),job.actor,action,policy.slug,job.id+" "+details);}finally{d.close();}}
  function evidencePath(id){if(!UUID.test(id))throw Error("Trabajo inválido");return path.join(dataDir,"release-"+id+".json");}
  function writeEvidence(id,value){const target=evidencePath(id),tmp=target+".part";fs.writeFileSync(tmp,JSON.stringify(value),{mode:0o600});fs.renameSync(tmp,target);}
  async function inspect(){const item=JSON.parse(await run(["inspect",policy.container]))[0];if(item?.Name!=="/"+policy.container||item.Config?.Labels?.["com.docker.compose.project"]!==policy.project||item.Config?.Labels?.["com.docker.compose.service"]!==policy.service)throw Error("El contenedor no pertenece al servicio Hub aprobado");return item;}
@@ -40,6 +41,7 @@ function createReleaseEngine({run=docker,policy=POLICY,dataDir=process.env.DATA_
    const archive=await backup.createBackup(apps,policy.slug,"release",job.actor,{jobId:job.id});
    const check=await restore.checkIsolated(apps,archive.id,job.actor,{jobId:job.id});
    if(check.status!=="passed"||check.checksum!==archive.checksum)throw Error("No se aprobó la restauración del backup previo");
+   audit(job,"HUB_RELEASE_STARTED",release.revision+" backup="+archive.id);
    // Revalidate after the expensive backup. No expired approval or drift at mutation time.
    if(hash(load())!==hash(catalog)||!validateActor(job,catalog)||!leaseValid())throw Error("La aprobación o el lease cambió durante la preparación");
    const still=await inspect();if(still.Id!==current.Id||runtimeFingerprint(still,catalog.environmentKeys)!==catalog.runtimeFingerprint||hash(await neighbors())!==hash(before))throw Error("El entorno cambió durante la preparación");
@@ -53,10 +55,11 @@ function createReleaseEngine({run=docker,policy=POLICY,dataDir=process.env.DATA_
     await apply(forward);await healthy(release.imageId,catalog,before);
     if(!leaseValid())throw Error("Lease perdido; se requiere reconciliar");
     evidence.phase="healthy";evidence.at=clock();writeEvidence(job.id,evidence);
+    audit(job,"HUB_RELEASE_SUCCEEDED",release.revision);
     return {releaseId:release.id,revision:release.revision,imageId:release.imageId,backupId:archive.id,checksum:archive.checksum,neighborsUnchanged:true,rolledBack:false};
    }catch{
     evidence.phase="rolling-back";writeEvidence(job.id,evidence);
-    try{await apply(rollback);await healthy(current.Image,catalog,before);if(!leaseValid())throw Error("Lease perdido");evidence.phase="rolled-back";evidence.at=clock();writeEvidence(job.id,evidence);}catch{const error=Error("No se confirmó el estado final; revisar despliegue y bloqueo antes de repetir");error.uncertain=true;throw error;}
+    try{await apply(rollback);await healthy(current.Image,catalog,before);if(!leaseValid())throw Error("Lease perdido");evidence.phase="rolled-back";evidence.at=clock();writeEvidence(job.id,evidence);audit(job,"HUB_RELEASE_ROLLED_BACK",current.Image);}catch{const error=Error("No se confirmó el estado final; revisar despliegue y bloqueo antes de repetir");error.uncertain=true;throw error;}
     const error=Error("La versión no aprobó la verificación; Hub volvió a la imagen anterior sin restaurar la base");error.rolledBack=true;throw error;
    }
   }catch(error){retain=!!error.uncertain||(mutating&&!['healthy','rolled-back'].includes(evidence?.phase));if(retain)error.uncertain=true;throw error;}
