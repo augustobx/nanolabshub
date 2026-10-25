@@ -469,7 +469,7 @@ export default function BackupsPage() {
                 <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
                   {backup.status === "verified" && <a href={`/api/backups/download?id=${encodeURIComponent(backup.id)}`}
                     className="rounded-lg border border-brand-cyan/30 px-3 py-2 text-brand-cyan">Descargar backup</a>}
-                  <span className="text-slate-500">{backup.trigger === "scheduled" ? "Programado" : backup.trigger === "imported" ? "Importado" : "Manual"} · {backup.restoreTested ? "Restauración probada" : "Restauración no probada"}</span>
+                  <span className="text-slate-500">{backup.trigger === "release" ? "Previo a actualización" : backup.trigger === "scheduled" ? "Programado" : backup.trigger === "imported" ? "Importado" : "Manual"} · {backup.restoreTested ? "Restauración probada" : "Restauración no probada"}</span>
                 </div>
                 <div className="mt-3 flex flex-wrap justify-between gap-2 border-t border-white/[0.07] pt-3 text-[11px]">
                   <span className="text-slate-400">{backup.dbType.toUpperCase()} · {backup.sizeFormatted}</span>

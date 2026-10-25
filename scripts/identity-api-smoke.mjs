@@ -20,6 +20,8 @@ assert.ok(token);
 await call("/api/auth/users",{method:"POST",token,origin:"https://untrusted.example.invalid",body:{},status:403});
 const users=await call("/api/auth/users",{token});assert(users.data.every(u=>!('password_hash' in u)&&!('mfa_secret' in u)));
 await call("/api/apps/deploy",{token,status:503}); // No approved catalog in this isolated HTTP runtime.
+await call("/api/maintenance/images",{token,status:503});
+await call("/api/maintenance/images",{method:"POST",token,body:{imageIds:[],requestId:randomUUID(),confirmation:"yes"},status:403});
 await call("/api/apps/deploy",{method:"POST",token,origin:"https://untrusted.example.invalid",body:{slug:"nanolabshub"},status:403});
 await call("/api/apps/deploy",{method:"POST",token,body:{slug:"onlyfood",releaseId:"unapproved",requestId:randomUUID()},status:403});
 await call("/api/apps/deploy",{method:"POST",token,body:{slug:"nanolabshub",releaseId:"unapproved",requestId:randomUUID()},status:403});
@@ -55,6 +57,8 @@ for(const role of ["viewer","operator"]){
   await call("/api/auth/account",{token:login.cookie,status:401});
   const active=enrolled.cookie;assert.ok(active);
   await call("/api/apps/deploy",{token:active,status:403});
+  await call("/api/maintenance/images",{token:active,status:403});
+  await call("/api/maintenance/images",{method:"POST",token:active,body:{imageIds:[],requestId:randomUUID(),confirmation:"yes"},status:403});
   await call("/api/apps/deploy",{method:"POST",token:active,body:{slug:"nanolabshub",releaseId:"unapproved",requestId:randomUUID()},status:403});
   await call("/api/jobs",{token:active});
   const inventory=await call("/api/backups/import",{token:active,status:role==="viewer"?403:200});
@@ -71,6 +75,7 @@ for(const role of ["viewer","operator"]){
   await call("/api/auth/account",{token:active,status:401});
 }
 for(const containerName of ["onlypadel-web","onlycars-app-1","onlyerp-web"])await call("/api/apps/restart",{method:"POST",token,body:{containerName},status:403});
+await call("/api/apps/restart",{method:"POST",token,body:{containerName:"nanolabshub"},status:403});
 await call("/api/auth/logout",{method:"POST",token});
 await call("/api/auth/account",{token,status:401});
 console.log("Real isolated identity API assertions:",assertions);

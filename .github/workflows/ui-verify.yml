@@ -72,7 +72,7 @@ jobs:
         run: node --test scripts/saas-bridge.test.cjs scripts/saas-management.test.cjs
 
       - name: Backup engine safety tests
-        run: node --test scripts/backup-engine.test.cjs scripts/job-store.test.cjs scripts/backup-runner.test.cjs scripts/release-engine.test.cjs
+        run: node --test scripts/backup-engine.test.cjs scripts/job-store.test.cjs scripts/backup-runner.test.cjs scripts/release-engine.test.cjs scripts/image-maintenance.test.cjs
       - name: Authentication, operations and truthfulness regressions
         run: node --test scripts/audit-security.test.cjs scripts/identity.test.cjs scripts/route-coverage.test.cjs
       - name: Production dependency audit

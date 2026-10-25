@@ -10,17 +10,17 @@ function actorValidator({db,clock=Date.now,publicKeyPath=process.env.HUB_RELEASE
   const d=db();try{return !!d.prepare("SELECT 1 FROM auth_users WHERE username=? AND active=1 AND role='owner' AND mfa_secret IS NOT NULL").get(job.actor);}finally{d.close();}
  };
 }
-function createReleaseWorker({store,engine,dataDir=process.env.DATA_DIR||"/app/data"}){
+function createReleaseWorker({store,engine,maintenance,dataDir=process.env.DATA_DIR||"/app/data"}){
  let working=false;
  function heartbeat(){fs.mkdirSync(dataDir,{recursive:true,mode:0o700});const target=path.join(dataDir,"release-worker-heartbeat");fs.writeFileSync(target+".part",String(Date.now()),{mode:0o600});fs.renameSync(target+".part",target);}
  async function tick(){
   if(working)return;working=true;
   let timer;
   try{
-   heartbeat();store.expire();const job=store.claim("release",[POLICY.slug]);if(!job)return;
+   heartbeat();store.expire();const job=store.claim("release",[POLICY.slug])||(maintenance?store.claim("maintenance",[POLICY.slug]):null);if(!job)return;
    let lost=false;
    timer=setInterval(()=>{try{if(!store.heartbeat(job.id,job.lease_owner))lost=true;}catch{lost=true;}},20000);timer.unref();
-   try{const result=await engine.execute(job,{leaseValid:()=>!lost});store.finish(job.id,job.lease_owner,result);}
+   try{const result=await (job.kind==="maintenance"?maintenance:engine).execute(job,{leaseValid:()=>!lost});store.finish(job.id,job.lease_owner,result);}
    catch(error){try{store.fail(job.id,job.lease_owner,error.message,{uncertain:lost||!!error.uncertain,retryable:false});}catch{/* Lost leases stay uncertain, never replayed. */}}
   }finally{clearInterval(timer);working=false;}
  }
@@ -29,9 +29,12 @@ function createReleaseWorker({store,engine,dataDir=process.env.DATA_DIR||"/app/d
 function production(){
  const dataDir=process.env.DATA_DIR||"/app/data",backup=require("./backup-engine.cjs"),restore=require("./recovery-engine.cjs");
  process.env.HUB_RELEASE_WORKER_INSTANCE=require("node:crypto").randomUUID();fs.mkdirSync(dataDir,{recursive:true,mode:0o700});fs.writeFileSync(path.join(dataDir,"release-worker-instance"),process.env.HUB_RELEASE_WORKER_INSTANCE,{mode:0o600});
+ fs.writeFileSync(path.join(dataDir,"release-worker-capabilities.json"),JSON.stringify({instance:process.env.HUB_RELEASE_WORKER_INSTANCE,kinds:["release","maintenance"]}),{mode:0o600});
  const store=require("./job-store.cjs").createJobStore({dataDir});
- const engine=require("./release-engine.cjs").createReleaseEngine({dataDir,backup,restore,validateActor:actorValidator({db:backup.db})});
- return {worker:createReleaseWorker({store,engine,dataDir}),engine,store};
+ const validateActor=actorValidator({db:backup.db});
+ const engine=require("./release-engine.cjs").createReleaseEngine({dataDir,backup,restore,validateActor});
+ const maintenance=require("./image-maintenance.cjs").createImageMaintenance({dataDir,store,db:backup.db,validateActor});
+ return {worker:createReleaseWorker({store,engine,maintenance,dataDir}),engine,maintenance,store};
 }
 if(require.main===module){const {worker}=production();const pulse=setInterval(()=>{try{worker.heartbeat();}catch{process.exitCode=1;}},5000);pulse.unref();const poll=setInterval(()=>void worker.tick().catch(()=>{process.exitCode=1;}),5000);void worker.tick();process.on("SIGTERM",()=>{clearInterval(poll);clearInterval(pulse);process.exitCode=0;});}
 module.exports={actorValidator,createReleaseWorker,production};

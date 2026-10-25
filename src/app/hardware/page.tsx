@@ -1,5 +1,6 @@
 "use client";
 
+import { MaintenancePanel } from "@/components/MaintenancePanel";
 import { Header } from "@/components/Header";
 import { TerminalModal } from "@/components/TerminalModal";
 import { ContainerInfo,ServerMetrics } from "@/lib/types";
@@ -10,11 +11,11 @@ HardDrive,
 Layers,
 RotateCw,
 Terminal,
-Trash2,
 TrendingUp
 } from "lucide-react";
 import { useEffect,useRef,useState } from "react";
 
+const restartBlocked=(name:string)=>/^(nanolabshub|onlypadel|onlycars|onlyerp)(?:[_.-]|$)/.test(name);
 export default function HardwarePage() {
   const [metrics, setMetrics] = useState<ServerMetrics | null>(null);
   const [containers, setContainers] = useState<ContainerInfo[]>([]);
@@ -155,14 +156,11 @@ export default function HardwarePage() {
               Supervisá el entorno sin salir del Hub.
             </p>
           </div>
-          <button type="button" disabled
-            title="Limpieza global bloqueada: requiere revisión fuera del Hub"
-            className="inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-xl border border-amber-400/20 bg-amber-400/[0.07] px-4 py-3 text-xs font-semibold text-amber-200 transition-colors hover:bg-amber-400/10">
-            <Trash2 className="h-4 w-4" /> Limpieza global bloqueada
-          </button>
+
         </section>
 
         {error&&<p role="alert" className="text-sm text-amber-200">{error}. Sin mediciones actuales.</p>}
+        <MaintenancePanel />
         {/* Primary Hardware Gauges */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {/* CPU Card */}
@@ -403,7 +401,7 @@ export default function HardwarePage() {
                     className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] text-xs text-slate-200">
                     <Terminal className="h-4 w-4 text-brand-cyan" /> Logs
                   </button>
-                  <button type="button" onClick={() => handleRestartContainer(container.name)}
+                  <button type="button" disabled={restartBlocked(container.name)} title={container.name.startsWith("nanolabshub")?"Actualizá el Hub desde Software con el worker":"El recurso puede estar protegido"} onClick={() => handleRestartContainer(container.name)}
                     className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg border border-amber-400/20 bg-amber-400/[0.04] text-xs text-amber-200">
                     <RotateCw className="h-4 w-4" /> Reiniciar
                   </button>
@@ -472,9 +470,9 @@ export default function HardwarePage() {
                           <span>Logs</span>
                         </button>
                         <button
-                          onClick={() => handleRestartContainer(c.name)}
+                          disabled={restartBlocked(c.name)} onClick={() => handleRestartContainer(c.name)}
                           className="px-2 py-1 rounded bg-surface-100 hover:bg-amber-500/20 text-gray-300 hover:text-amber-400 border border-white/5 hover:border-amber-500/30 text-[10px] font-mono flex items-center gap-1 transition-all"
-                          title={`Reiniciar contenedor ${c.name}`}
+                          title={restartBlocked(c.name)?"Recurso protegido; el Hub se actualiza desde Software":`Reiniciar contenedor ${c.name}`}
                         >
                           <RotateCw className="w-3 h-3 text-amber-400" />
                           <span>Reiniciar</span>

@@ -14,6 +14,7 @@ export function assertContainerMutable(name: string) {
   const owner = KNOWN_APPS.find(a => a.containerNames.some(n => n === name || name.startsWith(n + "-")));
   if (!owner) throw new Error("Contenedor fuera del inventario permitido");
   assertProductMutable(owner.slug);
+  if(owner.slug==="nanolabshub")throw new Error("El Hub se actualiza desde Software mediante el worker independiente; el reinicio directo puede interrumpir backups o restores");
 }
 export function assertDeploymentAllowed(): never {
   throw new Error("Despliegue genérico deshabilitado: requiere un release con imagen, respaldo y composición efectiva verificados. Utilizá el procedimiento documentado.");

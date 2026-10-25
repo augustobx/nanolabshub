@@ -10,10 +10,10 @@ funcionalidad terminada. Los hallazgos H01–H27 están documentados en
 | --- | --- | --- | --- |
 | C01 | Usuarios, roles, MFA | Bootstrap único, hash resistente, TOTP/recovery de un uso, autorización por recurso y UI real | Desplegado y probado en aislamiento; producción registra propietario con MFA activo, preservado en PR #7 |
 | C02 | Revocación persistente | Cookie copiada rechazada tras logout, revocación, cambio de contraseña/permisos; idle/TTL | Desplegado; cookie revocada rechazada en producción y en API aislada |
-| C03 | Deploy seguro desde Hub | Manifest efectivo, imagen, backup, CI, salud, rollback, vecinos intactos | Implementación en curso en `codex/hub-safe-releases-20261024`; requiere CI, sandbox Docker y activación productiva |
+| C03 | Deploy seguro desde Hub | Manifest efectivo, imagen, backup, CI, salud, rollback, vecinos intactos | Desplegado en PR #9, revisión 7b1258d y CI 40127881138 aprobado; job productivo 4bc2eb0e-2f43-48bf-ba28-5d88866e1d65 exitoso, backup restaurado antes del cambio y 36 vecinos intactos |
 | C04 | Réplica externa automática | Copia cifrada independiente y recuperación desde el remoto | Preparación pendiente; el usuario confirmó que todavía no tiene destino |
 | C05 | Restore MariaDB/PostgreSQL | Instancias temporales aisladas y evidencia por motor | Desplegado en PR #7; SQL sintético nativo validado y copia real SQLite del Hub aprobada. PR #8 desplegado: 17 archivos reales restaurados (Hub 9, Food 2, Gym 4, Turn 2); copia histórica truncada de Turn excluida |
-| C06 | Jobs recuperables | Claim atómico, lease, reintento, resultado incierto y reconciliación | Backups y restores desplegados en PR #7, con evidencia por job y checksum; imports desplegados en PR #8; releases en preparación |
+| C06 | Jobs recuperables | Claim atómico, lease, reintento, resultado incierto y reconciliación | Backups y restores desplegados en PR #7, con evidencia por job y checksum; imports desplegados en PR #8; releases desplegados en PR #9, con exclusión atómica y reconciliación comprobada |
 | C07 | Retención | Política explícita, archivo íntegro y recuperación antes de purga | Pendiente |
 | C08 | Lint obligatorio | ESLint CLI sin interacción ni warnings; gate en CI | Gate obligatorio aprobado en PR #6; se conserva para cada release |
 | C09 | Importación de backups | Pertenencia, hash, formato, restore y deduplicación | Desplegada en PR #8, revisión b5915e28 y CI 40126048967 aprobado; 17 copias reales válidas, un duplicado evitado; originales conservados. Food vacío y Turn truncado excluidos |
@@ -31,7 +31,7 @@ funcionalidad terminada. Los hallazgos H01–H27 están documentados en
 | Operaciones | Docker/health/Git/lifecycle | Estado real, autorización, errores, concurrencia y recuperación |
 | Software | Versiones y releases | Revisión identificada, deploy como job y logs acotados |
 | Infraestructura | Inventario Docker y host | Estados paused/starting/restarting, jobs finalizados y datos desconocidos |
-| Hardware | Telemetría y mantenimiento | Datos frescos; mantenimiento acotado; sin prune global |
+| Hardware | Telemetría y mantenimiento | Datos frescos; mantenimiento de imágenes propias en validación en esta rama; sin prune global |
 | Networking | Registry, puertos y comprobaciones HTTP | Links reales, estado desconocido visible, sin exponer bases |
 | Seguridad | Estado de identidad/conectores/réplica | Capacidades efectivas; ninguna afirmación por configuración solamente |
 | Mi cuenta | Usuarios, MFA y sesiones propias persistidas | Enrolamiento, recuperación, permisos, revocación y cambio de contraseña |
@@ -53,7 +53,8 @@ La prueba de cobertura debe detectar rutas nuevas sin registro explícito.
 | Lecturas | apps, operations, telemetry, telemetry/history, infrastructure, governance, alerts, audit, security/summary | Sesión persistente con MFA; fallos sin fallback saludable |
 | Logs | apps/logs, apps/logs/stream | Propietario u operador asignado al recurso; límites y cancelación |
 | Lifecycle | apps/lifecycle GET/POST | Lectura autenticada; cambio con MFA reciente, alcance y protección de productos |
-| Releases | apps/deploy, apps/deploy/stream | Bloqueados hasta cumplir C03; luego rol, alcance y revisión verificadas |
+| Releases | apps/deploy, apps/deploy/stream | Deploy aprobado del Hub con propietario/MFA, catálogo y worker; streaming genérico retirado |
+| Mantenimiento | maintenance/images GET/POST | Propietario con MFA; selección explícita, revisión de referencias/pins y job durable, sin prune global |
 | Gestión | saas-management/[slug] GET/POST | Aplicación autorizada; mutaciones con MFA reciente y contrato firmado |
 | Backups | backups GET/POST, backups/schedule, backups/download, backups/restore-check | Lectura autenticada; descarga restringida; cambio por app y MFA reciente |
 | Scheduler | backups/schedule/run POST | Clave de máquina independiente; ninguna sesión humana la sustituye |

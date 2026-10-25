@@ -38,8 +38,15 @@ async function main(){
   const result=await engine.execute(good);assert.equal(result.imageId,target);assert.equal(result.neighborsUnchanged,true);
   const failure={...good,id:crypto.randomUUID(),payload:{releaseId:"bad"}};await assert.rejects(engine.execute(failure),e=>e.rolledBack===true&&!e.uncertain);
   const final=JSON.parse(await docker(["inspect",prefix]))[0];assert.equal(final.Image,target);assert.equal(final.State.Health.Status,"healthy");assert.equal(final.Config.Env.find(e=>e.startsWith("SECRET_LITERAL=")),"SECRET_LITERAL=$HOME $(id) `literal` $$value");
+  // Only this fixture namespace is eligible. Simulated age exercises the
+  // seven-day rule without changing the server clock or production policy.
+  const unused=await image("unused");catalog.releases.push({id:"rollback-pin",imageId:prior,revision});
+  const maintenance=require("./image-maintenance.cjs").createImageMaintenance({policy,dataDir:process.env.DATA_DIR,load:()=>catalog,clock:()=>Date.now()+8*86400000,validateActor:()=>true,db:backup.db});
+  const candidates=await maintenance.inventory();assert.deepEqual(candidates.map(i=>i.imageId),[unused]);
+  const cleanup=await maintenance.execute({id:crypto.randomUUID(),kind:"maintenance",resource:policy.slug,actor:"synthetic-qa-owner",payload:{images:[{imageId:unused,tag:prefix+":unused"}]}});
+  assert.equal(cleanup.removed.length,1);assert.equal(cleanup.volumesDeleted,0);assert.equal(JSON.parse(await docker(["image","inspect",prior]))[0].Id,prior);
   const source=new DatabaseSync(path.join(process.env.DATA_DIR,"hub.sqlite"),{readOnly:true});try{assert.equal(source.prepare("SELECT COUNT(*) AS n FROM fixture").get().n,2);assert.equal(source.prepare("SELECT COUNT(*) AS n FROM backup_restore_checks WHERE status='passed'").get().n,2);}finally{source.close();}
-  console.log(JSON.stringify({sandbox:true,forwardPassed:true,rollbackPassed:true,backupsRestored:2,literalEnvironmentPreserved:true,neighborsUnchanged:true,productionDatabaseMutations:0}));
+  console.log(JSON.stringify({sandbox:true,forwardPassed:true,rollbackPassed:true,backupsRestored:2,literalEnvironmentPreserved:true,neighborsUnchanged:true,temporaryImagesRemoved:1,simulatedFixtureAge:true,volumesDeleted:0,productionDatabaseMutations:0}));
  }finally{
   // Remove only the two unique containers created above, and our own tagged fixture images.
   for(const name of [prefix,neighbor]){try{const c=JSON.parse(await docker(["inspect",name]))[0];if(c.Name==="/"+name&&(name===prefix?c.Config.Labels?.["com.docker.compose.project"]===prefix:c.Config.Labels?.["nanohub.qa"]==="release"))await docker(["rm","-f",c.Id]);}catch{/* Creation may have failed. */}}

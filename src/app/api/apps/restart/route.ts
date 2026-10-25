@@ -2,6 +2,7 @@ import { restartContainer } from "@/lib/server-api";
 import { requireMutatingSession } from "@/lib/action-security";
 import { assertContainerAppActive } from "@/lib/app-lifecycle";
 import { getDatabase } from "@/lib/db";
+import { assertContainerMutable } from "@/lib/operational-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,7 @@ export async function POST(req: Request) {
       return Response.json({ success: false, error: "containerName is required" }, { status: 400 });
     }
 
+    try{assertContainerMutable(containerName);}catch(error){return Response.json({success:false,error:error instanceof Error?error.message:"Reinicio no permitido"},{status:403});}
     assertContainerAppActive(containerName);
     const db = getDatabase();
     db.logAudit(actor,"CONTAINER_RESTART_STARTED",containerName,"Reinicio solicitado");
