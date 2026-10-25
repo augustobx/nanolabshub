@@ -34,6 +34,7 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/scripts/backup-engine.cjs /app/scripts/backup-engine.cjs
+COPY --from=builder /app/scripts/backup-schedule.cjs /app/scripts/backup-schedule.cjs
 COPY --from=builder /app/scripts/hub-identity.cjs /app/scripts/hub-identity.cjs
 COPY --from=builder /app/scripts/recover-owner.cjs /app/scripts/recover-owner.cjs
 COPY --from=builder /app/scripts/job-store.cjs /app/scripts/job-store.cjs

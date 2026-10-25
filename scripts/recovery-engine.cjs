@@ -9,22 +9,23 @@ const LIMIT=512*1024*1024,busy=new Set();
 function listChecks(slug){
   const db=backup.db();try{
     ensureRestoreSchema(db);
-    return slug?db.prepare("SELECT id,backup_id AS backupId,slug,checked_at AS checkedAt,status,details,checksum FROM backup_restore_checks WHERE slug=? ORDER BY checked_at DESC,rowid DESC LIMIT 150").all(slug):
+    return slug?db.prepare("SELECT id,backup_id AS backupId,slug,checked_at AS checkedAt,status,details,checksum,duration_ms AS durationMs FROM backup_restore_checks WHERE slug=? ORDER BY checked_at DESC,rowid DESC LIMIT 150").all(slug):
       db.prepare("SELECT id,backup_id AS backupId,slug,checked_at AS checkedAt,status,details,checksum FROM backup_restore_checks ORDER BY checked_at DESC,rowid DESC LIMIT 250").all();
   }finally{db.close();}
 }
-function record(id,slug,actor,status,details,checksum,manifest=null,jobId=null){
+function record(id,slug,actor,status,details,checksum,manifest=null,jobId=null,durationMs=null){
   const db=backup.db(),checkedAt=new Date().toISOString(),uid=crypto.randomUUID();
   try{
     ensureRestoreSchema(db);
-    db.prepare("INSERT INTO backup_restore_checks(id,backup_id,slug,checked_at,actor,status,details,checksum,manifest,job_id) VALUES(?,?,?,?,?,?,?,?,?,?)")
-      .run(uid,id,slug,checkedAt,actor,status,details,checksum,manifest?JSON.stringify(manifest):null,jobId);
+    db.prepare("INSERT INTO backup_restore_checks(id,backup_id,slug,checked_at,actor,status,details,checksum,manifest,job_id,duration_ms) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
+      .run(uid,id,slug,checkedAt,actor,status,details,checksum,manifest?JSON.stringify(manifest):null,jobId,durationMs);
     db.prepare("INSERT INTO audit_log(timestamp,user,action,target,details) VALUES(?,?,?,?,?)")
       .run(checkedAt,actor,status==="passed"?"BACKUP_RESTORE_CHECK_PASSED":"BACKUP_RESTORE_CHECK_FAILED",slug,id);
-    return {id:uid,backupId:id,slug,checkedAt,status,details,checksum};
+    return {id:uid,backupId:id,slug,checkedAt,status,details,checksum,durationMs};
   }finally{db.close();}
 }
 async function checkIsolated(apps,id,actor,metadata={}){
+  const started=performance.now(),duration=()=>Math.max(0,Math.round(performance.now()-started));
   if(process.env.HUB_BACKUPS_ENABLED!=="true")throw Error("Backups deshabilitados");
   if(typeof id!=="string"||!/^[a-f0-9-]{36}$/.test(id))throw Error("Identificador inválido");
   if(metadata.jobId&&!/^[a-f0-9-]{36}$/.test(metadata.jobId))throw Error("ID de trabajo inválido");
@@ -49,7 +50,7 @@ async function checkIsolated(apps,id,actor,metadata={}){
     if(app.dbType!=="sqlite"){
       const manifest=await sandbox.restore(app,b.file,{format:b.name.endsWith(".dump.gz")?"postgres-custom":"sql"});
       if((await backup.verify(b.file)).sha!==checksum)throw Error("El archivo cambió durante la restauración");
-      return record(id,slug,actor,"passed",`${app.dbType}: restauración aislada, ${manifest.tables} tablas y ${manifest.rows} filas. Conteos de la copia restaurada; no comparados con producción. ${manifest.format==="postgres-custom"?"Dump de una base: propietarios y privilegios omitidos en el sandbox. ":""}La aplicación no se inició.`,checksum,manifest,metadata.jobId);
+      return record(id,slug,actor,"passed",`${app.dbType}: restauración aislada, ${manifest.tables} tablas y ${manifest.rows} filas. Conteos de la copia restaurada; no comparados con producción. ${manifest.format==="postgres-custom"?"Dump de una base: propietarios y privilegios omitidos en el sandbox. ":""}La aplicación no se inició.`,checksum,manifest,metadata.jobId,duration());
     }
     if(!b.name.endsWith(".sqlite.gz"))throw Error("Extensión SQLite incorrecta");
     await fsp.mkdir(root,{recursive:true,mode:0o700});
@@ -76,11 +77,11 @@ async function checkIsolated(apps,id,actor,metadata={}){
       if(db.prepare("PRAGMA foreign_key_check").all().length)throw Error("foreign_key_check detectó errores");
       const tables=db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all().map(t=>({table:t.name,rows:db.prepare('SELECT count(*) AS n FROM "'+t.name.replaceAll('"','""')+'"').get().n}));
       if((await backup.verify(b.file)).sha!==checksum)throw Error("El archivo cambió durante la restauración");
-      return record(id,slug,actor,"passed","Copia SQLite aislada: "+bytes+" bytes, "+tables.length+" tablas; integrity_check=ok; foreign_key_check=0. Conteos de la copia; sin comparación con producción. No se inició la app.",checksum,{engine:"sqlite",bytes,tables,comparison:"restored-copy-only",applicationStarted:false},metadata.jobId);
+      return record(id,slug,actor,"passed","Copia SQLite aislada: "+bytes+" bytes, "+tables.length+" tablas; integrity_check=ok; foreign_key_check=0. Conteos de la copia; sin comparación con producción. No se inició la app.",checksum,{engine:"sqlite",bytes,tables,comparison:"restored-copy-only",applicationStarted:false},metadata.jobId,duration());
     }finally{db?.close();}
   }catch(err){
     retainLock=!!err.uncertain;
-    if(slug)record(id,slug,actor,"failed",(err instanceof Error?err.message:"Error de prueba").slice(0,220),checksum,null,metadata.jobId);
+    if(slug)record(id,slug,actor,"failed",(err instanceof Error?err.message:"Error de prueba").slice(0,220),checksum,null,metadata.jobId,duration());
     throw err;
   }finally{
     if(folder)await fsp.rm(folder,{recursive:true,force:true}).catch(()=>{});

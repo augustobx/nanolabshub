@@ -11,7 +11,7 @@ test("restore evidence migrates legacy checks without inventing proof and binds 
   assert.equal(latestEvidence(db,archive).restoreTested,false);
   const add=db.prepare("INSERT INTO backup_restore_checks(id,backup_id,slug,checked_at,actor,status,details,checksum) VALUES(?,'archive','nanolabshub',?,'ci',?,'test',?)");
   add.run("one","2026-10-24T00:00:00Z","passed","sha-a");
-  assert.deepEqual(latestEvidence(db,archive),{restoreTested:true,restoreStatus:"passed",restoreCheckedAt:"2026-10-24T00:00:00Z"});
+  assert.deepEqual(latestEvidence(db,archive),{restoreTested:true,restoreStatus:"passed",restoreCheckedAt:"2026-10-24T00:00:00Z",restoreDurationMs:null});
   assert.equal(latestEvidence(db,{...archive,checksum:"sha-b"}).restoreTested,false);
   add.run("two","2026-10-24T00:01:00Z","failed","sha-a");
   assert.equal(latestEvidence(db,archive).restoreStatus,"failed");

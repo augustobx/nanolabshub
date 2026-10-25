@@ -15,7 +15,7 @@ export const backupEngine = require("../../scripts/backup-engine.cjs") as {
   list(apps: typeof KNOWN_APPS): Array<Record<string,unknown>>;
   externalInventory(apps: typeof KNOWN_APPS): Array<{slug:string;count:number|null;totalBytes:number|null;lastModified:string|null;status:string}>;
   download(apps: typeof KNOWN_APPS, id: string): Promise<{file:string;name:string;size:number}>;
-  schedules(apps: typeof KNOWN_APPS): Array<{slug:string;name:string;enabled:boolean;hourLocal:number;weekdays:string;lastRunDay:string|null}>;
-  schedule(apps: typeof KNOWN_APPS, slug:string, cfg:{enabled:boolean;hourLocal:number;weekdays:string}, actor:string):void;
+  schedules(apps: typeof KNOWN_APPS): Array<{slug:string;name:string;enabled:boolean;hourLocal:number;weekdays:string;lastRunDay:string|null;lastRunSlot:string|null;intervalHours:number;autoRestore:boolean}>;
+  schedule(apps: typeof KNOWN_APPS, slug:string, cfg:{enabled:boolean;hourLocal:number;weekdays:string;intervalHours?:number;autoRestore?:boolean}, actor:string):void;
   tick(apps: typeof KNOWN_APPS):Promise<Array<Record<string,unknown>>>;
 };

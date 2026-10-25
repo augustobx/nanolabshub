@@ -5,11 +5,12 @@ import { Header } from "@/components/Header";
 import { JobPanel } from "@/components/JobPanel";
 import { KNOWN_APPS } from "@/lib/apps-registry";
 import { ArrowUpRight, CheckCircle2, CircleAlert, DatabaseBackup, Download, ShieldCheck, RefreshCw, FlaskConical, HardDrive, CloudOff } from "lucide-react";
-type Backup = {id:string;appSlug:string;filename:string;status:string;createdAt:string;sizeFormatted:string;checksum?:string;error?:string;dbType:string;restoreTested?:boolean;restoreCheckedAt?:string|null;restoreStatus?:string};
-type Check = {id:string;backupId:string;slug:string;status:"passed"|"failed";checkedAt:string;details:string};
+type Backup = {id:string;appSlug:string;filename:string;status:string;createdAt:string;sizeFormatted:string;checksum?:string;error?:string;dbType:string;restoreTested?:boolean;restoreCheckedAt?:string|null;restoreStatus?:string;capturedAt?:string|null;restoreDurationMs?:number|null;trigger?:string};
+type Check = {id:string;backupId:string;slug:string;status:"passed"|"failed";checkedAt:string;details:string;durationMs?:number|null};
 function time(date?:string){return date?new Date(date).toLocaleString("es-AR"):"Sin registro";}
 export default function ContinuityPage(){
  const [backups,setBackups]=useState<Backup[]>([]),[checks,setChecks]=useState<Check[]>([]);
+ const [schedules,setSchedules]=useState<Array<{slug:string;enabled:boolean;intervalHours:number;weekdays:string}>>([]);
  const [known,setKnown]=useState(false),[errors,setErrors]=useState<string[]>([]);
  const [loading,setLoading]=useState(true),[running,setRunning]=useState<string|null>(null);
  const [feedback,setFeedback]=useState<string|null>(null);
@@ -23,10 +24,10 @@ export default function ContinuityPage(){
    const results=await Promise.allSettled(sources.map(async u=>{
      const r=await fetch(u,{cache:"no-store"}),j=await r.json();
      if(!r.ok||j.success!==true)throw Error(j.error||"Servicio no disponible");
-     return j.data;
+     return u==="/api/backups"?{backups:j.data,schedules:j.schedules||[]}:j.data;
    }));
    if(current!==generation.current)return;
-   if(results[0].status==="fulfilled"){setBackups(results[0].value);setKnown(true);}else{setBackups([]);setKnown(false);}
+   if(results[0].status==="fulfilled"){setBackups(results[0].value.backups);setSchedules(results[0].value.schedules);setKnown(true);}else{setBackups([]);setSchedules([]);setKnown(false);}
    if(results[1].status==="fulfilled")setChecks(results[1].value);else setChecks([]);
    setErrors(results.flatMap((r,i)=>r.status==="rejected"?[sources[i]+": "+String(r.reason?.message||"sin respuesta")]:[]));
    setLoading(false);
@@ -39,7 +40,8 @@ export default function ContinuityPage(){
      .sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
    const latest=copies[0];
    const validated=latest?.restoreTested?checks.find(c=>c.backupId===latest.id&&c.status==="passed"&&c.checkedAt===latest.restoreCheckedAt):undefined;
-   return {app,latest,validated};
+   const capture=copies.filter(b=>b.capturedAt&&Number.isFinite(Date.parse(b.capturedAt))&&Date.parse(b.capturedAt)<=Date.now()+5000).sort((a,b)=>b.capturedAt!.localeCompare(a.capturedAt!))[0],ageHours=capture?Math.max(0,(Date.now()-Date.parse(capture.capturedAt!))/3600000):null,schedule=schedules.find(s=>s.slug===app.slug&&s.enabled),targetHours=schedule?.weekdays==="0,1,2,3,4,5,6"?(schedule.intervalHours??24):null;
+   return {app,latest,validated,capture,ageHours,targetHours};
  });
  const missing=known?summary.filter(x=>!x.latest).length:0;
  const isolated=known?summary.filter(x=>!!x.validated).length:0;
@@ -92,14 +94,15 @@ export default function ContinuityPage(){
          <button type="button" onClick={()=>void load()} disabled={loading} className="hub-secondary-action"><RefreshCw className="h-4 w-4"/> Actualizar</button>
        </div>
        <div className="grid gap-3 p-4 sm:p-5">
-         {summary.map(({app,latest,validated})=><div key={app.slug} className="flex flex-col gap-4 rounded-xl border border-white/[0.09] bg-white/[0.025] p-4 lg:flex-row lg:items-center">
+         {summary.map(({app,latest,validated,capture,ageHours,targetHours})=><div key={app.slug} className="flex flex-col gap-4 rounded-xl border border-white/[0.09] bg-white/[0.025] p-4 lg:flex-row lg:items-center">
            <div className="min-w-0 flex-1">
              <div className="flex flex-wrap items-center gap-2">
                <h3 className="text-sm font-semibold text-white">{app.name}</h3>
                <span className="hub-state hub-state-neutral">{app.dbType.toUpperCase()}</span>
              </div>
-             <p className="mt-1 text-[11px] text-slate-400">Último backup con integridad OK: {known?time(latest?.createdAt):"Sin lectura"}</p>
-             {validated&&<p className="mt-1 text-[11px] text-emerald-300">Restauración aislada: {time(validated.checkedAt)}</p>}
+             <p className="mt-1 text-[11px] text-slate-400">{latest?.trigger==="imported"?"Registro de copia importada":"Último backup con integridad OK"}: {known?time(latest?.createdAt):"Sin lectura"}</p>
+             {validated&&<p className="mt-1 text-[11px] text-emerald-300">Restauración aislada: {time(validated.checkedAt)}{validated.durationMs!=null?` · Prueba DB: ${validated.durationMs} ms`:""}</p>}
+             {known&&latest&&<p className={`mt-1 text-[11px] ${targetHours&&ageHours!=null&&ageHours>targetHours?"text-amber-200":"text-slate-400"}`}>{capture?`Captura propia más reciente: ${time(capture.capturedAt!)} · hace ${ageHours!.toFixed(1)} h`:"Fecha de captura desconocida; la importación no acredita una copia reciente."}{targetHours?` · Objetivo según agenda: ${targetHours} h${ageHours!=null&&ageHours>targetHours?" (superado)":""}`:" · Sin objetivo diario activo."}</p>}
            </div>
            <div className="flex flex-wrap items-center gap-2">
              {!known?<span className="hub-state hub-state-neutral">Sin telemetría</span>:

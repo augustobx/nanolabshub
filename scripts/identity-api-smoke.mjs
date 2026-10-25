@@ -29,6 +29,11 @@ const requestId=randomUUID(),queued=await call("/api/backups",{method:"POST",tok
 const repeated=await call("/api/backups",{method:"POST",token,body:{slug:"onlyfood",requestId},status:202});assert.equal(queued.data.jobId,repeated.data.jobId);
 assert.equal((await call("/api/jobs",{token})).data.length,1);
 await call("/api/backups",{token}); // Initialize and exercise the actual registry/schema migration.
+const scheduleBody={slug:"onlyfood",config:{enabled:false,hourLocal:2,weekdays:"0,1,2,3,4,5,6",intervalHours:6,autoRestore:true}};
+const agenda=await call("/api/backups/schedule",{method:"POST",token,body:scheduleBody});assert.equal(agenda.data.find(s=>s.slug==="onlyfood").intervalHours,6);assert.equal(agenda.data.find(s=>s.slug==="onlyfood").autoRestore,true);
+const legacyAgenda=await call("/api/backups/schedule",{method:"POST",token,body:{slug:"onlyfood",config:{enabled:false,hourLocal:3,weekdays:"0,1,2,3,4,5,6"}}});assert.equal(legacyAgenda.data.find(s=>s.slug==="onlyfood").intervalHours,6);assert.equal(legacyAgenda.data.find(s=>s.slug==="onlyfood").autoRestore,true);
+await call("/api/backups/schedule",{method:"POST",token,body:{...scheduleBody,config:{...scheduleBody.config,hourLocal:8}},status:422});
+await call("/api/backups/schedule",{method:"POST",token,body:{...scheduleBody,slug:"onlypadel"},status:403});
 await call("/api/backups/import",{token});
 await call("/api/backups/import",{method:"POST",token,origin:"https://untrusted.example.invalid",body:{slug:"onlyfood",filename:"fixture.sql.gz",requestId:randomUUID()},status:403});
 await call("/api/backups/import",{method:"POST",token,body:{slug:"onlyfood",filename:"../hub.sqlite",requestId:randomUUID()},status:422});
