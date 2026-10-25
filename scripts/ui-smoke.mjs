@@ -251,6 +251,8 @@ try {
       }
       if (path === "/legacy") {
         await page.getByRole("heading", { name: "Planes de migración por producto" }).waitFor();
+        const unavailable=async route=>route.fulfill({status:503,contentType:"application/json",body:JSON.stringify({success:false,error:"Fixture unavailable"})});
+        await page.route("**/api/governance",unavailable);await page.reload({waitUntil:"domcontentloaded"});await page.getByRole("alert").filter({hasText:"Fixture unavailable"}).waitFor();await page.getByText("Sin lectura",{exact:true}).first().waitFor();assert.equal(await page.getByText("No integrado",{exact:true}).count(),0);await page.unroute("**/api/governance",unavailable);
       }
       if (path === "/infrastructure") {
         await page.getByRole("heading", { name: "Inventario técnico clasificado" }).waitFor();
@@ -280,7 +282,16 @@ try {
       }
       if (path === "/superadmin") {
         await page.getByRole("heading", { name: "Mapa de integración por producto" }).waitFor();
-        await page.getByText("0 / 7").waitFor();
+        // A measured zero and an unavailable source must render differently.
+        const emptyCoverage={...governance,managementProducts:[]};
+        const coverage=async route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({success:true,data:emptyCoverage})});
+        await page.route("**/api/governance",coverage);await page.reload({waitUntil:"domcontentloaded"});await page.getByText("0 / 7").waitFor();
+        await page.unroute("**/api/governance",coverage);
+        const unavailable=async route=>route.fulfill({status:503,contentType:"application/json",body:JSON.stringify({success:false,error:"Fixture unavailable"})});
+        await page.route("**/api/governance",unavailable);await page.reload({waitUntil:"domcontentloaded"});await page.getByText("— / 7").waitFor();
+        await page.getByText("Sin lectura",{exact:true}).first().waitFor();
+        await page.screenshot({path:`ui-screenshots/${device.name}-superadmin-unavailable.png`,fullPage:true,animations:"disabled"});
+        await page.unroute("**/api/governance",unavailable);
       }
       if (path === "/backups") {
         const imports=page.getByRole("region",{name:"Importar copias existentes"});
