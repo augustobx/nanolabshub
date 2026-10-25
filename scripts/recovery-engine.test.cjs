@@ -28,6 +28,8 @@ test("SQLite copy validation happens on isolated files and records an audit trai
   assert.equal(result.status,"passed");
   assert.match(result.details,/integrity_check=ok/);
   assert.equal(recovery.listChecks("nanolabshub").length,1);
+  assert.equal(recovery.listChecks()[0].durationMs,result.durationMs);
+  assert.equal(recovery.listChecks("nanolabshub")[0].durationMs,result.durationMs);
   assert.equal(result.checksum,checksum);
   const rows=backup.db();try{
    assert.equal(rows.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action='BACKUP_RESTORE_CHECK_PASSED'").get().n,1);

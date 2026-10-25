@@ -14,9 +14,21 @@ funcionalidad terminada. Los hallazgos H01–H27 están documentados en
 | C04 | Réplica externa automática | Copia cifrada independiente y recuperación desde el remoto | Preparación pendiente; el usuario confirmó que todavía no tiene destino |
 | C05 | Restore MariaDB/PostgreSQL | Instancias temporales aisladas y evidencia por motor | Desplegado en PR #7; SQL sintético nativo validado y copia real SQLite del Hub aprobada. PR #8 desplegado: 17 archivos reales restaurados (Hub 9, Food 2, Gym 4, Turn 2); copia histórica truncada de Turn excluida |
 | C06 | Jobs recuperables | Claim atómico, lease, reintento, resultado incierto y reconciliación | Backups y restores desplegados en PR #7, con evidencia por job y checksum; imports desplegados en PR #8; releases desplegados en PR #9, con exclusión atómica y reconciliación comprobada |
-| C07 | Retención | Política explícita, archivo íntegro y recuperación antes de purga | Pendiente |
+| C07 | Retención | Política explícita, archivo íntegro y recuperación antes de purga | Política conservar todo implementada, sin purga; evidencia de snapshot y capacidad en Continuidad. Ver HUB_HISTORY_RETENTION.md; aceptación productiva registrada en el informe de cada release |
 | C08 | Lint obligatorio | ESLint CLI sin interacción ni warnings; gate en CI | Gate obligatorio aprobado en PR #6; se conserva para cada release |
 | C09 | Importación de backups | Pertenencia, hash, formato, restore y deduplicación | Desplegada en PR #8, revisión b5915e28 y CI 40126048967 aprobado; 17 copias reales válidas, un duplicado evitado; originales conservados. Food vacío y Turn truncado excluidos |
+
+PR #11 desplegado (b4f499c, CI 40166096281): agendas cada seis horas para Hub,
+OnlyFood, OnlyGym y OnlyTurn a las 02/08/14/20 de Buenos Aires, con restauración
+aislada automática. Ciclo de las 08:00 del 25/10 aprobado para los cuatro; SHA-256
+de cada archivo ligado a su prueba, cero jobs protegidos y 35 vecinos intactos.
+El fallo histórico del import truncado permanece visible; no se ocultó ni reintentó.
+La duración de prueba DB no equivale al RTO de recuperación de la aplicación.
+
+El paso 2 sigue diferido por instrucción del usuario. OnlyFood tiene deshabilitado
+su conector administrativo en la aplicación actual (503); el Hub lo informa como
+no disponible. OnlyGym y OnlyTurn responden al contrato. No se modificó OnlyFood
+para resolver esa integración durante el cierre del paso 1.
 
 ## Cobertura de módulos
 
