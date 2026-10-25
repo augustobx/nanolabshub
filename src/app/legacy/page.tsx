@@ -25,12 +25,12 @@ export default function LegacyPage(){
      <div className="grid gap-3 p-4 md:grid-cols-2 sm:p-5">{SAAS_PRODUCTS.map(p=>{
        const source=gov?.sources?.find(x=>x.saas===p.slug); const capabilities=productCapabilities(gov,p.slug);
        return <div key={p.slug} className="rounded-xl border border-white/[0.09] bg-white/[0.025] p-4">
-         <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-sm font-semibold text-white">{p.name}</h3><p className="mt-1 text-xs text-slate-400">{p.focus}</p></div><span className="hub-state hub-state-neutral">{capabilities.available?"Gestión disponible":"Integración pendiente"}</span></div>
+         <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-sm font-semibold text-white">{p.name}</h3><p className="mt-1 text-xs text-slate-400">{p.focus}</p></div><span className="hub-state hub-state-neutral">{!gov?"Sin lectura":capabilities.available?"Gestión disponible":"Integración pendiente"}</span></div>
          <div className="mt-4 space-y-2 text-xs">
            <div className="flex items-center justify-between gap-2"><span className="text-slate-300">Ficha de producto</span><span className="text-emerald-300">Disponible</span></div>
-           <div className="flex items-center justify-between gap-2"><span className="text-slate-300">Lectura de tenants</span><span className={source?.status==="available"?"text-emerald-300":"text-slate-400"}>{source?.status==="available"?"Conectada":"Pendiente / sin respuesta"}</span></div>
-           <div className="flex items-center justify-between gap-2"><span className="text-slate-300">Cambio de estado y módulos</span><span className="text-slate-400">{capabilities.statusWrite&&capabilities.moduleWrite?"Disponible":"No habilitado"}</span></div>
-           <div className="flex items-center justify-between gap-2"><span className="text-slate-300">Credenciales, sesiones y auditoría</span><span className="text-slate-400">{capabilities.impersonation&&capabilities.activity?"Disponible":"No integrado"}</span></div>
+           <div className="flex items-center justify-between gap-2"><span className="text-slate-300">Lectura de tenants</span><span className={source?.status==="available"?"text-emerald-300":"text-slate-400"}>{!gov?"Sin lectura":source?.status==="available"?"Conectada":"Pendiente / sin respuesta"}</span></div>
+           <div className="flex items-center justify-between gap-2"><span className="text-slate-300">Cambio de estado y módulos</span><span className="text-slate-400">{!gov?"Sin lectura":capabilities.statusWrite&&capabilities.moduleWrite?"Disponible":"No habilitado"}</span></div>
+           <div className="flex items-center justify-between gap-2"><span className="text-slate-300">Credenciales, sesiones y auditoría</span><span className="text-slate-400">{!gov?"Sin lectura":capabilities.impersonation&&capabilities.activity?"Disponible":"No integrado"}</span></div>
          </div>
          <Link href={"/saas/"+p.slug} className="hub-text-link mt-4">Abrir ficha <ArrowUpRight className="h-4 w-4"/></Link>
        </div>;

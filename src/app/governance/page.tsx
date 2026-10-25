@@ -275,7 +275,7 @@ export default function GovernancePage() {
             <h1 className="hub-hero-title">Gestioná todo tu ecosistema SaaS.</h1>
             <p className="hub-description">
               Empresas, planes, estados, métricas y módulos de cada producto.
-              Todo conectado a una misma experiencia de administración.
+              Administración central según las capacidades de cada conector disponible.
             </p>
           </div>
           <button type="button" onClick={fetchGovernance} disabled={isLoading}

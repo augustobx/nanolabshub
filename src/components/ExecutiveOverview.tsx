@@ -37,7 +37,7 @@ export function ExecutiveOverview() {
   }, []);
 
   const metrics = [
-    { label: "Clientes gestionados", value: overview?.totalTenants, icon: Building2, helper: "En todos los productos" },
+    { label: "Clientes gestionados", value: overview?.totalTenants, icon: Building2, helper: "Según conectores disponibles" },
     { label: "Clientes activos", value: overview?.activeTenants, icon: CheckCircle2, helper: "Con servicio activo" },
     { label: "En período de prueba", value: overview?.trialTenants, icon: Clock3, helper: "Tenants en trial" },
     { label: "Productos conectados", value: overview?.saasCount, icon: Layers3, helper: "Fuentes SaaS reportadas" },

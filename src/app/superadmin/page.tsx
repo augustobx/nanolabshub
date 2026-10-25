@@ -44,7 +44,7 @@ export default function SuperadminPage() {
       <section aria-label="Cobertura de gobierno" className="grid gap-4 sm:grid-cols-3">
         <div className="hub-card p-5"><div className="flex items-center gap-2 text-xs text-slate-400"><Layers3 className="h-4 w-4 text-[#abc2fa]"/> SaaS registradas</div><p className="mt-2 text-3xl font-semibold text-white">{SAAS_PRODUCTS.length}</p><p className="mt-1 text-xs text-slate-400">Todas con ficha estándar</p></div>
         <div className="hub-card p-5"><div className="flex items-center gap-2 text-xs text-slate-400"><Users className="h-4 w-4 text-[#abc2fa]"/> Tenants reportados</div><p className="mt-2 text-3xl font-semibold text-white">{overview?.sources?.some(x=>x.status==="available")?overview.totalTenants:"—"}</p><p className="mt-1 text-xs text-slate-400">Según conectores actuales</p></div>
-        <div className="hub-card p-5"><div className="flex items-center gap-2 text-xs text-slate-400"><ShieldCheck className="h-4 w-4 text-[#abc2fa]"/> Gestión central integrada</div><p className="mt-2 text-3xl font-semibold text-white">{overview?.managementProducts?.filter(slug=>healthySources.has(slug)).length ?? 0} / {SAAS_PRODUCTS.length}</p><p className="mt-1 text-xs text-slate-400">Tenants, planes, suscripciones, módulos, accesos y auditoría</p></div>
+        <div className="hub-card p-5"><div className="flex items-center gap-2 text-xs text-slate-400"><ShieldCheck className="h-4 w-4 text-[#abc2fa]"/> Gestión central integrada</div><p className="mt-2 text-3xl font-semibold text-white">{overview?.managementProducts?overview.managementProducts.filter(slug=>healthySources.has(slug)).length:"—"} / {SAAS_PRODUCTS.length}</p><p className="mt-1 text-xs text-slate-400">Tenants, planes, suscripciones, módulos, accesos y auditoría</p></div>
       </section>
       <section className="hub-card overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.08] p-5 sm:p-6">
@@ -55,7 +55,7 @@ export default function SuperadminPage() {
           <thead><tr><th className="px-5">Plataforma</th>{CAPABILITIES.map(c=><th key={c.key}>{c.label}</th>)}</tr></thead>
           <tbody>{SAAS_PRODUCTS.map(product=><tr key={product.slug} className="border-t border-white/[0.07]">
             <td className="px-5"><Link className="font-semibold text-[#c6d8ff] hover:underline" href={"/saas/"+product.slug}>{product.name}</Link></td>
-            {CAPABILITIES.map(cap=>{const available=productCapabilities(overview,product.slug)[cap.key];return <td key={cap.key}><span className={available?"hub-state hub-state-good":"hub-state hub-state-neutral"}>{available?"Disponible":"Sin conectar"}</span></td>;})}
+            {CAPABILITIES.map(cap=>{const available=productCapabilities(overview,product.slug)[cap.key];return <td key={cap.key}><span className={available?"hub-state hub-state-good":"hub-state hub-state-neutral"}>{!overview?"Sin lectura":available?"Disponible":"Sin conectar"}</span></td>;})}
           </tr>)}</tbody>
         </table></div>
       </section>
@@ -68,7 +68,7 @@ export default function SuperadminPage() {
       </div>
       <div className="hub-card flex flex-wrap items-start gap-3 border-amber-300/20 bg-amber-300/[0.035] p-5">
         <ShieldAlert className="h-5 w-5 shrink-0 text-amber-300"/>
-        <div className="min-w-0 flex-1"><h2 className="text-sm font-semibold text-white">Migración real de Superadmin</h2><p className="mt-1 text-xs leading-6 text-slate-300">La capa visual ya es uniforme, pero faltan endpoints de escritura autenticados, permisos por rol y auditoría coherente en las SaaS. No se debe tratar un módulo simulado ni un enlace antiguo como una integración completa. La administración por producto se habilitará por capacidades verificadas, no por promesas del panel.</p></div>
+        <div className="min-w-0 flex-1"><h2 className="text-sm font-semibold text-white">Alcance de la administración central</h2><p className="mt-1 text-xs leading-6 text-slate-300">El mapa muestra las capacidades confirmadas por los conectores actuales. Cada producto puede ofrecer controles diferentes; las operaciones disponibles se consultan en su ficha. Una fuente sin respuesta queda sin verificar. Los productos pendientes de integración conservan su administración de origen.</p></div>
       </div>
     </div>
   </div>;
