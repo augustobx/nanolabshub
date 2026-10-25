@@ -41,6 +41,7 @@ COPY --from=builder /app/scripts/job-store.cjs /app/scripts/job-store.cjs
 COPY --from=builder /app/scripts/backup-runner.cjs /app/scripts/backup-runner.cjs
 COPY --from=builder /app/scripts/recovery-engine.cjs /app/scripts/recovery-engine.cjs
 COPY --from=builder /app/scripts/restore-evidence.cjs /app/scripts/restore-evidence.cjs
+COPY --from=builder /app/scripts/history-retention.cjs /app/scripts/history-retention.cjs
 COPY --from=builder /app/scripts/restore-sandbox.cjs /app/scripts/restore-sandbox.cjs
 COPY --from=builder /app/scripts/recovery-runner.cjs /app/scripts/recovery-runner.cjs
 COPY --from=builder /app/scripts/backup-import.cjs /app/scripts/backup-import.cjs
