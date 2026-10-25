@@ -11,8 +11,9 @@ const headers = { "Cache-Control": "private, no-store" };
 export async function GET() {
   if (!await getSessionUser()) return Response.json({success:false,error:"Sesión requerida"},{status:401,headers});
   try {
+    const retention=await require("../../../../scripts/history-retention.cjs").createRetentionReport()(KNOWN_APPS).catch(()=>null);
     return Response.json({ success:true, data:backupEngine.list(KNOWN_APPS),
-      schedules:backupEngine.schedules(KNOWN_APPS), externalCopies:backupEngine.externalInventory(KNOWN_APPS), scope:"hub-registry", externalNote:"Solo metadatos de archivos externos al registro del Hub; no se verificó su contenido ni restauración." },{headers});
+      retention,schedules:backupEngine.schedules(KNOWN_APPS), externalCopies:backupEngine.externalInventory(KNOWN_APPS), scope:"hub-registry", externalNote:"Solo metadatos de archivos externos al registro del Hub; no se verificó su contenido ni restauración." },{headers});
   } catch (error) {
     return Response.json({success:false,error:error instanceof Error?error.message:"No se pudo consultar el historial"},{status:500,headers});
   }

@@ -10,7 +10,7 @@ function listChecks(slug){
   const db=backup.db();try{
     ensureRestoreSchema(db);
     return slug?db.prepare("SELECT id,backup_id AS backupId,slug,checked_at AS checkedAt,status,details,checksum,duration_ms AS durationMs FROM backup_restore_checks WHERE slug=? ORDER BY checked_at DESC,rowid DESC LIMIT 150").all(slug):
-      db.prepare("SELECT id,backup_id AS backupId,slug,checked_at AS checkedAt,status,details,checksum FROM backup_restore_checks ORDER BY checked_at DESC,rowid DESC LIMIT 250").all();
+      db.prepare("SELECT id,backup_id AS backupId,slug,checked_at AS checkedAt,status,details,checksum,duration_ms AS durationMs FROM backup_restore_checks ORDER BY checked_at DESC,rowid DESC LIMIT 250").all();
   }finally{db.close();}
 }
 function record(id,slug,actor,status,details,checksum,manifest=null,jobId=null,durationMs=null){

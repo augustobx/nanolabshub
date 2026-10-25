@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Header } from "@/components/Header";
 import { JobPanel } from "@/components/JobPanel";
+import { RetentionPanel, type RetentionReport } from "@/components/RetentionPanel";
 import { KNOWN_APPS } from "@/lib/apps-registry";
 import { ArrowUpRight, CheckCircle2, CircleAlert, DatabaseBackup, Download, ShieldCheck, RefreshCw, FlaskConical, HardDrive, CloudOff } from "lucide-react";
 type Backup = {id:string;appSlug:string;filename:string;status:string;createdAt:string;sizeFormatted:string;checksum?:string;error?:string;dbType:string;restoreTested?:boolean;restoreCheckedAt?:string|null;restoreStatus?:string;capturedAt?:string|null;restoreDurationMs?:number|null;trigger?:string};
@@ -10,6 +11,7 @@ type Check = {id:string;backupId:string;slug:string;status:"passed"|"failed";che
 function time(date?:string){return date?new Date(date).toLocaleString("es-AR"):"Sin registro";}
 export default function ContinuityPage(){
  const [backups,setBackups]=useState<Backup[]>([]),[checks,setChecks]=useState<Check[]>([]);
+ const [retention,setRetention]=useState<RetentionReport|null>(null);
  const [schedules,setSchedules]=useState<Array<{slug:string;enabled:boolean;intervalHours:number;weekdays:string}>>([]);
  const [known,setKnown]=useState(false),[errors,setErrors]=useState<string[]>([]);
  const [loading,setLoading]=useState(true),[running,setRunning]=useState<string|null>(null);
@@ -24,10 +26,10 @@ export default function ContinuityPage(){
    const results=await Promise.allSettled(sources.map(async u=>{
      const r=await fetch(u,{cache:"no-store"}),j=await r.json();
      if(!r.ok||j.success!==true)throw Error(j.error||"Servicio no disponible");
-     return u==="/api/backups"?{backups:j.data,schedules:j.schedules||[]}:j.data;
+     return u==="/api/backups"?{backups:j.data,schedules:j.schedules||[],retention:j.retention??null}:j.data;
    }));
    if(current!==generation.current)return;
-   if(results[0].status==="fulfilled"){setBackups(results[0].value.backups);setSchedules(results[0].value.schedules);setKnown(true);}else{setBackups([]);setSchedules([]);setKnown(false);}
+   if(results[0].status==="fulfilled"){setBackups(results[0].value.backups);setSchedules(results[0].value.schedules);setRetention(results[0].value.retention);setKnown(true);}else{setBackups([]);setSchedules([]);setRetention(null);setKnown(false);}
    if(results[1].status==="fulfilled")setChecks(results[1].value);else setChecks([]);
    setErrors(results.flatMap((r,i)=>r.status==="rejected"?[sources[i]+": "+String(r.reason?.message||"sin respuesta")]:[]));
    setLoading(false);
@@ -119,6 +121,7 @@ export default function ContinuityPage(){
          </div>)}
        </div>
      </section>
+     <RetentionPanel report={retention}/>
      <JobPanel/>
      <section className="grid gap-4 lg:grid-cols-3">
        <div className="hub-card p-5"><ShieldCheck className="h-5 w-5 text-[#abc2fa]"/><h2 className="mt-3 text-sm font-semibold text-white">Integridad</h2>

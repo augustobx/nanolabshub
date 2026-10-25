@@ -236,6 +236,8 @@ try {
         }
       }
       if (path === "/continuity") {
+        await page.getByRole("heading", { name: "Conservación del historial" }).waitFor();
+        await page.getByText("Sin lectura de la política y su evidencia. No se asume cobertura.").waitFor();
         await page.getByRole("heading", { name: "Preparación de recuperación por aplicación" }).waitFor();
         await page.getByText("Copia externa verificada").first().waitFor();
         await page.getByText(/Fecha de captura desconocida; la importación no acredita una copia reciente/).waitFor();
