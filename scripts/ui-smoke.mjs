@@ -105,6 +105,7 @@ const responses = {
   "/api/backups/restore-check": { success: true, data: [] },
   "/api/backups/import": {success:true,data:[{slug:"nanolabshub",status:"available",files:[{filename:"hub-existing.sqlite",supported:true,size:94208,mtimeMs:1792840000000}]}]},
   "/api/jobs": { success: true, data: [] },
+  "/api/maintenance/images":{success:true,data:{slug:"nanolabshub",minimumAgeDays:7,candidates:[{imageId:"sha256:"+"3".repeat(64),tag:"nanolabshub:fixture-old",createdAt:"2026-10-01T00:00:00Z",sizeBytes:10485760,ageDays:24}],workerHealthy:true,automaticDeletion:false,volumesIncluded:false,selectionLimit:20}},
   "/api/apps/deploy":{success:true,data:{slug:"nanolabshub",currentImageId:"sha256:"+"1".repeat(64),currentRevision:"a".repeat(40),configurationMatches:true,workerHealthy:true,ready:true,releases:[{id:"fixture-approved",revision:"b".repeat(40),imageId:"sha256:"+"2".repeat(64),available:true,ci:{runId:123,conclusion:"success"}}],services:["nanolabshub"],backupRequired:true,isolatedRestoreRequired:true,automaticDatabaseRestore:false}},
   "/api/alerts": { success: true, data: { alerts: [] } },
 };
@@ -125,6 +126,10 @@ try {
     await page.route("**/api/**", (route) => {
       const url = new URL(route.request().url());
       if (url.pathname.startsWith("/api/auth/")) return route.continue();
+      if(url.pathname==="/api/maintenance/images"&&route.request().method()==="POST"){
+        const body=route.request().postDataJSON();assert.deepEqual(body.imageIds,["sha256:"+"3".repeat(64)]);assert.equal(body.confirmation,"ELIMINAR 1 IMAGENES DEL HUB");assert.match(body.requestId,/^[a-f0-9-]{36}$/);
+        return route.fulfill({status:202,contentType:"application/json",body:JSON.stringify({success:true,data:{id:"fixture-maintenance-job",state:"pending"}})});
+      }
       if(url.pathname==="/api/apps/deploy"&&route.request().method()==="POST"){
         const body=route.request().postDataJSON();assert.equal(body.slug,"nanolabshub");assert.equal(body.releaseId,"fixture-approved");assert.match(body.requestId,/^[a-f0-9-]{36}$/);
         return route.fulfill({status:202,contentType:"application/json",body:JSON.stringify({success:true,data:{id:"fixture-persisted-release-job",state:"pending"}})});
@@ -247,6 +252,11 @@ try {
         await page.getByRole("heading", { name: "Inventario técnico clasificado" }).waitFor();
         await page.getByRole("button", { name: /Servicios web/ }).click();
         await page.getByText("onlyfood-web").first().waitFor();
+      }
+      if(path==="/hardware"){
+        const maintenance=page.getByRole("region",{name:"Mantenimiento de imágenes del Hub"});await maintenance.waitFor();await maintenance.getByRole("checkbox").check();
+        const button=maintenance.getByRole("button",{name:"Retirar imágenes seleccionadas"});assert.equal(await button.isEnabled(),false);await maintenance.getByRole("textbox",{name:"Confirmación de limpieza de imágenes"}).fill("ELIMINAR 1 IMAGENES DEL HUB");await button.click();await maintenance.getByRole("status").filter({hasText:"fixture-maintenance-job"}).waitFor();
+        await page.screenshot({path:`ui-screenshots/${device.name}-maintenance.png`,fullPage:true,animations:"disabled"});
       }
       if (path === "/networking") {
         await page.getByRole("heading", { name: "Inventario de URLs" }).waitFor();

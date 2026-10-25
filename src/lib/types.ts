@@ -112,7 +112,7 @@ export interface BackupRecord {
   checksum?: string | null;
   integrityStatus?: "running" | "integrity_ok" | "failed";
   error?: string | null;
-  trigger?: "manual" | "scheduled" | "imported";
+  trigger?: "manual" | "scheduled" | "imported" | "release";
   restoreTested?: boolean;
   restoreStatus?: "passed" | "failed" | "untested";
   restoreCheckedAt?: string | null;

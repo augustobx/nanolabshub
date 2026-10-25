@@ -50,6 +50,7 @@ COPY --from=builder /app/scripts/release-catalog.cjs /app/scripts/release-catalo
 COPY --from=builder /app/scripts/release-engine.cjs /app/scripts/release-engine.cjs
 COPY --from=builder /app/scripts/release-worker.cjs /app/scripts/release-worker.cjs
 COPY --from=builder /app/scripts/release-worker-health.cjs /app/scripts/release-worker-health.cjs
+COPY --from=builder /app/scripts/image-maintenance.cjs /app/scripts/image-maintenance.cjs
 
 EXPOSE 3000
 

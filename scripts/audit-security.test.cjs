@@ -39,6 +39,7 @@ test('container command inputs and protected products are rejected before any ex
   await assert.rejects(api.getContainerLogs(name));await assert.rejects(api.restartContainer(name));
  }
  for(const name of ['onlypadel-web','onlycars-db-1','onlyerp-web'])await assert.rejects(api.restartContainer(name),/protegido/);
+ await assert.rejects(api.restartContainer('nanolabshub'),/worker independiente/);
  for(const lines of [-1,0,1001,NaN,Infinity])await assert.rejects(api.getContainerLogs('onlyfood-app-1',lines));
  await assert.rejects(api.deployApp('onlyfood'),/genérico deshabilitado/);assert.equal(calls,0);
  assert.equal(await api.getContainerLogs('onlyfood-app-1',10),'fixture log');assert.equal(calls,1);
