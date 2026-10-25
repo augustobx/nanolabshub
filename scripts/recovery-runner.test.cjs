@@ -45,3 +45,21 @@ test("a worker dying after committed proof can reconcile only that job and the s
   await f.runner.reconcile(f.apps,job.id);assert.equal(f.store.get(job.id).state,"succeeded");assert.equal(f.calls(),0);
  }finally{f.close();}
 });
+function scheduledSource(f){
+ const schedule={slug:"onlyfood",enabled:true,autoRestore:true,intervalHours:6,hourLocal:3,weekdays:"0,1,2,3,4,5,6"};f.backup.schedules=()=>[schedule];
+ const source=f.store.enqueue({kind:"backup",resource:"onlyfood",key:"fixture-scheduled-source",actor:"service:backup-scheduler",payload:{slug:"onlyfood",trigger:"scheduled",restoreAfterBackup:true,configurationHash:require("./backup-schedule.cjs").configurationHash(schedule)}}),claimed=f.store.claim("backup",["onlyfood"]);
+ const d=f.backup.db();try{d.prepare("UPDATE backup_jobs SET id=? WHERE id=?").run(source.id,f.id);}finally{d.close();}
+ f.store.finish(source.id,claimed.lease_owner,{backupId:source.id,checksum:"fixture-sha"});return {source,schedule};
+}
+test("automatic restore requires a completed scheduled source, matching bytes and current opt-in",async()=>{
+ const f=fixture();try{assert.throws(()=>f.runner.enqueueScheduled(f.apps,f.id),/programado/);const {source}=scheduledSource(f),job=f.runner.enqueueScheduled(f.apps,source.id);assert.equal(f.runner.enqueueScheduled(f.apps,source.id).id,job.id);assert.equal(f.store.get(job.id).actor,"service:backup-restore");f.allow(false);await f.runner.tick(f.apps);assert.equal(f.calls(),1);assert.equal(f.store.get(job.id).state,"succeeded");}finally{f.close();}
+});
+test("disabling automatic checks after enqueue prevents the pending service job",async()=>{
+ const f=fixture();try{const {source,schedule}=scheduledSource(f),job=f.runner.enqueueScheduled(f.apps,source.id);schedule.autoRestore=false;await f.runner.tick(f.apps);assert.equal(f.store.get(job.id).state,"failed");assert.equal(f.calls(),0);}finally{f.close();}
+});
+test("a service restore cannot use altered source bytes or unrelated backup evidence",async()=>{
+ const f=fixture();try{const {source}=scheduledSource(f);const d=f.backup.db();try{d.prepare("UPDATE backup_jobs SET checksum='different' WHERE id=?").run(source.id);}finally{d.close();}assert.throws(()=>f.runner.enqueueScheduled(f.apps,source.id),/agenda cambió/);}finally{f.close();}
+});
+test("scheduled restore receipts remain idempotent after a human explicit retry",async()=>{
+ const f=fixture();try{const {source}=scheduledSource(f),job=f.runner.enqueueScheduled(f.apps,source.id),claimed=f.store.claim("restore",["onlyfood"]);f.store.fail(job.id,claimed.lease_owner,"confirmed fixture failure");f.store.retry(job.id,"owner");assert.equal(f.runner.enqueueScheduled(f.apps,source.id).id,job.id);f.allow(false);await f.runner.tick(f.apps);assert.equal(f.store.get(job.id).state,"failed");assert.equal(f.calls(),0);}finally{f.close();}
+});

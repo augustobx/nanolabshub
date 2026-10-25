@@ -26,7 +26,7 @@ import { useEffect,useState,useRef,useCallback } from "react";
 export default function BackupsPage() {
   const [backups, setBackups] = useState<BackupRecord[]>([]);
   const [schedules, setSchedules] = useState<Array<{
-    slug: string; name: string; enabled: boolean; hourLocal: number; weekdays: string; lastRunDay: string | null;
+    slug: string; name: string; enabled: boolean; hourLocal: number; weekdays: string; lastRunDay: string | null; lastRunSlot?:string|null; intervalHours?:number; autoRestore?:boolean;
   }>>([]);
   const [scheduleSaving, setScheduleSaving] = useState<string | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
@@ -112,13 +112,13 @@ export default function BackupsPage() {
     }
   };
 
-  const handleSchedule = async (slug: string, enabled: boolean, hourLocal: number, weekdays: string) => {
+  const handleSchedule = async (slug: string, enabled: boolean, hourLocal: number, weekdays: string,intervalHours:number,autoRestore:boolean) => {
     setScheduleSaving(slug);
     setPageError(null);
     try {
       const res = await fetch("/api/backups/schedule", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug, config: { enabled, hourLocal, weekdays } }),
+        body: JSON.stringify({ slug, config: { enabled, hourLocal, weekdays,intervalHours,autoRestore } }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || "Error al guardar programación");
@@ -385,35 +385,38 @@ export default function BackupsPage() {
               <div key={schedule.slug} className="flex flex-wrap items-center gap-3 rounded-lg border border-white/10 p-3">
                 <span className="min-w-[155px] flex-1 text-xs font-semibold text-white">{schedule.name}</span>
                 <label className="flex items-center gap-2 text-xs text-slate-300">
-                  Hora
+                  Hora base
                   <select aria-label={`Hora de ${schedule.name}`} value={schedule.hourLocal}
                     onChange={(e) => setSchedules((prev) => prev.map((s) => s.slug === schedule.slug ? { ...s, hourLocal: Number(e.target.value) } : s))}
                     className="rounded-lg border border-white/15 bg-surface-100 px-2 py-2 text-white">
-                    {Array.from({ length: 24 }, (_, hour) => <option key={hour} value={hour}>{String(hour).padStart(2, "0")}:00</option>)}
+                    {Array.from({ length: schedule.intervalHours??24 }, (_, hour) => <option key={hour} value={hour}>{String(hour).padStart(2, "0")}:00</option>)}
                   </select>
                 </label>
                 <label className="flex items-center gap-2 text-xs text-slate-300">
-                  Frecuencia
+                  Días
                   <select aria-label={`Frecuencia de ${schedule.name}`}
-                    value={schedule.weekdays === "0,1,2,3,4,5,6" ? "daily" : "weekly"}
+                    value={schedule.weekdays === "0,1,2,3,4,5,6" ? "daily" : schedule.weekdays==="0"?"weekly":"custom"}
                     onChange={(e) => setSchedules((prev) => prev.map((s) => s.slug === schedule.slug ?
-                      { ...s, weekdays: e.target.value === "daily" ? "0,1,2,3,4,5,6" : "0" } : s))}
+                      { ...s, weekdays: e.target.value === "daily" ? "0,1,2,3,4,5,6" : e.target.value === "weekly"?"0":s.weekdays } : s))}
                     className="rounded-lg border border-white/15 bg-surface-100 px-2 py-2 text-white">
-                    <option value="daily">Diaria</option>
+                    <option value="daily">Todos los días</option>
                     <option value="weekly">Domingos</option>
+                    {!["0","0,1,2,3,4,5,6"].includes(schedule.weekdays)&&<option value="custom">Personalizada: {schedule.weekdays.split(",").map(d=>["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"][Number(d)]).join(", ")}</option>}
                   </select>
                 </label>
+                <label className="flex items-center gap-2 text-xs text-slate-300">Intervalo<select aria-label={`Intervalo de ${schedule.name}`} value={schedule.intervalHours??24} onChange={e=>setSchedules(prev=>prev.map(s=>s.slug===schedule.slug?{...s,intervalHours:Number(e.target.value),hourLocal:s.hourLocal%Number(e.target.value)}:s))} className="rounded-lg border border-white/15 bg-surface-100 px-2 py-2 text-white"><option value={6}>Cada 6 horas</option><option value={12}>Cada 12 horas</option><option value={24}>Cada 24 horas</option></select></label>
+                <label className="flex items-center gap-2 text-xs text-slate-200"><input type="checkbox" aria-label={`Probar restauración de ${schedule.name}`} checked={!!schedule.autoRestore} onChange={e=>setSchedules(prev=>prev.map(s=>s.slug===schedule.slug?{...s,autoRestore:e.target.checked}:s))}/>Probar cada copia en aislamiento</label>
                 <label className="flex items-center gap-2 text-xs text-slate-200">
                   <input type="checkbox" checked={schedule.enabled}
                     onChange={(e) => setSchedules((prev) => prev.map((s) => s.slug === schedule.slug ? { ...s, enabled: e.target.checked } : s))} />
                   Activa
                 </label>
                 <button type="button" disabled={!["nanolabshub","onlyfood","onlygym","onlyturn"].includes(schedule.slug) || scheduleSaving === schedule.slug}
-                  onClick={() => void handleSchedule(schedule.slug, schedule.enabled, schedule.hourLocal, schedule.weekdays)}
+                  onClick={() => void handleSchedule(schedule.slug, schedule.enabled, schedule.hourLocal, schedule.weekdays,schedule.intervalHours??24,!!schedule.autoRestore)}
                   className="rounded-lg border border-brand-cyan/40 px-3 py-2 text-xs font-semibold text-brand-cyan disabled:opacity-50">
                   {scheduleSaving === schedule.slug ? "Guardando…" : "Guardar"}
                 </button>
-                {schedule.lastRunDay && <span className="text-[11px] text-slate-500">Última ejecución: {schedule.lastRunDay}</span>}
+                {(schedule.lastRunSlot||schedule.lastRunDay) && <span className="text-[11px] text-slate-500">Último turno cubierto: {schedule.lastRunSlot||schedule.lastRunDay}</span>}
               </div>
             ))}
           </div>
@@ -469,7 +472,7 @@ export default function BackupsPage() {
                 <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
                   {backup.status === "verified" && <a href={`/api/backups/download?id=${encodeURIComponent(backup.id)}`}
                     className="rounded-lg border border-brand-cyan/30 px-3 py-2 text-brand-cyan">Descargar backup</a>}
-                  <span className="text-slate-500">{backup.trigger === "release" ? "Previo a actualización" : backup.trigger === "scheduled" ? "Programado" : backup.trigger === "imported" ? "Importado" : "Manual"} · {backup.restoreTested ? "Restauración probada" : "Restauración no probada"}</span>
+                  <span className="text-slate-500">{backup.trigger === "release" ? "Previo a actualización" : backup.trigger === "scheduled" ? "Programado" : backup.trigger === "imported" ? "Importado" : "Manual"} · {backup.restoreTested ? "Restauración probada" : "Restauración no probada"}{backup.restoreDurationMs!=null?` · Prueba DB: ${backup.restoreDurationMs} ms`:""}</span>
                 </div>
                 <div className="mt-3 flex flex-wrap justify-between gap-2 border-t border-white/[0.07] pt-3 text-[11px]">
                   <span className="text-slate-400">{backup.dbType.toUpperCase()} · {backup.sizeFormatted}</span>

@@ -31,7 +31,7 @@ funcionalidad terminada. Los hallazgos H01–H27 están documentados en
 | Operaciones | Docker/health/Git/lifecycle | Estado real, autorización, errores, concurrencia y recuperación |
 | Software | Versiones y releases | Revisión identificada, deploy como job y logs acotados |
 | Infraestructura | Inventario Docker y host | Estados paused/starting/restarting, jobs finalizados y datos desconocidos |
-| Hardware | Telemetría y mantenimiento | Datos frescos; mantenimiento de imágenes propias en validación en esta rama; sin prune global |
+| Hardware | Telemetría y mantenimiento | Datos frescos; mantenimiento de imágenes propias desplegado en PR #10, CI 40164899204 aprobado; 35 vecinos preservados, sin limpieza productiva; sin prune global |
 | Networking | Registry, puertos y comprobaciones HTTP | Links reales, estado desconocido visible, sin exponer bases |
 | Seguridad | Estado de identidad/conectores/réplica | Capacidades efectivas; ninguna afirmación por configuración solamente |
 | Mi cuenta | Usuarios, MFA y sesiones propias persistidas | Enrolamiento, recuperación, permisos, revocación y cambio de contraseña |

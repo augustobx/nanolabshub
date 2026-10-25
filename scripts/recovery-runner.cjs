@@ -14,6 +14,19 @@ function createRecoveryRunner({engine,backup,store,validateActor,enabled=()=>pro
   const row=archive(apps,id);
   return store.enqueue({kind:"restore",resource:row.slug,key:requestId,payload:{backupId:id,checksum:row.checksum},actor,maxAttempts:1});
  }
+ function scheduledArchive(apps,sourceId){
+  const source=store.get(sourceId);
+  if(!source||source.kind!=="backup"||source.state!=="succeeded"||source.payload.trigger!=="scheduled"||source.payload.restoreAfterBackup!==true||source.result?.backupId!==sourceId||source.actor!=="service:backup-scheduler"&&!store.events(sourceId).some(e=>e.state==="pending"&&e.details==="Trabajo persistido por service:backup-scheduler"))throw Error("Falta un backup programado confirmado para esta prueba automática");
+  const row=archive(apps,sourceId);
+  if(row.slug!==source.resource||row.checksum!==source.result.checksum||!backup.schedules(apps).some(s=>s.slug===row.slug&&s.enabled&&s.autoRestore&&source.payload.configurationHash===require("./backup-schedule.cjs").configurationHash(s)))throw Error("La agenda cambió o la prueba automática ya no está habilitada");
+  return row;
+ }
+ function enqueueScheduled(apps,sourceId){
+  if(!enabled())throw Error("Backups deshabilitados");const row=scheduledArchive(apps,sourceId);
+  const key="scheduled:"+sourceId,payload={backupId:sourceId,checksum:row.checksum,sourceBackupJobId:sourceId},existing=store.byKey("restore",row.slug,key);
+  if(existing){if(JSON.stringify(existing.payload)!==JSON.stringify(payload))throw Error("Conflicto de idempotencia de prueba automática");return existing;}
+  return store.enqueue({kind:"restore",resource:row.slug,key,payload,actor:"service:backup-restore",maxAttempts:1});
+ }
  async function reconcile(apps,id){
   const job=store.get(id);if(!job||job.kind!=="restore"||job.state!=="uncertain")throw Error("El trabajo no requiere reconciliación");
   archive(apps,job.payload.backupId);
@@ -34,7 +47,9 @@ function createRecoveryRunner({engine,backup,store,validateActor,enabled=()=>pro
   try{
    const row=archive(apps,job.payload.backupId);
    if(row.slug!==job.resource||row.checksum!==job.payload.checksum)throw Error("El archivo registrado cambió desde la solicitud");
-   if(!validateActor(job.actor,job.resource))throw Error("El actor ya no tiene permiso para esta restauración aislada");
+   if(job.payload.sourceBackupJobId){
+    if(job.payload.sourceBackupJobId!==job.payload.backupId||scheduledArchive(apps,job.payload.sourceBackupJobId).checksum!==job.payload.checksum||job.actor!=="service:backup-restore"&&!validateActor(job.actor,job.resource))throw Error("La prueba automática no pertenece al backup programado autorizado");
+   }else if(!validateActor(job.actor,job.resource))throw Error("El actor ya no tiene permiso para esta restauración aislada");
    const result=await engine.checkIsolated(apps,job.payload.backupId,job.actor,{jobId:job.id});
    store.finish(job.id,job.lease_owner,{checkId:result.id,backupId:job.payload.backupId,status:result.status});
    return [{slug:job.resource,status:"restore-passed",id:job.id}];
@@ -44,7 +59,7 @@ function createRecoveryRunner({engine,backup,store,validateActor,enabled=()=>pro
    return [{slug:job.resource,status:uncertain?"uncertain":"restore-failed",id:job.id}];
   }finally{clearInterval(timer);}
  }
- return {enqueue,tick,reconcile,store};
+ return {enqueue,enqueueScheduled,tick,reconcile,store};
 }
 let instance;
 function getRunner(){

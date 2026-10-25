@@ -27,6 +27,7 @@ test("external SQLite import preserves the original, validates before publicatio
   assert.equal(runner.enqueue(apps,"nanolabshub","hub-existing.sqlite",key,"fixture-owner").id,queued.id);
   assert.equal((await runner.tick(apps))[0].status,"import-passed",store.get(queued.id).error);
   assert.equal(store.get(queued.id).state,"succeeded");assert.equal(stagedChecks,1);
+  assert.equal(backup.list(apps).find(b=>b.id===queued.id).capturedAt,null,"Import time must not become a false snapshot/RPO timestamp");
   assert.deepEqual(await fs.readFile(source),original);
   const db=importer.db();try{
    const record=db.prepare("SELECT * FROM backup_jobs WHERE id=?").get(queued.id),proof=db.prepare("SELECT * FROM backup_imports WHERE job_id=?").get(queued.id);

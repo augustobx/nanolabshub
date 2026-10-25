@@ -113,9 +113,11 @@ export interface BackupRecord {
   integrityStatus?: "running" | "integrity_ok" | "failed";
   error?: string | null;
   trigger?: "manual" | "scheduled" | "imported" | "release";
+  capturedAt?: string | null;
   restoreTested?: boolean;
   restoreStatus?: "passed" | "failed" | "untested";
   restoreCheckedAt?: string | null;
+  restoreDurationMs?: number | null;
 }
 
 export type SaaSSlug = "onlyfood" | "onlypadel" | "onlycars" | "onlygym" | "onlyturn" | "onlyerp" | "onlymob";

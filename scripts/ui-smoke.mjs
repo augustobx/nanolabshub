@@ -73,6 +73,7 @@ const backups = [{
   sizeBytes: 10485760, sizeFormatted: "10 MB", createdAt: "22/10/2026 13:00",
   status: "unverified", storageLocation: "local",
 }];
+backups.push({...backups[0],id:"fixture-imported-archive",filename:"onlyfood_imported_fixture.sql.gz",status:"verified",trigger:"imported",createdAt:"2026-10-25T00:00:00Z",capturedAt:null,restoreTested:false});
 const responses = {
   "/api/governance": { success: true, data: governance },
   "/api/operations": { success: true, data: { timestamp: new Date().toISOString(), telemetry, containers: [container], apps } },
@@ -237,6 +238,7 @@ try {
       if (path === "/continuity") {
         await page.getByRole("heading", { name: "Preparación de recuperación por aplicación" }).waitFor();
         await page.getByText("Copia externa verificada").first().waitFor();
+        await page.getByText(/Fecha de captura desconocida; la importación no acredita una copia reciente/).waitFor();
       }
       if (path === "/security") {
         await page.getByRole("heading", { name: "Integración por SaaS" }).waitFor();
@@ -303,6 +305,8 @@ try {
         await page.screenshot({ path: `ui-screenshots/${device.name}-backups-manual.png`, fullPage: true, animations: "disabled" });
         await page.getByText("Backups programados").waitFor();
         const selector = page.getByRole("combobox", { name: "Hora de OnlyFood" });
+        await page.getByRole("combobox",{name:"Intervalo de OnlyFood"}).selectOption("6");
+        await page.getByRole("checkbox",{name:"Probar restauración de OnlyFood"}).check();
         await selector.selectOption("5");
         await page.getByRole("button", { name: "Guardar" }).first().click();
         await page.getByRole("link", { name: "Descargar" }).count();
