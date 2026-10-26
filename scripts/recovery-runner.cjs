@@ -1,6 +1,6 @@
 "use strict";
 const fs=require("node:fs"),path=require("node:path");
-const ALLOWED=["nanolabshub","onlyfood","onlygym","onlyturn","onlycars"];
+const ALLOWED=["nanolabshub","onlyfood","onlygym","onlyturn","onlycars","onlyerp"];
 function createRecoveryRunner({engine,backup,store,validateActor,enabled=()=>process.env.HUB_BACKUPS_ENABLED==="true",dataDir=process.env.DATA_DIR||"/app/data"}){
  function archive(apps,id){
   if(typeof id!=="string"||!/^[a-f0-9-]{36}$/.test(id))throw Error("ID de respaldo inválido");

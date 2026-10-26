@@ -1,7 +1,7 @@
 "use strict";
 const {createJobStore}=require("./job-store.cjs");
 const {latestSlot,configurationHash}=require("./backup-schedule.cjs");
-const ALLOWED=["nanolabshub","onlyfood","onlygym","onlyturn","onlycars"];
+const ALLOWED=["nanolabshub","onlyfood","onlygym","onlyturn","onlycars","onlyerp"];
 function createBackupRunner({engine,store,enabled=()=>process.env.HUB_BACKUPS_ENABLED==="true",validateActor,enqueueRestore=()=>{}}){
   function permitted(apps,slug){if(!ALLOWED.includes(slug)||!apps.some(a=>a.slug===slug&&a.dbType!=="none"))throw Error("Aplicación fuera del alcance autorizado de backups");}
   function enqueue(apps,slug,requestId,actor){permitted(apps,slug);if(!enabled())throw Error("Backups deshabilitados");if(typeof requestId!=="string"||!/^[a-f0-9-]{36}$/.test(requestId))throw Error("ID de solicitud inválido");return store.enqueue({kind:"backup",resource:slug,key:"manual:"+requestId,payload:{slug,trigger:"manual"},actor});}

@@ -1,15 +1,15 @@
 "use strict";
 const fs=require("node:fs"),fsp=require("node:fs/promises"),path=require("node:path"),crypto=require("node:crypto");
 const {pipeline}=require("node:stream/promises"),{Transform}=require("node:stream"),{createGzip,createGunzip}=require("node:zlib");
-const ALLOWED=["nanolabshub","onlyfood","onlygym","onlyturn","onlycars"],LIMIT=512*1024**2;
+const ALLOWED=["nanolabshub","onlyfood","onlygym","onlyturn","onlycars","onlyerp"],LIMIT=512*1024**2;
 function createBackupImporter({root="/opt/backups",backup=require("./backup-engine.cjs"),recovery=require("./recovery-engine.cjs")}={}){
  function db(){const d=backup.db();d.exec("CREATE TABLE IF NOT EXISTS backup_imports(id TEXT PRIMARY KEY,job_id TEXT NOT NULL,slug TEXT NOT NULL,source_filename TEXT NOT NULL,source_checksum TEXT NOT NULL,archive_checksum TEXT NOT NULL,backup_id TEXT NOT NULL,created_at TEXT NOT NULL,actor TEXT NOT NULL,deduplicated INTEGER NOT NULL)");return d;}
- function appOf(apps,slug){const app=apps.find(a=>a.slug===slug&&["sqlite","mariadb","postgres"].includes(a.dbType));if(!ALLOWED.includes(slug)||!app)throw Error("Aplicación fuera del alcance autorizado de importación");return app;}
+ function appOf(apps,slug){const app=apps.find(a=>a.slug===slug&&["sqlite","mariadb","mysql","postgres"].includes(a.dbType));if(!ALLOWED.includes(slug)||!app)throw Error("Aplicación fuera del alcance autorizado de importación");return app;}
  function source(apps,slug,filename){
   const app=appOf(apps,slug);
   if(typeof filename!=="string"||filename.length>180||!/^[_a-zA-Z0-9.-]+$/.test(filename)||filename.startsWith(".")||!/[.](sql[.]gz|dump([.]gz)?|sqlite([.]gz)?)$/.test(filename))throw Error("Formato no admitido: SQLite, SQL gzip o dump PostgreSQL; sin rutas arbitrarias");
   for(const folder of [root,path.join(root,slug)]){const stat=fs.lstatSync(folder);if(!stat.isDirectory()||stat.isSymbolicLink())throw Error("Directorio de importación inseguro");}
-  if(app.dbType==="mariadb"&&!filename.endsWith(".sql.gz")||app.dbType==="postgres"&&!/[.](sql[.]gz|dump([.]gz)?)$/.test(filename))throw Error("El formato no corresponde al motor registrado");
+  if(["mariadb","mysql"].includes(app.dbType)&&!filename.endsWith(".sql.gz")||app.dbType==="postgres"&&!/[.](sql[.]gz|dump([.]gz)?)$/.test(filename))throw Error("El formato no corresponde al motor registrado");
   if(app.dbType==="sqlite"&&!/[.]sqlite([.]gz)?$/.test(filename))throw Error("Se requiere una copia SQLite");
   const file=path.join(root,slug,filename),entry=fs.lstatSync(file);
   if(!entry.isFile()||entry.isSymbolicLink()||entry.size<32||entry.size>LIMIT)throw Error("Archivo inseguro, vacío o mayor a 512 MiB");

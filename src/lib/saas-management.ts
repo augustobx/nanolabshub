@@ -2,7 +2,7 @@ import { createHmac } from "node:crypto";
 import { SAAS_PRODUCTS } from "./product-taxonomy";
 import type { ManagedSaaS, ManagementCommand } from "./saas-management-types";
 
-const products = new Set(["onlygym", "onlyturn", "onlyfood", "onlycars"]);
+const products = new Set(["onlygym", "onlyturn", "onlyfood", "onlycars", "onlyerp"]);
 const operations = new Set(["tenant.create", "tenant.update", "tenant.status", "subscription.update", "subscription.renew", "module.set", "admin.update", "admin.revoke", "plan.create", "plan.update", "payment.record", "payment.status", "domain.add"]);
 export class SaaSManagementError extends Error {
   constructor(public status: number, public code: string, message: string) { super(message); }

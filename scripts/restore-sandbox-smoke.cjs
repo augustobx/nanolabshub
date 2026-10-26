@@ -13,24 +13,24 @@ async function main(){
  const folder=await fs.mkdtemp(path.join(os.tmpdir(),"hub-restore-smoke-")),results=[];
  const previousData=process.env.DATA_DIR;process.env.DATA_DIR=folder;
  try{
-  for(const [slug,dbType,image] of [["onlyfood","mariadb",process.env.HUB_RESTORE_TEST_MARIADB_IMAGE||"mariadb:11.8.9"],["onlygym","postgres","postgres:16-alpine"],["onlyturn","postgres","postgres:17-alpine"]]){
+  for(const [slug,dbType,image] of [["onlyerp","mysql",process.env.HUB_RESTORE_TEST_MYSQL_IMAGE||"mysql:8.0.43"],["onlyfood","mariadb",process.env.HUB_RESTORE_TEST_MARIADB_IMAGE||"mariadb:11.8.9"],["onlygym","postgres","postgres:16-alpine"],["onlyturn","postgres","postgres:17-alpine"]]){
    const imageInfo=JSON.parse(await docker(["image","inspect",image]));
    const app={slug,dbType},spec=sandboxSpec(app,imageInfo[0].Id,crypto.randomBytes(16).toString("hex"));
    const source=await docker(spec.args);
    if(!/^[a-f0-9]{64}$/.test(source))throw Error("Fixture ID inválido");
    try{
     await docker(["start",source]);
-    const pg=dbType==="postgres";
+    const pg=dbType==="postgres", mysql=dbType==="mysql";
     let ready=false;
     for(let i=0;i<60;i++){
-     try{await docker(["exec",source,...(pg?["sh","-ec",'test "$(cat /proc/1/comm)" = postgres; exec pg_isready -U "$1"',"sh",spec.role]:["mariadb-admin","-uroot","ping"])],{timeout:3000});ready=true;break;}
+     try{await docker(["exec",source,...(pg?["sh","-ec",'test "$(cat /proc/1/comm)" = postgres; exec pg_isready -U "$1"',"sh",spec.role]:[mysql?"mysqladmin":"mariadb-admin","-uroot","ping"])],{timeout:3000});ready=true;break;}
      catch{await new Promise(r=>setTimeout(r,1000));}
     }
     if(!ready)throw Error("El fixture de origen no inició");
     const sql=(pg?"CREATE DATABASE hub_restore_fixture;\n\\connect hub_restore_fixture\n":"CREATE DATABASE hub_restore_fixture;\nUSE hub_restore_fixture;\n")+
-     "CREATE TABLE parent(id INTEGER PRIMARY KEY);\nCREATE TABLE child(id INTEGER PRIMARY KEY,parent_id INTEGER REFERENCES parent(id));\nINSERT INTO parent VALUES(1),(2);\nINSERT INTO child VALUES(11,1),(12,2),(13,1);\n";
-    await docker(["exec","-i",source,...(pg?["psql","-X","-v","ON_ERROR_STOP=1","-U",spec.role,"-d","postgres"]:["mariadb","-uroot"])],{input:Readable.from([sql])});
-    const dump=await docker(["exec",source,...(pg?["pg_dumpall","-U",spec.role,"--no-role-passwords"]:["mariadb-dump","-uroot","--single-transaction","--quick","--routines","--events","--triggers","--all-databases"])],{maxOutput:64*1024**2});
+     "CREATE TABLE parent(id INTEGER PRIMARY KEY);\nCREATE TABLE child(id INTEGER PRIMARY KEY,parent_id INTEGER, FOREIGN KEY(parent_id) REFERENCES parent(id));\nINSERT INTO parent VALUES(1),(2);\nINSERT INTO child VALUES(11,1),(12,2),(13,1);\n";
+    await docker(["exec","-i",source,...(pg?["psql","-X","-v","ON_ERROR_STOP=1","-U",spec.role,"-d","postgres"]:[mysql?"mysql":"mariadb","-uroot"])],{input:Readable.from([sql])});
+    const dump=await docker(["exec",source,...(pg?["pg_dumpall","-U",spec.role,"--no-role-passwords"]:[mysql?"mysqldump":"mariadb-dump","-uroot","--single-transaction","--quick","--routines","--events","--triggers","--all-databases"])],{maxOutput:64*1024**2});
     const file=path.join(folder,slug+".sql.gz");await fs.writeFile(file,gzipSync(dump),{mode:0o600});
     const start=Date.now(),target={...app,dbContainer:source,containerNames:[source]};
     const manifest=await createSandboxRunner().restore(target,file);
@@ -70,7 +70,7 @@ async function main(){
     let rejected=false;try{await createSandboxRunner().restore(target,file);}catch{rejected=true;}
     if(!rejected)throw Error("SQL inválido fue aceptado");
     results.at(-1).invalidSQLRejected=true;
-    const brokenFK=(pg?"CREATE TABLE parent(id INTEGER PRIMARY KEY); CREATE TABLE child(parent_id INTEGER REFERENCES parent(id));":"CREATE DATABASE broken_fk; USE broken_fk; CREATE TABLE parent(id INTEGER PRIMARY KEY); CREATE TABLE child(parent_id INTEGER REFERENCES parent(id)); SET FOREIGN_KEY_CHECKS=0;")+" INSERT INTO child VALUES(999);";
+    const brokenFK=(pg?"CREATE TABLE parent(id INTEGER PRIMARY KEY); CREATE TABLE child(parent_id INTEGER, FOREIGN KEY(parent_id) REFERENCES parent(id));":"CREATE DATABASE broken_fk; USE broken_fk; CREATE TABLE parent(id INTEGER PRIMARY KEY); CREATE TABLE child(parent_id INTEGER, FOREIGN KEY(parent_id) REFERENCES parent(id)); SET FOREIGN_KEY_CHECKS=0;")+" INSERT INTO child VALUES(999);";
     await fs.writeFile(file,gzipSync(brokenFK));
     let fkRejected=false;try{await createSandboxRunner().restore(target,file);}catch{fkRejected=true;}
     if(!fkRejected)throw Error("Relaciones sin correspondencia fueron aceptadas");
