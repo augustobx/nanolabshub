@@ -40,12 +40,20 @@ para resolver esa integración durante el cierre del paso 1.
 
 ## Cobertura de módulos
 
+Actualización del 26/10: OnlyERP integrado y desplegado con autorización expresa,
+revisión ERP `f23732d` y Hub `f52cb09d`. CI aprobado; 145 verificaciones HTTP
+y 52 nativas en QA; 81 tablas y 21.509 filas originales preservadas, con dos
+cambios aditivos de esquema. Agenda 03/09/15/21 Buenos Aires con restore MySQL
+automático comprobado (82 tablas, 155 FKs). Treinta y siete contenedores vecinos
+intactos; MySQL no se reinició. La protección del ciclo de vida genérico sigue
+vigente. C04 continúa diferido. Ver `ONLYERP_INTEGRATION_20261026.md`.
+
 | Pantalla | Fuente / acciones | Evidencia y regresión de cierre |
 | --- | --- | --- |
 | Inicio | Governance, operaciones, telemetría y alertas reales | Resumen consistente con fuentes; vacío/error; UI escritorio/móvil |
 | Superadmin | Catálogos de operaciones autenticados | Capacidades confirmadas, permisos y enlaces válidos |
 | SaaS y ficha | Registry + governance + operaciones | Configuración separada de mediciones; conectores inaccesibles visibles |
-| Gestión SaaS | Contratos OnlyFood, OnlyGym, OnlyTurn y OnlyCars; habilitación por producto | Lecturas y comandos, versiones, idempotencia, aislamiento, permisos; OnlyFood administrativo permanece deshabilitado |
+| Gestión SaaS | Contratos OnlyFood, OnlyGym, OnlyTurn, OnlyCars y OnlyERP; habilitación por producto | Lecturas y comandos, versiones, idempotencia, aislamiento, permisos; OnlyFood administrativo permanece deshabilitado |
 | Governance | Tenants del conector y acceso a gestión | Conteos, paginación, filtros, modal y enlaces; sin mensaje global falso de bloqueo |
 | Legacy | Capacidades compartidas | Fichas coherentes con catálogos actuales; exclusiones explícitas |
 | Operaciones | Docker/health/Git/lifecycle | Estado real, autorización, errores, concurrencia y recuperación |
