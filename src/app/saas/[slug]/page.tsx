@@ -80,7 +80,7 @@ export default function SaaSWorkspacePage() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          {(slug==="onlygym"||slug==="onlyturn"||slug==="onlyfood"||slug==="onlycars")&&<Link className="hub-primary-action" href={"/saas/"+slug+"/manage"}>Administrar plataforma <Settings2 className="h-4 w-4"/></Link>}
+          {(slug==="onlygym"||slug==="onlyturn"||slug==="onlyfood"||slug==="onlycars"||slug==="onlyerp")&&<Link className="hub-primary-action" href={"/saas/"+slug+"/manage"}>Administrar plataforma <Settings2 className="h-4 w-4"/></Link>}
           <Link className="hub-secondary-action" href={"/governance?saas="+slug}><Users className="h-4 w-4"/> Ver tenants</Link>
           <Link className="hub-primary-action" href="/software"><ServerCog className="h-4 w-4"/> Acciones técnicas <ArrowUpRight className="h-4 w-4"/></Link>
         </div>

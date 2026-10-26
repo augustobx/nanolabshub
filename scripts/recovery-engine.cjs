@@ -35,7 +35,7 @@ async function checkIsolated(apps,id,actor,metadata={}){
   try{
     const registry=backup.db();let archive;
     try{archive=registry.prepare("SELECT slug,db_type,checksum FROM backup_jobs WHERE id=? AND (status='integrity_ok' OR (?=1 AND status='import_testing'))").get(id,metadata.importValidation===true?1:0);}finally{registry.close();}
-    if(!archive||!["nanolabshub","onlyfood","onlygym","onlyturn","onlycars"].includes(archive.slug))throw Error("Respaldo fuera del alcance autorizado");
+    if(!archive||!["nanolabshub","onlyfood","onlygym","onlyturn","onlycars","onlyerp"].includes(archive.slug))throw Error("Respaldo fuera del alcance autorizado");
     slug=archive.slug;checksum=archive.checksum;
     const app=apps.find(a=>a.slug===slug&&a.dbType===archive.db_type);
     if(!app)throw Error("El motor registrado no coincide con la aplicación");

@@ -635,8 +635,8 @@ export default function GovernancePage() {
               </button>
             </div>
 
-            {(activeTenant.saas==="onlygym"||activeTenant.saas==="onlyturn"||activeTenant.saas==="onlyfood"||activeTenant.saas==="onlycars")&&<div className="space-y-3 px-6 py-8"><p className="text-sm text-slate-300">Administrá este tenant con los controles autenticados de su plataforma: suscripción, estados, módulos, credenciales, pagos y auditoría.</p><Link href={"/saas/"+activeTenant.saas+"/manage?tenantId="+encodeURIComponent(activeTenant.id)} className="hub-primary-action">Abrir administración del tenant</Link></div>}
-            <div style={activeTenant.saas==="onlygym"||activeTenant.saas==="onlyturn"||activeTenant.saas==="onlyfood"||activeTenant.saas==="onlycars"?{display:"none"}:undefined} role="tablist" aria-label="Áreas de administración del cliente"
+            {(activeTenant.saas==="onlygym"||activeTenant.saas==="onlyturn"||activeTenant.saas==="onlyfood"||activeTenant.saas==="onlycars"||activeTenant.saas==="onlyerp")&&<div className="space-y-3 px-6 py-8"><p className="text-sm text-slate-300">Administrá este tenant con los controles autenticados de su plataforma: suscripción, estados, módulos, credenciales, pagos y auditoría.</p><Link href={"/saas/"+activeTenant.saas+"/manage?tenantId="+encodeURIComponent(activeTenant.id)} className="hub-primary-action">Abrir administración del tenant</Link></div>}
+            <div style={activeTenant.saas==="onlygym"||activeTenant.saas==="onlyturn"||activeTenant.saas==="onlyfood"||activeTenant.saas==="onlycars"||activeTenant.saas==="onlyerp"?{display:"none"}:undefined} role="tablist" aria-label="Áreas de administración del cliente"
               className="flex gap-1 overflow-x-auto border-b border-white/[0.08] px-4 py-3 sm:px-6">
               {([
                 { id: "status", text: "Estado y plan" },
@@ -666,7 +666,7 @@ export default function GovernancePage() {
               ))}
             </div>
 
-            <div hidden={activeTenant.saas==="onlygym"||activeTenant.saas==="onlyturn"||activeTenant.saas==="onlyfood"||activeTenant.saas==="onlycars"} className="min-h-[230px] flex-1 overflow-y-auto px-5 py-6 sm:px-6">
+            <div hidden={activeTenant.saas==="onlygym"||activeTenant.saas==="onlyturn"||activeTenant.saas==="onlyfood"||activeTenant.saas==="onlycars"||activeTenant.saas==="onlyerp"} className="min-h-[230px] flex-1 overflow-y-auto px-5 py-6 sm:px-6">
               {tenantTab === "status" && (
                 <div id="tenant-panel-status" role="tabpanel" aria-labelledby="tenant-tab-status" className="space-y-5">
                   <div>

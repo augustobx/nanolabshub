@@ -5,7 +5,7 @@ const {createSandboxRunner,sandboxSpec}=require("./restore-sandbox.cjs");
 const image="sha256:"+"a".repeat(64),id="b".repeat(64);
 const app={slug:"onlygym",dbType:"postgres",dbContainer:"fixture-source",containerNames:["fixture-source"]};
 test("SQL sandbox has no host volumes, published ports, network, privileges or production secrets",()=>{
- for(const dbType of ["postgres","mariadb"]){
+ for(const dbType of ["postgres","mariadb","mysql"]){
   const spec=sandboxSpec({...app,dbType},image,"c".repeat(32));
   const args=spec.args;
   for(const forbidden of ["--volume","-v","--mount","--publish","-p","--privileged","--env-file"])assert.ok(!args.includes(forbidden));
@@ -41,7 +41,7 @@ test("SQL is sent only to the new verified ID; failure cleans only its own sandb
 test("protected sources are rejected before Docker and non-official images cannot start",async()=>{
  let calls=0;
  const runner=createSandboxRunner({run:async args=>{calls++;return args[0]==="image"?JSON.stringify([{RepoDigests:["untrusted/database@sha256:"+"a".repeat(64)]}]):JSON.stringify(image);}});
- await assert.rejects(runner.restore({...app,slug:"onlyerp"},"unused"),/fuera del alcance/);assert.equal(calls,0);
+ await assert.rejects(runner.restore({...app,slug:"onlypadel"},"unused"),/fuera del alcance/);assert.equal(calls,0);
  await assert.rejects(runner.restore(app,"unused"),/digest oficial/);assert.equal(calls,2);
 });
 test("lost sandbox ownership never deletes a container and leaves an uncertain cleanup result",async()=>{
