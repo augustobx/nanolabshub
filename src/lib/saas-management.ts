@@ -2,8 +2,8 @@ import { createHmac } from "node:crypto";
 import { SAAS_PRODUCTS } from "./product-taxonomy";
 import type { ManagedSaaS, ManagementCommand } from "./saas-management-types";
 
-const products = new Set(["onlygym", "onlyturn", "onlyfood"]);
-const operations = new Set(["tenant.create", "tenant.update", "tenant.status", "subscription.update", "subscription.renew", "module.set", "admin.update", "admin.revoke", "plan.create", "plan.update", "payment.record", "payment.status"]);
+const products = new Set(["onlygym", "onlyturn", "onlyfood", "onlycars"]);
+const operations = new Set(["tenant.create", "tenant.update", "tenant.status", "subscription.update", "subscription.renew", "module.set", "admin.update", "admin.revoke", "plan.create", "plan.update", "payment.record", "payment.status", "domain.add"]);
 export class SaaSManagementError extends Error {
   constructor(public status: number, public code: string, message: string) { super(message); }
 }
@@ -14,6 +14,7 @@ export function isManagementEnabled(product: string): product is ManagedSaaS {
 export async function callSaaSManagement(product: string, actor: string, query: URLSearchParams, command?: ManagementCommand, timeoutMs = 25000): Promise<unknown> {
   if (!products.has(product)) throw new SaaSManagementError(403, "PROTECTED_PRODUCT", "La gestión central está limitada a los productos autorizados.");
   if (command?.operation === "payment.status" && product !== "onlyfood") throw new SaaSManagementError(400, "COMMAND", "Operación no disponible para este producto.");
+  if (command?.operation === "domain.add" && product !== "onlycars") throw new SaaSManagementError(400, "COMMAND", "Operación no disponible para este producto.");
   if (!isManagementEnabled(product)) throw new SaaSManagementError(503, "DISABLED", "Gestión central no configurada para este producto.");
   if (!/^[a-zA-Z0-9@._:+-]{1,120}$/.test(actor)) throw new SaaSManagementError(403, "ACTOR", "Identidad administrativa inválida.");
   if (command && (!operations.has(command.operation) || !/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(command.requestId))) throw new SaaSManagementError(400, "COMMAND", "Solicitud de gestión inválida.");

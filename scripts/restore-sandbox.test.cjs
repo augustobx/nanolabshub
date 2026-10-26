@@ -15,6 +15,8 @@ test("SQL sandbox has no host volumes, published ports, network, privileges or p
   assert.ok(args.includes("--user"));assert.ok(!args.some(a=>/POSTGRES_PASSWORD|MYSQL_ROOT_PASSWORD|MARIADB_ROOT_PASSWORD/.test(a)));
  }
  assert.throws(()=>sandboxSpec({...app,slug:"onlypadel"},image,"c".repeat(32)),/fuera del alcance/);
+ const cars=sandboxSpec({...app,slug:"onlycars",dbType:"mariadb"},image,"c".repeat(32));
+ assert.equal(cars.args[cars.args.indexOf("--network")+1],"none");assert.ok(!cars.args.includes("-v"));assert.ok(!cars.args.includes("-p"));
  assert.throws(()=>sandboxSpec(app,"postgres:latest","c".repeat(32)),/imagen local exacta/);
 });
 test("SQL is sent only to the new verified ID; failure cleans only its own sandbox",async()=>{
