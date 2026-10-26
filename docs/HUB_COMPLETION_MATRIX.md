@@ -26,8 +26,12 @@ El fallo histórico del import truncado permanece visible; no se ocultó ni rein
 La duración de prueba DB no equivale al RTO de recuperación de la aplicación.
 
 Actualización del 25/10: el usuario autorizó integrar OnlyCars completo antes de
-OnlyFood, incluyendo su base, pruebas aisladas y despliegue. La implementación
-de OnlyCars está en curso; este documento no acredita su activación productiva.
+OnlyFood, incluyendo su base, pruebas aisladas y despliegue. OnlyCars quedó
+integrado y activado el 25/10, con conector `5678249` y Hub `312f484`; CI de ambos
+aprobado, 85 verificaciones HTTP en clon restaurado, 36 verificaciones nativas y
+64 de administración del Hub en escritorio/móvil. El primer backup automático
+de OnlyCars restauró 44 tablas, 2.983 filas y 79 claves foráneas; los hashes de
+las filas originales se conservaron. Ver `ONLYCARS_DEPLOYMENT_20261025.md`.
 OnlyPadel y OnlyERP siguen protegidos. C04 permanece diferido por decisión del
 usuario, que todavía no definirá destino externo. OnlyFood tiene deshabilitado
 su conector administrativo en la aplicación actual (503); el Hub lo informa como
@@ -41,7 +45,7 @@ para resolver esa integración durante el cierre del paso 1.
 | Inicio | Governance, operaciones, telemetría y alertas reales | Resumen consistente con fuentes; vacío/error; UI escritorio/móvil |
 | Superadmin | Catálogos de operaciones autenticados | Capacidades confirmadas, permisos y enlaces válidos |
 | SaaS y ficha | Registry + governance + operaciones | Configuración separada de mediciones; conectores inaccesibles visibles |
-| Gestión SaaS | Contratos OnlyFood, OnlyGym y OnlyTurn | Lecturas y comandos, versiones, idempotencia, aislamiento, permisos |
+| Gestión SaaS | Contratos OnlyFood, OnlyGym, OnlyTurn y OnlyCars; habilitación por producto | Lecturas y comandos, versiones, idempotencia, aislamiento, permisos; OnlyFood administrativo permanece deshabilitado |
 | Governance | Tenants del conector y acceso a gestión | Conteos, paginación, filtros, modal y enlaces; sin mensaje global falso de bloqueo |
 | Legacy | Capacidades compartidas | Fichas coherentes con catálogos actuales; exclusiones explícitas |
 | Operaciones | Docker/health/Git/lifecycle | Estado real, autorización, errores, concurrencia y recuperación |

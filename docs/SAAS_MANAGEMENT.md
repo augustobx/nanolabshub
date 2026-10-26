@@ -125,7 +125,9 @@ repetir el mismo UUID; documentar que cambia versión/auditoría, sin crear pago
 renovar, suspender o cambiar credenciales de clientes.
 
 Rollback: recrear solo el web afectado con su imagen y configuración guardadas.
-El código no cambia el esquema. No restaurar bases como parte de un rollback de
+Los conectores anteriores no cambian el esquema. OnlyCars agrega tres booleanos
+compatibles con su imagen anterior: conservar esas columnas al volver de imagen;
+ver `ONLYCARS_DEPLOYMENT_20261025.md`. No restaurar bases como parte de un rollback de
 aplicación. No activar ni ejecutar tareas globales de infraestructura sobre otros
 productos. Registrar las pruebas y revisiones exactas en el informe operativo.
 
