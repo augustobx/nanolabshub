@@ -3,7 +3,7 @@
 const crypto = require("node:crypto"), fs = require("node:fs"), path = require("node:path");
 const { DatabaseSync } = require("node:sqlite");
 const ROLES = ["owner", "operator", "viewer"];
-const SCOPES = ["nanolabshub", "onlyfood", "onlygym", "onlyturn"];
+const SCOPES = ["nanolabshub", "onlyfood", "onlygym", "onlyturn", "onlycars"];
 const ABSOLUTE_MS = 12 * 3600000, IDLE_MS = 30 * 60000, RECENT_MS = 10 * 60000;
 const digest = value => crypto.createHash("sha256").update(value).digest("hex");
 function hashPassword(password) {

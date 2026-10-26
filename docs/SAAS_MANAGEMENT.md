@@ -1,8 +1,9 @@
-# Administración central de OnlyGym, OnlyTurn y OnlyFood
+# Administración central de OnlyGym, OnlyTurn, OnlyFood y OnlyCars
 
-El Hub administra estos dos productos desde `/saas/onlygym/manage` y
-`/saas/onlyturn/manage` y `/saas/onlyfood/manage`. La lista permitida está fijada
-en código. OnlyPadel, OnlyCars, OnlyERP y los demás productos no pueden utilizar este proxy,
+El Hub ofrece administración desde `/saas/onlygym/manage`,
+`/saas/onlyturn/manage`, `/saas/onlyfood/manage` y `/saas/onlycars/manage`,
+sujeta a habilitación y respuesta del conector real. La lista permitida está fijada
+en código. OnlyPadel, OnlyERP y los demás productos no pueden utilizar este proxy,
 incluso si se agregan por error a las variables de configuración.
 
 ## Contrato y autorización
@@ -18,12 +19,33 @@ Configurar en ejecución, fuera del repositorio y del contexto Docker:
 | OnlyGym web | `HUB_MANAGEMENT_ENABLED=true`, `HUB_MANAGEMENT_TOKEN` |
 | OnlyTurn app | `HUB_MANAGEMENT_ENABLED=true`, `HUB_MANAGEMENT_TOKEN` |
 | OnlyFood app | `HUB_MANAGEMENT_ENABLED=true`, `HUB_MANAGEMENT_TOKEN` |
+| OnlyCars app | `HUB_MANAGEMENT_ENABLED=true`, `HUB_MANAGEMENT_TOKEN`, `HUB_INTEGRATION_ENABLED=true`, `HUB_INTEGRATION_TOKEN` |
 | Hub web | `HUB_SAAS_MANAGEMENT_PRODUCTS=onlygym,onlyturn`, `HUB_MANAGEMENT_ONLYGYM_TOKEN`, `HUB_MANAGEMENT_ONLYTURN_TOKEN` |
 
 Para sumar OnlyFood, agregar `onlyfood` a la lista explícita e inyectar
 `HUB_MANAGEMENT_ONLYFOOD_TOKEN`. Su lectura requiere además
 `HUB_INTEGRATION_ONLYFOOD_TOKEN` y la selección explícita en
 `HUB_SAAS_INTEGRATION_PRODUCTS`. Sin ambas configuraciones no se habilita.
+
+OnlyCars requiere añadir `onlycars` a ambas listas explícitas del Hub y las claves
+independientes `HUB_MANAGEMENT_ONLYCARS_TOKEN` y `HUB_INTEGRATION_ONLYCARS_TOKEN`.
+Su habilitación fue autorizada expresamente; no habilita cambios en OnlyFood,
+OnlyPadel ni OnlyERP. La configuración efectiva de OnlyCars usa `.env.docker`.
+Los reinicios y el ciclo de vida genéricos de sus contenedores continúan bloqueados;
+la autorización del Hub habilita la administración por contrato y sus backups,
+importaciones y restauraciones de prueba aisladas.
+
+El catálogo de OnlyCars informa 12 operaciones, planes en USD, identificador de
+tenant inmutable, contacto, dominios y pagos recibidos con moneda y período.
+`domain.add` exige una declaración explícita de verificación manual de titularidad,
+DNS y HTTPS; no configura estos servicios. `payment.status` no existe en OnlyCars.
+Un pago de período vigente activa la suscripción; uno histórico o futuro conserva
+el acceso. La renovación independiente no inventa pagos. Los módulos ejecutados
+son `pwa_clientes`, `seller_pwa` y `branding_documentos`; el resto de las funciones
+históricas del plan se conserva. Sus límites son vehículos, usuarios y sedes.
+Las nuevas marcas de gestión tienen valor inicial falso para conservar el
+comportamiento anterior al despliegue. La migración agrega tres booleanos, sin
+renombrar tablas, resembrar datos ni tocar el esquema histórico adicional.
 
 OnlyFood usa MariaDB y capacidades propias: estado PAST_DUE, fin de prueba,
 acceso efectivo, dominios conservados, integraciones sanitizadas y ciclo de pagos
@@ -36,12 +58,14 @@ No se ejecutan locks de PostgreSQL ni se accede a MariaDB desde el Hub.
 
 Generar una clave distinta de al menos 32 bytes para cada producto. Debe ser
 distinta de su token de lectura. No inyectar claves nuevas en bases, migradores,
-workers o scheduler. `HUB_MANAGEMENT_OPERATIONS` permite restringir las operaciones
-en cada SaaS; una lista vacía no permite ninguna. El catálogo informa la lista real.
+workers o scheduler. OnlyGym/OnlyTurn/OnlyFood usan `HUB_MANAGEMENT_OPERATIONS`
+para restringir las operaciones; OnlyCars expone su catálogo fijo de 12 operaciones.
+El catálogo autenticado informa las capacidades reales de cada conector.
 
 Todas las solicitudes usan Bearer y HMAC SHA-256 con esa clave. Se firma el texto
 `timestamp + "\n" + method + "\n" + pathnameAndQuery + "\n" + actor + "\n" + body`.
-Los encabezados son `X-NanoLabs-Timestamp` (milisegundos; tolerancia 5 minutos),
+Los encabezados son `X-NanoLabs-Timestamp` (milisegundos; tolerancia 5 minutos
+en los conectores anteriores, 60 segundos en OnlyCars),
 `X-NanoLabs-Actor` y `X-NanoLabs-Signature` (hexadecimal). GET firma cuerpo vacío.
 El Hub deriva el actor de su sesión administrativa y fija el destino mediante el
 registro de productos; el navegador no conoce claves ni selecciona una URL.

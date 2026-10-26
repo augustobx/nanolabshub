@@ -113,7 +113,7 @@ export default function ContinuityPage(){
               <span className="hub-state hub-state-neutral">Integridad OK · recuperación sin prueba</span>}
              {latest&&<a href={"/api/backups/download?id="+encodeURIComponent(latest.id)}
                className="hub-secondary-action"><Download className="h-4 w-4"/> Descargar</a>}
-             {latest&&["nanolabshub","onlyfood","onlygym","onlyturn"].includes(app.slug)&&(permission?.role==="owner"||permission?.role==="operator"&&permission.scopes.includes(app.slug))&&<button type="button" disabled={!!running}
+             {latest&&["nanolabshub","onlyfood","onlygym","onlyturn","onlycars"].includes(app.slug)&&(permission?.role==="owner"||permission?.role==="operator"&&permission.scopes.includes(app.slug))&&<button type="button" disabled={!!running}
                onClick={()=>void runCheck(latest.id)} className="hub-primary-action">
                <FlaskConical className="h-4 w-4"/> {running===latest.id?"Comprobando…":"Probar restauración aislada"}</button>}
              {!latest&&<Link href="/backups" className="hub-text-link">Abrir backups <ArrowUpRight className="h-4 w-4"/></Link>}

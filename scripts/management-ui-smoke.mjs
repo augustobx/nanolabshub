@@ -24,13 +24,13 @@ for (const device of [{ name: "desktop", viewport: { width: 1440, height: 1000 }
   let uncertainPayment = true, rejectedStale = false, uncertainId;
   page.on("pageerror", error => errors.push(error.message));
   page.on("dialog", dialog => dialog.accept());
-  const catalogs = { onlyfood: {modules:["orders","loyalty"],limits:["maxLocations","maxProducts"],optionalLimits:[],paymentLifecycle:true,trialDates:true,statuses:["ACTIVE","TRIAL","PAST_DUE","SUSPENDED","CANCELED"]}, onlygym: { modules: ["socios", "reportes"], limits: ["maxUsers", "maxBranches", "maxMembers"], optionalLimits: ["maxMembers"] }, onlyturn: { modules: ["whatsappNotifications", "advancedReports"], limits: ["maxLocations", "maxStaff", "maxResources", "maxBookings"], optionalLimits: [] } };
-  const operations = ["tenant.create", "tenant.update", "tenant.status", "subscription.update", "subscription.renew", "module.set", "admin.update", "admin.revoke", "plan.create", "plan.update", "payment.record", "payment.status"];
+  const catalogs = { onlycars: {modules:["pwa_clientes","seller_pwa","branding_documentos"],limits:["maxVehicles","maxLocations","maxUsers"],optionalLimits:[],currency:"USD",paymentPeriods:true,immutableSlug:true,tenantFields:["email","phone","address","city","cuit"],domainManagement:true,trialDates:true,statuses:["ACTIVE","TRIAL","PAST_DUE","SUSPENDED","CANCELED"]}, onlyfood: {modules:["orders","loyalty"],limits:["maxLocations","maxProducts"],optionalLimits:[],paymentLifecycle:true,trialDates:true,statuses:["ACTIVE","TRIAL","PAST_DUE","SUSPENDED","CANCELED"]}, onlygym: { modules: ["socios", "reportes"], limits: ["maxUsers", "maxBranches", "maxMembers"], optionalLimits: ["maxMembers"] }, onlyturn: { modules: ["whatsappNotifications", "advancedReports"], limits: ["maxLocations", "maxStaff", "maxResources", "maxBookings"], optionalLimits: [] } };
+  const operations = ["tenant.create", "tenant.update", "tenant.status", "subscription.update", "subscription.renew", "module.set", "admin.update", "admin.revoke", "plan.create", "plan.update", "payment.record", "payment.status", "domain.add"];
   const plans = {}, tenants = {};
   let sequence = 1;
   const revision = () => new Date(Date.parse(now) + sequence++).toISOString();
-  for (const product of ["onlygym", "onlyturn", "onlyfood"]) {
-    const catalog = catalogs[product], plan = { id: "plan-" + product, code: "PRO", name: "Profesional", description: "Fixture", priceCents: 10000, currency: "ARS", active: true, modules: Object.fromEntries(catalog.modules.map(k => [k, true])), limits: Object.fromEntries(catalog.limits.map(k => [k, 100])), version: revision() };
+  for (const product of ["onlygym", "onlyturn", "onlyfood", "onlycars"]) {
+    const catalog = catalogs[product], plan = { id: "plan-" + product, code: "PRO", name: "Profesional", description: "Fixture", priceCents: 10000, currency: catalog.currency || "ARS", active: true, modules: Object.fromEntries(catalog.modules.map(k => [k, true])), limits: Object.fromEntries(catalog.limits.map(k => [k, 100])), version: revision() };
     plans[product] = [plan]; tenants[product] = [{ id: "tenant-" + product, name: "Empresa QA " + product, slug: "qa-" + product, status: "ACTIVE", version: revision(), plan,
       subscription: { id: "sub-" + product, planId: plan.id, status: "ACTIVE", start: now, end, ...(product === "onlyfood" ? {trialEndsAt:"2025-01-01T00:00:00.000Z"} : {}) }, ...(product === "onlyfood" ? {access:{enabled:false,reason:"Prueba vencida"}} : {}), modules: Object.fromEntries([...catalog.modules, ...(product === "onlyturn" ? catalog.limits : [])].map(k => [k, { enabled: catalog.modules.includes(k) ? true : 100, override: null }])),
       admins: [{ id: "owner-" + product, name: "Propietario QA", email: "owner@example.invalid", role: "OWNER", active: true }], usage: product === "onlyfood" ? {clients:3,orders:2,products:4,locations:1} : { clientes: 3, reservas: 2 }, payments: [] }];
@@ -39,12 +39,12 @@ for (const device of [{ name: "desktop", viewport: { width: 1440, height: 1000 }
     const request = route.request(), url = new URL(request.url()), path = url.pathname;
     const ok = data => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ success: true, data }) });
     if (path === "/api/alerts") return ok({ alerts: [] });
-    if (path === "/api/governance") return ok({ managementProducts: ["onlygym", "onlyturn", "onlyfood"], tenants: Object.entries(tenants).flatMap(([saas, ts]) => ts.map(t => ({ ...t, saas, saasName: saas, rawStatus: t.status, createdAt: now, domain: "", metrics: { totalRecords: 3, recordLabel: "registros", available: true } }))), sources: ["onlygym", "onlyturn", "onlyfood"].map(saas => ({ saas, status: "available", count: tenants[saas].length })) });
+    if (path === "/api/governance") return ok({ managementProducts: ["onlygym", "onlyturn", "onlyfood", "onlycars"], tenants: Object.entries(tenants).flatMap(([saas, ts]) => ts.map(t => ({ ...t, saas, saasName: saas, rawStatus: t.status, createdAt: now, domain: "", metrics: { totalRecords: 3, recordLabel: "registros", available: true } }))), sources: ["onlygym", "onlyturn", "onlyfood", "onlycars"].map(saas => ({ saas, status: "available", count: tenants[saas].length })) });
     if (!path.startsWith("/api/saas-management/")) return ok([]);
-    const product = path.split("/").at(-1); assert.ok(["onlygym", "onlyturn", "onlyfood"].includes(product));
+    const product = path.split("/").at(-1); assert.ok(["onlygym", "onlyturn", "onlyfood", "onlycars"].includes(product));
     if (request.method() === "GET") {
       const resource = url.searchParams.get("resource");
-      if (resource === "catalog") return ok({ ...catalogs[product], operations, currency: "ARS", destructiveDelete: false });
+      if (resource === "catalog") return ok({ ...catalogs[product], operations: product === "onlycars" ? operations.filter(o=>o!=="payment.status") : operations, currency: catalogs[product].currency || "ARS", destructiveDelete: false });
       if (resource === "plans") return ok({ items: plans[product], nextOffset: null });
       if (resource === "tenant") return ok(tenants[product].find(t => t.id === url.searchParams.get("tenantId")));
       if (resource === "audit") return ok({ items: [{ id: "event-1", tenantId: tenants[product][0].id, actor: "ci_smoke", action: "hub.management", entity: "tenant.update", entityId: tenants[product][0].id, result: "success", createdAt: now }], nextOffset: null });
@@ -59,13 +59,14 @@ for (const device of [{ name: "desktop", viewport: { width: 1440, height: 1000 }
       return route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ success: false, code: "STALE_VERSION", error: "Los datos cambiaron. Actualizá la ficha antes de guardar." }) });
     }
     if (t) assert.equal(i.version, t.version);
-    if (c.operation === "tenant.update") { t.name = i.name; t.slug = i.slug; }
+    if (c.operation === "tenant.update") { if(product==="onlycars"){assert.equal(i.slug,t.slug);t.contact=Object.fromEntries(catalogs.onlycars.tenantFields.map(k=>[k,i[k]]));} t.name = i.name; t.slug = i.slug; }
+    if(c.operation === "domain.add"){assert.equal(product,"onlycars");assert.equal(i.confirmOwnership,true);t.domains=[...(t.domains||[]),{hostname:i.hostname,primary:i.primary,custom:i.custom,verified:true}];}
     if (c.operation === "tenant.status") t.status = i.status;
     if (c.operation === "subscription.update") { assert.ok(new Date(i.end) > new Date(i.start)); t.subscription = { ...t.subscription, start: i.start, end: i.end, planId: i.planId }; t.status = i.status; }
     if (c.operation === "subscription.renew") { assert.equal(typeof i.days, "number"); t.subscription.end = new Date(Date.parse(t.subscription.end) + i.days * 86400000).toISOString(); t.status = "ACTIVE"; if(product==="onlyfood")t.access={enabled:true,reason:null}; }
     if (c.operation === "module.set") { assert.ok(typeof i.enabled === "boolean" || i.enabled === null); t.modules[i.key] = { enabled: i.enabled ?? t.plan.modules[i.key] ?? i.limit, override: i.enabled ?? i.limit }; }
     if (c.operation === "admin.update") { t.admins[0] = { ...t.admins[0], name: i.name, email: i.email }; assert.equal(i.password, "Fixture-new-password-2026"); }
-    if (c.operation === "payment.record") { assert.equal(i.amountCents, 12345); if(product!=="onlyfood")assert.equal(i.days, 0);else{assert.equal(i.status,"PENDING");assert.ok(i.start&&i.end);assert.equal(i.currency,"ARS");} t.payments.push({ id: c.requestId, amountCents: i.amountCents, method: i.method, reference: i.reference, status: i.status || "registered", currency:i.currency, start:i.start, end:i.end, createdAt: now }); }
+    if (c.operation === "payment.record") { assert.equal(i.amountCents, 12345); if(product==="onlycars"){assert.equal(i.currency,"USD");assert.ok(i.start&&i.end);assert.equal(i.days,undefined);}else if(product!=="onlyfood")assert.equal(i.days, 0);else{assert.equal(i.status,"PENDING");assert.ok(i.start&&i.end);assert.equal(i.currency,"ARS");} t.payments.push({ id: c.requestId, amountCents: i.amountCents, method: i.method, reference: i.reference, status: i.status || "registered", currency:i.currency, start:i.start, end:i.end, createdAt: now }); }
     if (c.operation === "payment.status") {const p=t.payments.find(p=>p.id===i.paymentId);p.status=i.status; t.status=i.status==="OVERDUE"?"PAST_DUE":i.status==="PAID"?"ACTIVE":t.status;}
     if (c.operation === "plan.update") { const p = plans[product].find(p => p.id === i.planId); assert.equal(i.version, p.version); Object.assign(p, i, { version: revision() }); }
     if (c.operation === "plan.create") { entityId = "plan-new-" + product; plans[product].push({ ...i, id: entityId, version: revision() }); }
@@ -78,13 +79,19 @@ for (const device of [{ name: "desktop", viewport: { width: 1440, height: 1000 }
     }
     return ok(result);
   });
-  for (const product of ["onlygym", "onlyturn", "onlyfood"]) {
+  for (const product of ["onlygym", "onlyturn", "onlyfood", "onlycars"]) {
     await page.goto(origin + "/saas/" + product + "/manage?tenantId=tenant-" + product);
-    await page.getByRole("heading", { name: "Administración de " + ({onlygym:"OnlyGym",onlyturn:"OnlyTurn",onlyfood:"OnlyFood"}[product]) }).waitFor();
+    await page.getByRole("heading", { name: "Administración de " + ({onlygym:"OnlyGym",onlyturn:"OnlyTurn",onlyfood:"OnlyFood",onlycars:"OnlyCars"}[product]) }).waitFor();
     await page.getByRole("textbox", { name: "Nombre", exact: true }).fill("Empresa editada QA");
     await page.getByRole("button", { name: "Guardar cambios", exact: true }).click();
     if (product === "onlygym") { await page.getByRole("alert").filter({ hasText: "Los datos cambiaron" }).waitFor(); await page.getByRole("textbox", { name: "Nombre", exact: true }).fill("Empresa editada QA"); await page.getByRole("button", { name: "Guardar cambios", exact: true }).click(); }
     await page.getByRole("status").filter({ hasText: "Cambio confirmado" }).waitFor();
+        if(product === "onlycars"){
+      assert.equal(await page.getByRole("textbox",{name:"Identificador / subdominio"}).getAttribute("readonly"),"");
+      await page.getByRole("textbox",{name:"Nombre de dominio",exact:true}).fill("qa.example.invalid");
+      await page.getByLabel("Confirmo que verifiqué").check();await page.getByRole("button",{name:"Agregar dominio",exact:true}).click();
+      await page.getByRole("status").filter({hasText:"Cambio confirmado"}).waitFor();assert.equal(tenants.onlycars[0].domains[0].hostname,"qa.example.invalid");
+    }
     await capture(product + "-identity");
     await page.getByRole("button", { name: "Módulos y límites", exact: true }).click();
     const moduleForm = page.locator("form").first(); await moduleForm.getByRole("combobox").selectOption("off"); await moduleForm.getByRole("button", { name: "Aplicar excepción" }).click();
@@ -97,13 +104,14 @@ for (const device of [{ name: "desktop", viewport: { width: 1440, height: 1000 }
     await page.getByLabel("Nueva contraseña", { exact: false }).fill("Fixture-new-password-2026"); await page.getByRole("button", { name: "Actualizar acceso" }).click(); await page.getByRole("status").filter({ hasText: "Cambio confirmado" }).waitFor();
     assert.equal(await page.getByLabel("Nueva contraseña", { exact: false }).inputValue(), "");
     await page.getByRole("button", { name: "Pagos SaaS", exact: true }).click();
-    await page.getByRole("spinbutton", { name: product === "onlyfood" ? "Importe" : "Importe en pesos argentinos", exact:true }).fill("123.45"); await page.getByRole("textbox", { name: "Método de pago" }).fill("Transferencia"); await page.getByRole("textbox", { name: "Referencia única" }).fill("UI-REF-" + product + device.name); await page.getByRole("button", { name: "Registrar pago SaaS" }).click();
+    await page.getByRole("spinbutton", { name: product === "onlycars" ? "Importe recibido" : product === "onlyfood" ? "Importe" : "Importe en pesos argentinos", exact:true }).fill("123.45"); await page.getByRole("textbox", { name: "Método de pago" }).fill("Transferencia"); await page.getByRole("textbox", { name: "Referencia única" }).fill("UI-REF-" + product + device.name); await page.getByRole("button", { name: "Registrar pago SaaS" }).click();
     if (product === "onlygym") { await page.getByRole("button", { name: "Reintentar la misma solicitud" }).waitFor(); await page.getByRole("button", { name: "Reintentar la misma solicitud" }).click(); }
     await page.getByRole("status").filter({ hasText: "Cambio confirmado" }).waitFor(); assert.equal(tenants[product][0].payments.length, 1);
     if(product==="onlyfood"){const updateForm=page.locator("form").filter({has:page.getByRole("button",{name:"Actualizar estado del pago"})});await updateForm.getByRole("combobox",{name:"Estado del pago"}).selectOption("PAID");await updateForm.getByRole("button",{name:"Actualizar estado del pago"}).click();await page.getByRole("status").filter({hasText:"Cambio confirmado"}).waitFor();assert.equal(tenants.onlyfood[0].payments[0].status,"PAID");}
     await capture(product + "-payments");
     await page.getByRole("button", { name: "Planes", exact: true }).click();
     await page.getByRole("combobox", { name: "Plan a administrar" }).selectOption("plan-" + product);
+    if(product==="onlycars")await page.getByRole("spinbutton",{name:"Precio mensual en USD"}).waitFor();
     await page.getByRole("textbox", { name: "Nombre", exact: true }).fill("Plan actualizado QA"); await page.getByRole("button", { name: "Actualizar plan", exact: true }).click(); await page.getByRole("status").filter({ hasText: "Cambio confirmado" }).waitFor();
     await capture(product + "-plans");
     await page.getByRole("button", { name: "Auditoría", exact: true }).click(); await page.getByText("hub.management", { exact: true }).waitFor();

@@ -63,7 +63,7 @@ export const KNOWN_APPS: AppDefinition[] = [
     dbType: "mariadb",
     dbContainer: "onlycars-db-1",
     dbPort: 3306,
-    envFile: "/opt/apps/onlycars/.env",
+    envFile: "/opt/apps/onlycars/.env.docker",
     description: "SaaS de gestión de agencias automotrices y stock",
   },
   {

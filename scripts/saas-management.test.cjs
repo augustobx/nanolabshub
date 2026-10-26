@@ -18,9 +18,29 @@ function api(fetch, extra = {}) {
   return load(path.resolve(__dirname, '../src/lib/saas-management.ts'));
 }
 const cmd = { requestId: '13d16e21-0221-4f4d-9cd7-38c5f2b3b9c7', operation: 'tenant.status', input: { tenantId: 'fixture', version: '2026-01-01T00:00:00.000Z', status: 'SUSPENDED' } };
+
+test('OnlyCars requires opt-in, signs its fixed destination and keeps native payment/domain contracts', async () => {
+  const token = 'cars-fixture-'.repeat(6); let calls = 0;
+  assert.equal(api(() => { throw Error(); }).isManagementEnabled('onlycars'), false);
+  assert.equal(api(() => { throw Error(); }, { HUB_MANAGEMENT_ONLYCARS_TOKEN: token, HUB_SAAS_MANAGEMENT_PRODUCTS: 'onlygym' }).isManagementEnabled('onlycars'), false);
+  const sdk = api(async (url, options) => {
+    calls++; assert.equal(url, 'https://onlycars.nanoapps.ar/api/integrations/nanolabs/management');
+    assert.equal(options.headers.Authorization, 'Bearer ' + token); assert.equal(options.redirect, 'error');
+    const body = JSON.parse(options.body); assert.equal(body.actor, 'trusted-admin');
+    assert.equal(options.headers['X-NanoLabs-Signature'], createHmac('sha256', token).update([options.headers['X-NanoLabs-Timestamp'], 'POST', '/api/integrations/nanolabs/management', body.actor, options.body].join('\n')).digest('hex'));
+    if (body.operation === 'payment.record') { assert.equal(body.input.currency, 'USD'); assert.ok(body.input.start && body.input.end); assert.equal(body.input.days, undefined); }
+    if (body.operation === 'domain.add') assert.equal(body.input.confirmOwnership, true);
+    return Response.json({ success: true, contract: 'nanolabs.saas.management.v1', product: 'onlycars', requestId: cmd.requestId, data: { tenantId: 'fixture' } });
+  }, { HUB_MANAGEMENT_ONLYCARS_TOKEN: token });
+  await sdk.callSaaSManagement('onlycars', 'trusted-admin', new URLSearchParams(), { ...cmd, operation: 'payment.record', input: { currency: 'USD', amountCents: 1000, start: '2026-10-01T00:00:00Z', end: '2026-11-01T00:00:00Z' } });
+  await sdk.callSaaSManagement('onlycars', 'trusted-admin', new URLSearchParams(), { ...cmd, operation: 'domain.add', input: { hostname: 'fixture.example.invalid', confirmOwnership: true } });
+  await assert.rejects(sdk.callSaaSManagement('onlycars', 'trusted-admin', new URLSearchParams(), { ...cmd, operation: 'payment.status' }), e => e.status === 400);
+  await assert.rejects(sdk.callSaaSManagement('onlygym', 'trusted-admin', new URLSearchParams(), { ...cmd, operation: 'domain.add' }), e => e.status === 400);
+  assert.equal(calls, 2);
+});
 test('protected products are rejected before any network call even if configured', async () => {
   let calls = 0; const sdk = api(async () => { calls++; throw Error(); });
-  for (const product of ['onlypadel', 'onlycars', 'onlyerp', 'onlymob', 'unknown']) {
+  for (const product of ['onlypadel', 'onlyerp', 'onlymob', 'unknown']) {
     assert.equal(sdk.isManagementEnabled(product), false);
     await assert.rejects(sdk.callSaaSManagement(product, 'admin', new URLSearchParams()), error => error.status === 403);
   }

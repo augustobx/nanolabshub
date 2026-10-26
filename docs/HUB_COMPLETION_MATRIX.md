@@ -25,7 +25,11 @@ de cada archivo ligado a su prueba, cero jobs protegidos y 35 vecinos intactos.
 El fallo histórico del import truncado permanece visible; no se ocultó ni reintentó.
 La duración de prueba DB no equivale al RTO de recuperación de la aplicación.
 
-El paso 2 sigue diferido por instrucción del usuario. OnlyFood tiene deshabilitado
+Actualización del 25/10: el usuario autorizó integrar OnlyCars completo antes de
+OnlyFood, incluyendo su base, pruebas aisladas y despliegue. La implementación
+de OnlyCars está en curso; este documento no acredita su activación productiva.
+OnlyPadel y OnlyERP siguen protegidos. C04 permanece diferido por decisión del
+usuario, que todavía no definirá destino externo. OnlyFood tiene deshabilitado
 su conector administrativo en la aplicación actual (503); el Hub lo informa como
 no disponible. OnlyGym y OnlyTurn responden al contrato. No se modificó OnlyFood
 para resolver esa integración durante el cierre del paso 1.
