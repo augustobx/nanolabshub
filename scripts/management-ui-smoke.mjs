@@ -24,12 +24,12 @@ for (const device of [{ name: "desktop", viewport: { width: 1440, height: 1000 }
   let uncertainPayment = true, rejectedStale = false, uncertainId;
   page.on("pageerror", error => errors.push(error.message));
   page.on("dialog", dialog => dialog.accept());
-  const catalogs = { onlyerp:{modules:["VENTAS","AFIP"],limits:["maxUsers","maxLocations","maxWarehouses"],optionalLimits:[],currency:"ARS",paymentCalendar:true,adminIdentity:"username",ownerIdentity:"username",immutableSlug:true,statuses:["ACTIVE","TRIAL","SUSPENDED","CANCELED"]}, onlycars: {modules:["pwa_clientes","seller_pwa","branding_documentos"],limits:["maxVehicles","maxLocations","maxUsers"],optionalLimits:[],currency:"USD",paymentPeriods:true,immutableSlug:true,tenantFields:["email","phone","address","city","cuit"],domainManagement:true,trialDates:true,statuses:["ACTIVE","TRIAL","PAST_DUE","SUSPENDED","CANCELED"]}, onlyfood: {modules:["orders","loyalty"],limits:["maxLocations","maxProducts"],optionalLimits:[],paymentLifecycle:true,trialDates:true,statuses:["ACTIVE","TRIAL","PAST_DUE","SUSPENDED","CANCELED"]}, onlygym: { modules: ["socios", "reportes"], limits: ["maxUsers", "maxBranches", "maxMembers"], optionalLimits: ["maxMembers"] }, onlyturn: { modules: ["whatsappNotifications", "advancedReports"], limits: ["maxLocations", "maxStaff", "maxResources", "maxBookings"], optionalLimits: [] } };
+  const catalogs = { onlyshop:{modules:["pwaEnabled","accountsEnabled"],limits:["maxProducts"],optionalLimits:[],currency:"ARS",immutableSlug:true,statuses:["ACTIVE","TRIAL","PAST_DUE","SUSPENDED","CANCELED"]}, onlyerp:{modules:["VENTAS","AFIP"],limits:["maxUsers","maxLocations","maxWarehouses"],optionalLimits:[],currency:"ARS",paymentCalendar:true,adminIdentity:"username",ownerIdentity:"username",immutableSlug:true,statuses:["ACTIVE","TRIAL","SUSPENDED","CANCELED"]}, onlycars: {modules:["pwa_clientes","seller_pwa","branding_documentos"],limits:["maxVehicles","maxLocations","maxUsers"],optionalLimits:[],currency:"USD",paymentPeriods:true,immutableSlug:true,tenantFields:["email","phone","address","city","cuit"],domainManagement:true,trialDates:true,statuses:["ACTIVE","TRIAL","PAST_DUE","SUSPENDED","CANCELED"]}, onlyfood: {modules:["orders","loyalty"],limits:["maxLocations","maxProducts"],optionalLimits:[],paymentLifecycle:true,trialDates:true,statuses:["ACTIVE","TRIAL","PAST_DUE","SUSPENDED","CANCELED"]}, onlygym: { modules: ["socios", "reportes"], limits: ["maxUsers", "maxBranches", "maxMembers"], optionalLimits: ["maxMembers"] }, onlyturn: { modules: ["whatsappNotifications", "advancedReports"], limits: ["maxLocations", "maxStaff", "maxResources", "maxBookings"], optionalLimits: [] } };
   const operations = ["tenant.create", "tenant.update", "tenant.status", "subscription.update", "subscription.renew", "module.set", "admin.update", "admin.revoke", "plan.create", "plan.update", "payment.record", "payment.status", "domain.add"];
   const plans = {}, tenants = {};
   let sequence = 1;
   const revision = () => new Date(Date.parse(now) + sequence++).toISOString();
-  for (const product of ["onlygym", "onlyturn", "onlyfood", "onlycars", "onlyerp"]) {
+  for (const product of ["onlygym", "onlyturn", "onlyfood", "onlycars", "onlyerp", "onlyshop"]) {
     const catalog = catalogs[product], plan = { id: "plan-" + product, code: "PRO", name: "Profesional", description: "Fixture", priceCents: 10000, currency: catalog.currency || "ARS", active: true, modules: Object.fromEntries(catalog.modules.map(k => [k, true])), limits: Object.fromEntries(catalog.limits.map(k => [k, 100])), version: revision() };
     plans[product] = [plan]; tenants[product] = [{ id: "tenant-" + product, name: "Empresa QA " + product, slug: "qa-" + product, status: "ACTIVE", version: revision(), plan,
       subscription: { id: "sub-" + product, planId: plan.id, status: "ACTIVE", start: now, end, ...(product === "onlyfood" ? {trialEndsAt:"2025-01-01T00:00:00.000Z"} : {}) }, ...(product === "onlyfood" ? {access:{enabled:false,reason:"Prueba vencida"}} : {}), modules: Object.fromEntries([...catalog.modules, ...(product === "onlyturn" ? catalog.limits : [])].map(k => [k, { enabled: catalog.modules.includes(k) ? true : 100, override: null }])),
@@ -39,12 +39,12 @@ for (const device of [{ name: "desktop", viewport: { width: 1440, height: 1000 }
     const request = route.request(), url = new URL(request.url()), path = url.pathname;
     const ok = data => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ success: true, data }) });
     if (path === "/api/alerts") return ok({ alerts: [] });
-    if (path === "/api/governance") return ok({ managementProducts: ["onlygym", "onlyturn", "onlyfood", "onlycars", "onlyerp"], tenants: Object.entries(tenants).flatMap(([saas, ts]) => ts.map(t => ({ ...t, saas, saasName: saas, rawStatus: t.status, createdAt: now, domain: "", metrics: { totalRecords: 3, recordLabel: "registros", available: true } }))), sources: ["onlygym", "onlyturn", "onlyfood", "onlycars", "onlyerp"].map(saas => ({ saas, status: "available", count: tenants[saas].length })) });
+    if (path === "/api/governance") return ok({ managementProducts: ["onlygym", "onlyturn", "onlyfood", "onlycars", "onlyerp", "onlyshop"], tenants: Object.entries(tenants).flatMap(([saas, ts]) => ts.map(t => ({ ...t, saas, saasName: saas, rawStatus: t.status, createdAt: now, domain: "", metrics: { totalRecords: 3, recordLabel: "registros", available: true } }))), sources: ["onlygym", "onlyturn", "onlyfood", "onlycars", "onlyerp", "onlyshop"].map(saas => ({ saas, status: "available", count: tenants[saas].length })) });
     if (!path.startsWith("/api/saas-management/")) return ok([]);
-    const product = path.split("/").at(-1); assert.ok(["onlygym", "onlyturn", "onlyfood", "onlycars", "onlyerp"].includes(product));
+    const product = path.split("/").at(-1); assert.ok(["onlygym", "onlyturn", "onlyfood", "onlycars", "onlyerp", "onlyshop"].includes(product));
     if (request.method() === "GET") {
       const resource = url.searchParams.get("resource");
-      if (resource === "catalog") return ok({ ...catalogs[product], operations: product === "onlyerp" ? operations.filter(o=>!["payment.status","domain.add"].includes(o)) : product === "onlycars" ? operations.filter(o=>o!=="payment.status") : operations, currency: catalogs[product].currency || "ARS", destructiveDelete: false });
+      if (resource === "catalog") return ok({ ...catalogs[product], operations: ["onlyerp","onlyshop"].includes(product) ? operations.filter(o=>!["payment.status","domain.add"].includes(o)) : product === "onlycars" ? operations.filter(o=>o!=="payment.status") : operations, currency: catalogs[product].currency || "ARS", destructiveDelete: false });
       if (resource === "plans") return ok({ items: plans[product], nextOffset: null });
       if (resource === "tenant") return ok(tenants[product].find(t => t.id === url.searchParams.get("tenantId")));
       if (resource === "audit") return ok({ items: [{ id: "event-1", tenantId: tenants[product][0].id, actor: "ci_smoke", action: "hub.management", entity: "tenant.update", entityId: tenants[product][0].id, result: "success", createdAt: now }], nextOffset: null });
@@ -79,9 +79,9 @@ for (const device of [{ name: "desktop", viewport: { width: 1440, height: 1000 }
     }
     return ok(result);
   });
-  for (const product of ["onlygym", "onlyturn", "onlyfood", "onlycars", "onlyerp"]) {
+  for (const product of ["onlygym", "onlyturn", "onlyfood", "onlycars", "onlyerp", "onlyshop"]) {
     await page.goto(origin + "/saas/" + product + "/manage?tenantId=tenant-" + product);
-    await page.getByRole("heading", { name: "Administración de " + ({onlygym:"OnlyGym",onlyturn:"OnlyTurn",onlyfood:"OnlyFood",onlycars:"OnlyCars",onlyerp:"OnlyERP"}[product]) }).waitFor();
+    await page.getByRole("heading", { name: "Administración de " + ({onlygym:"OnlyGym",onlyturn:"OnlyTurn",onlyfood:"OnlyFood",onlycars:"OnlyCars",onlyerp:"OnlyERP",onlyshop:"OnlyShop"}[product]) }).waitFor();
     await page.getByRole("textbox", { name: "Nombre", exact: true }).fill("Empresa editada QA");
     await page.getByRole("button", { name: "Guardar cambios", exact: true }).click();
     if (product === "onlygym") { await page.getByRole("alert").filter({ hasText: "Los datos cambiaron" }).waitFor(); await page.getByRole("textbox", { name: "Nombre", exact: true }).fill("Empresa editada QA"); await page.getByRole("button", { name: "Guardar cambios", exact: true }).click(); }

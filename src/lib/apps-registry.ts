@@ -28,6 +28,14 @@ export const KNOWN_APPS: AppDefinition[] = [
     description: "Centro de control de operaciones NanoLabs",
   },
   {
+    slug: "onlyshop", name: "OnlyShop SaaS", type: "saas",
+    path: "/opt/apps/onlyshop", url: "https://onlyshop.nanoapps.ar",
+    healthUrl: "https://onlyshop.nanoapps.ar/api/health",
+    containerNames: ["onlyshop-web"], dbType: "sqlite",
+    sqlitePath: "/opt/apps/onlyshop/data/dev.db",
+    description: "Comercio, inventario, cuentas corrientes y tienda PWA",
+  },
+  {
     slug: "onlyfood",
     name: "OnlyFood SaaS",
     type: "saas",

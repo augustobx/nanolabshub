@@ -1,7 +1,7 @@
 "use strict";
 const fs=require("node:fs"),fsp=require("node:fs/promises"),path=require("node:path"),crypto=require("node:crypto");
 const {pipeline}=require("node:stream/promises"),{Transform}=require("node:stream"),{createGzip,createGunzip}=require("node:zlib");
-const ALLOWED=["nanolabshub","onlyfood","onlygym","onlyturn","onlycars","onlyerp"],LIMIT=512*1024**2;
+const ALLOWED=["nanolabshub","onlyfood","onlygym","onlyturn","onlycars","onlyerp","onlyshop"],LIMIT=512*1024**2;
 function createBackupImporter({root="/opt/backups",backup=require("./backup-engine.cjs"),recovery=require("./recovery-engine.cjs")}={}){
  function db(){const d=backup.db();d.exec("CREATE TABLE IF NOT EXISTS backup_imports(id TEXT PRIMARY KEY,job_id TEXT NOT NULL,slug TEXT NOT NULL,source_filename TEXT NOT NULL,source_checksum TEXT NOT NULL,archive_checksum TEXT NOT NULL,backup_id TEXT NOT NULL,created_at TEXT NOT NULL,actor TEXT NOT NULL,deduplicated INTEGER NOT NULL)");return d;}
  function appOf(apps,slug){const app=apps.find(a=>a.slug===slug&&["sqlite","mariadb","mysql","postgres"].includes(a.dbType));if(!ALLOWED.includes(slug)||!app)throw Error("Aplicación fuera del alcance autorizado de importación");return app;}

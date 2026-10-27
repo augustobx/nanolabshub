@@ -297,7 +297,7 @@ export default function SoftwarePage() {
                   )}
                   {app.containers[0] && (
                     <button
-                      disabled={["nanolabshub","onlypadel","onlycars","onlyerp"].includes(app.slug) || (app.lifecycle?.state !== undefined && app.lifecycle.state !== "active")}
+                      disabled={["nanolabshub","onlypadel","onlycars","onlyerp","onlyshop"].includes(app.slug) || (app.lifecycle?.state !== undefined && app.lifecycle.state !== "active")}
                       onClick={() => handleRestart(app.containers[0].name)}
                       className="px-3 py-1.5 rounded-lg bg-surface-100 hover:bg-surface-50 text-gray-300 hover:text-white border border-white/10 text-xs font-mono flex items-center gap-1.5 transition-colors"
                       title={app.slug==="nanolabshub"?"Actualizá el Hub con el worker desde el panel superior":app.lifecycle?.state && app.lifecycle.state !== "active" ? "Bloqueado por ciclo de vida" : "Reiniciar contenedor principal"}

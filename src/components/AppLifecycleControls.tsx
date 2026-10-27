@@ -23,7 +23,7 @@ const choices: { action: Action; title: string; help: string }[] = [
 
 export function AppLifecycleControls({ app, onChanged }: { app: AppInfo; onChanged: () => Promise<void> | void }) {
   const state = app.lifecycle?.state || "active";
-  const protectedApp = app.type === "infrastructure" || app.slug === "nanolabshub" || ["onlypadel","onlycars","onlyerp"].includes(app.slug);
+  const protectedApp = app.type === "infrastructure" || app.slug === "nanolabshub" || ["onlypadel","onlycars","onlyerp","onlyshop"].includes(app.slug);
   const [selected, setSelected] = useState<Action | null>(null);
   const [confirmation, setConfirmation] = useState("");
   const [backupAck, setBackupAck] = useState(false);

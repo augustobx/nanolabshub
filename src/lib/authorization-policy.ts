@@ -2,7 +2,7 @@ import type { Principal } from "./auth";
 import { KNOWN_APPS } from "./apps-registry";
 import { assertProductMutable } from "./operational-policy";
 
-const mutableApps = new Set(["nanolabshub", "onlyfood", "onlygym", "onlyturn", "onlycars", "onlyerp"]);
+const mutableApps = new Set(["nanolabshub", "onlyfood", "onlygym", "onlyturn", "onlycars", "onlyerp","onlyshop"]);
 export function authorizeRequest(principal: Principal, pathname: string, method: string): boolean {
   if (pathname === "/account" || pathname === "/api/auth/account" || pathname === "/api/auth/logout") return true;
   if (!principal.mfaReady) return false;
@@ -13,13 +13,13 @@ export function authorizeRequest(principal: Principal, pathname: string, method:
   }
   if (principal.role === "viewer") return false;
   const operatorRoutes = ["/api/apps/restart", "/api/apps/lifecycle", "/api/backups", "/api/backups/schedule", "/api/backups/restore-check", "/api/backups/import", "/api/jobs"];
-  return principal.role === "owner" || operatorRoutes.includes(pathname) || /^\/api\/saas-management\/(onlyfood|onlygym|onlyturn|onlycars|onlyerp)$/.test(pathname);
+  return principal.role === "owner" || operatorRoutes.includes(pathname) || /^\/api\/saas-management\/(onlyfood|onlygym|onlyturn|onlycars|onlyerp|onlyshop)$/.test(pathname);
 }
 export function authorizeResource(principal: Principal, slug: string, mutate = true): void {
   if (mutate) {
     // Cars is authorized for scoped management and backups. Generic container
     // lifecycle/restarts retain their independent operational-policy guard.
-    if (!["onlycars", "onlyerp"].includes(slug)) assertProductMutable(slug);
+    if (!["onlycars", "onlyerp","onlyshop"].includes(slug)) assertProductMutable(slug);
     if (!mutableApps.has(slug)) throw Error("Aplicación fuera del alcance habilitado");
     if (principal.role === "viewer") throw Error("El rol de consulta no permite cambios");
   }

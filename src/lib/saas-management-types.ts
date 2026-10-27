@@ -1,4 +1,4 @@
-export type ManagedSaaS = "onlygym" | "onlyturn" | "onlyfood" | "onlycars" | "onlyerp";
+export type ManagedSaaS = "onlygym" | "onlyturn" | "onlyfood" | "onlycars" | "onlyerp" | "onlyshop";
 export type ManagementOperation = "tenant.create" | "tenant.update" | "tenant.status" | "subscription.update" | "subscription.renew" | "module.set" | "admin.update" | "admin.revoke" | "plan.create" | "plan.update" | "payment.record" | "payment.status" | "domain.add";
 export interface ManagementCatalog { operations: ManagementOperation[]; modules: string[]; limits: string[]; optionalLimits: string[]; currency: string; destructiveDelete: boolean; statuses?: string[]; trialDates?: boolean; paymentLifecycle?: boolean; paymentPeriods?: boolean; paymentCalendar?: boolean; adminIdentity?: "username"; ownerIdentity?: "username"; immutableSlug?: boolean; tenantFields?: string[]; domainManagement?: boolean; }
 export interface ManagedPlan { id: string; code: string; name: string; description: string; priceCents: number; currency: string; active: boolean; modules: Record<string, boolean>; limits: Record<string, number>; version: string; preservedFeatures?: string[]; }

@@ -1,6 +1,6 @@
 "use strict";
 const fs=require("node:fs"),path=require("node:path"),{ensureRestoreSchema}=require("./restore-evidence.cjs");
-const ALLOWED=["nanolabshub","onlyfood","onlygym","onlyturn","onlycars","onlyerp"];
+const ALLOWED=["nanolabshub","onlyfood","onlygym","onlyturn","onlycars","onlyerp","onlyshop"];
 function createImportRunner({importer,backup,store,validateActor,enabled=()=>process.env.HUB_BACKUPS_ENABLED==="true",dataDir=process.env.DATA_DIR||"/app/data"}){
  function enqueue(apps,slug,filename,requestId,actor){
   if(!enabled())throw Error("Backups deshabilitados");

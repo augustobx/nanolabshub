@@ -120,7 +120,7 @@ export interface BackupRecord {
   restoreDurationMs?: number | null;
 }
 
-export type SaaSSlug = "onlyfood" | "onlypadel" | "onlycars" | "onlygym" | "onlyturn" | "onlyerp" | "onlymob";
+export type SaaSSlug = "onlyfood" | "onlypadel" | "onlycars" | "onlygym" | "onlyturn" | "onlyerp" | "onlyshop" | "onlymob";
 
 export interface UniversalTenant {
   id: string;

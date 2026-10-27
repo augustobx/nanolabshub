@@ -1,5 +1,5 @@
 import { KNOWN_APPS } from "./apps-registry";
-export const PROTECTED_PRODUCTS = ["onlypadel", "onlycars", "onlyerp"] as const;
+export const PROTECTED_PRODUCTS = ["onlypadel", "onlycars", "onlyerp","onlyshop"] as const;
 export function assertProductMutable(slug: string) {
   if ((PROTECTED_PRODUCTS as readonly string[]).includes(slug)) throw new Error("Producto protegido: no se permiten operaciones sobre " + slug);
 }
