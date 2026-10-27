@@ -288,7 +288,7 @@ try {
         await page.route("**/api/governance",coverage);await page.reload({waitUntil:"domcontentloaded"});await page.getByText("0 / 8").waitFor();
         await page.unroute("**/api/governance",coverage);
         const unavailable=async route=>route.fulfill({status:503,contentType:"application/json",body:JSON.stringify({success:false,error:"Fixture unavailable"})});
-        await page.route("**/api/governance",unavailable);await page.reload({waitUntil:"domcontentloaded"});await page.getByText("— / 7").waitFor();
+        await page.route("**/api/governance",unavailable);await page.reload({waitUntil:"domcontentloaded"});await page.getByText("— / 8").waitFor();
         await page.getByText("Sin lectura",{exact:true}).first().waitFor();
         await page.screenshot({path:`ui-screenshots/${device.name}-superadmin-unavailable.png`,fullPage:true,animations:"disabled"});
         await page.unroute("**/api/governance",unavailable);
