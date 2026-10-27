@@ -37,6 +37,7 @@ jobs:
           node-version: "22"
       - name: Fetch official fixture images
         run: |
+          docker pull mysql:8.0.43
           docker pull mariadb:11.8.9
           docker pull postgres:16-alpine
           docker pull postgres:17-alpine

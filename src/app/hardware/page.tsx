@@ -15,7 +15,7 @@ TrendingUp
 } from "lucide-react";
 import { useEffect,useRef,useState } from "react";
 
-const restartBlocked=(name:string)=>/^(nanolabshub|onlypadel|onlycars|onlyerp)(?:[_.-]|$)/.test(name);
+const restartBlocked=(name:string)=>/^(nanolabshub|onlypadel|onlycars|onlyerp|onlyshop)(?:[_.-]|$)/.test(name);
 export default function HardwarePage() {
   const [metrics, setMetrics] = useState<ServerMetrics | null>(null);
   const [containers, setContainers] = useState<ContainerInfo[]>([]);

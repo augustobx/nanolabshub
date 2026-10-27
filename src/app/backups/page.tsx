@@ -131,7 +131,7 @@ export default function BackupsPage() {
   };
 
   const manualApps = KNOWN_APPS.filter((app) =>
-    app.dbType !== "none" && ["nanolabshub","onlyfood","onlygym","onlyturn","onlycars"].includes(app.slug) &&
+    app.dbType !== "none" && ["nanolabshub","onlyfood","onlygym","onlyturn","onlycars","onlyerp","onlyshop"].includes(app.slug) &&
     (app.name.toLowerCase().includes(manualSearch.trim().toLowerCase()) ||
      app.slug.toLowerCase().includes(manualSearch.trim().toLowerCase()))
   );
@@ -411,7 +411,7 @@ export default function BackupsPage() {
                     onChange={(e) => setSchedules((prev) => prev.map((s) => s.slug === schedule.slug ? { ...s, enabled: e.target.checked } : s))} />
                   Activa
                 </label>
-                <button type="button" disabled={!["nanolabshub","onlyfood","onlygym","onlyturn","onlycars"].includes(schedule.slug) || scheduleSaving === schedule.slug}
+                <button type="button" disabled={!["nanolabshub","onlyfood","onlygym","onlyturn","onlycars","onlyerp","onlyshop"].includes(schedule.slug) || scheduleSaving === schedule.slug}
                   onClick={() => void handleSchedule(schedule.slug, schedule.enabled, schedule.hourLocal, schedule.weekdays,schedule.intervalHours??24,!!schedule.autoRestore)}
                   className="rounded-lg border border-brand-cyan/40 px-3 py-2 text-xs font-semibold text-brand-cyan disabled:opacity-50">
                   {scheduleSaving === schedule.slug ? "Guardando…" : "Guardar"}

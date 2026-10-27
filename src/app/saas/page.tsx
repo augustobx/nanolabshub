@@ -74,7 +74,7 @@ export default function SaaSCatalogPage() {
         </div>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/[0.1] bg-white/[0.025] px-5 py-4">
-        <div className="flex items-start gap-3"><AlertTriangle className="mt-0.5 h-4 w-4 text-amber-300"/><p className="text-xs leading-5 text-slate-400">La lectura de tenants existe para las seis SaaS, pero sus controles de superadmin todavía necesitan una auditoría con permisos y contratos homogéneos. Las acciones pendientes se señalan dentro de cada ficha.</p></div>
+        <div className="flex items-start gap-3"><AlertTriangle className="mt-0.5 h-4 w-4 text-amber-300"/><p className="text-xs leading-5 text-slate-400">Cada plataforma informa sus capacidades disponibles mediante su conector autenticado. Las acciones pendientes se señalan dentro de cada ficha.</p></div>
         <Link href="/superadmin" className="hub-text-link">Ver integraciones <ArrowRight className="h-4 w-4"/></Link>
       </div>
     </div>
