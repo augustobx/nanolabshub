@@ -38,7 +38,7 @@ test('container command inputs and protected products are rejected before any ex
  for(const name of ['$(id)','onlyfood-app-1-$(id)','name";id','--help','name\nwhoami']){
   await assert.rejects(api.getContainerLogs(name));await assert.rejects(api.restartContainer(name));
  }
- for(const name of ['onlypadel-web','onlycars-db-1','onlyerp-web'])await assert.rejects(api.restartContainer(name),/protegido/);
+ for(const name of ['onlypadel-web','onlycars-db-1','onlyerp-web','onlyshop-web'])await assert.rejects(api.restartContainer(name),/protegido/);
  await assert.rejects(api.restartContainer('nanolabshub'),/worker independiente/);
  for(const lines of [-1,0,1001,NaN,Infinity])await assert.rejects(api.getContainerLogs('onlyfood-app-1',lines));
  await assert.rejects(api.deployApp('onlyfood'),/genérico deshabilitado/);assert.equal(calls,0);
@@ -94,7 +94,7 @@ test('authorization denies viewer writes, protected products and unassigned oper
  assert.doesNotThrow(()=>authorizeResource(operator,'onlyfood'));assert.throws(()=>authorizeResource(operator,'onlygym'),/permiso/);
  for(const slug of ['onlypadel'])assert.throws(()=>authorizeResource(owner,slug),/protegido/);
  assert.doesNotThrow(()=>authorizeResource(owner,'onlycars'));assert.throws(()=>authorizeResource(operator,'onlycars'),/permiso/);assert.doesNotThrow(()=>authorizeResource({...operator,scopes:['onlycars']},'onlycars'));assert.equal(authorizeRequest(operator,'/api/saas-management/onlycars','POST'),true);
- for(const slug of ['onlycars','onlyerp']){assert.doesNotThrow(()=>authorizeResource(owner,slug));assert.throws(()=>authorizeResource(operator,slug),/permiso/);assert.doesNotThrow(()=>authorizeResource({...operator,scopes:[slug]},slug));assert.throws(()=>authorizeResource(viewer,slug),/consulta/);assert.equal(authorizeRequest(operator,'/api/saas-management/'+slug,'POST'),true);}
+ for(const slug of ['onlycars','onlyerp','onlyshop']){assert.doesNotThrow(()=>authorizeResource(owner,slug));assert.throws(()=>authorizeResource(operator,slug),/permiso/);assert.doesNotThrow(()=>authorizeResource({...operator,scopes:[slug]},slug));assert.throws(()=>authorizeResource(viewer,slug),/consulta/);assert.equal(authorizeRequest(operator,'/api/saas-management/'+slug,'POST'),true);}
  assert.throws(()=>authorizeResource(viewer,'onlyfood'),/consulta/);
 });
 test('protected backup schedules are blocked even when a legacy row enables them',async()=>{

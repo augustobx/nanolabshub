@@ -1,13 +1,21 @@
-# Administración central de OnlyGym, OnlyTurn, OnlyFood, OnlyCars y OnlyERP
+# Administración central de OnlyGym, OnlyTurn, OnlyFood, OnlyCars, OnlyERP y OnlyShop
 
 El Hub ofrece administración desde `/saas/onlygym/manage`,
 `/saas/onlyturn/manage`, `/saas/onlyfood/manage`, `/saas/onlycars/manage`
-y `/saas/onlyerp/manage`,
+y `/saas/onlyerp/manage` y `/saas/onlyshop/manage`,
 sujeta a habilitación y respuesta del conector real. La lista permitida está fijada
 en código. OnlyPadel y los demás productos no pueden utilizar este proxy,
 incluso si se agregan por error a las variables de configuración.
 
 ## Contrato y autorización
+
+OnlyShop quedó integrado el 27/10/2026. Requiere `onlyshop` en ambas listas y
+claves independientes `HUB_MANAGEMENT_ONLYSHOP_TOKEN` y
+`HUB_INTEGRATION_ONLYSHOP_TOKEN`. Ofrece once operaciones, planes ARS,
+administradores por correo, PWA/cuentas corrientes y límite de productos.
+Planes y auditoría usan `{items,nextOffset}`. No ofrece `payment.status` ni
+`domain.add`. Backups SQLite cada seis horas con restauración aislada; ciclo de
+vida y reinicio genéricos protegidos. Ver `ONLYSHOP_INTEGRATION_20261026.md`.
 
 El contrato `nanolabs.saas.management.v1` vive en cada SaaS en
 `/api/integrations/nanolabs/management`. El contrato anterior de lectura conserva
