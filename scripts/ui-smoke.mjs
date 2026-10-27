@@ -21,7 +21,7 @@ const tenants = [
 const governance = {
   totalTenants: 2, activeTenants: 1, trialTenants: 1, suspendedTenants: 0,
   saasCount: 7, totalRecordsManaged: 1820, tenants, legacyPanels: [],
-  sources: ["onlyfood","onlypadel","onlycars","onlyerp","onlygym","onlyturn","onlymob"].map(saas => ({
+  sources: ["onlyfood","onlypadel","onlycars","onlyerp","onlygym","onlyturn","onlymob","onlyshop"].map(saas => ({
     saas, status: ["onlyfood","onlypadel"].includes(saas) ? "available" : "unavailable",
     count: saas === "onlyfood" || saas === "onlypadel" ? 1 : null,
     checkedAt: new Date().toISOString(), message: null
@@ -99,7 +99,7 @@ const responses = {
   "/api/security/summary": { success: true, data: {
     access:{adminCredentialsConfigured:true,multiFactorAvailable:false,roleBasedPermissionsAvailable:false,localAudit:true},
     switches:{backups:true,lifecycle:true,saasConnectors:false},
-    connectors:["onlyfood","onlypadel","onlycars","onlyerp","onlygym","onlyturn","onlymob"].map(slug=>({slug,name:slug,enabled:false,credentialConfigured:false,safeWriteContract:false})),
+    connectors:["onlyfood","onlypadel","onlycars","onlyerp","onlygym","onlyturn","onlymob","onlyshop"].map(slug=>({slug,name:slug,enabled:false,credentialConfigured:false,safeWriteContract:false})),
     offsite:{providerConfigured:false,lastVerifiedAt:null},
     legacy:{dbCredentialsRotation:"not_verified",superadminMigration:"incomplete"}
   } },
@@ -285,7 +285,7 @@ try {
         // A measured zero and an unavailable source must render differently.
         const emptyCoverage={...governance,managementProducts:[]};
         const coverage=async route=>route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({success:true,data:emptyCoverage})});
-        await page.route("**/api/governance",coverage);await page.reload({waitUntil:"domcontentloaded"});await page.getByText("0 / 7").waitFor();
+        await page.route("**/api/governance",coverage);await page.reload({waitUntil:"domcontentloaded"});await page.getByText("0 / 8").waitFor();
         await page.unroute("**/api/governance",coverage);
         const unavailable=async route=>route.fulfill({status:503,contentType:"application/json",body:JSON.stringify({success:false,error:"Fixture unavailable"})});
         await page.route("**/api/governance",unavailable);await page.reload({waitUntil:"domcontentloaded"});await page.getByText("— / 7").waitFor();
