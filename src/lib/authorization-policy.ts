@@ -2,7 +2,7 @@ import type { Principal } from "./auth";
 import { KNOWN_APPS } from "./apps-registry";
 import { assertProductMutable } from "./operational-policy";
 
-const mutableApps = new Set(["nanolabshub", "onlyfood", "onlygym", "onlyturn", "onlycars", "onlyerp","onlyshop"]);
+const mutableApps = new Set(["nanolabshub", "onlyfood", "onlycars", "onlyerp", "onlyshop"]);
 export function authorizeRequest(principal: Principal, pathname: string, method: string): boolean {
   if (pathname === "/account" || pathname === "/api/auth/account" || pathname === "/api/auth/logout") return true;
   if (!principal.mfaReady) return false;
@@ -13,7 +13,7 @@ export function authorizeRequest(principal: Principal, pathname: string, method:
   }
   if (principal.role === "viewer") return false;
   const operatorRoutes = ["/api/apps/restart", "/api/apps/lifecycle", "/api/backups", "/api/backups/schedule", "/api/backups/restore-check", "/api/backups/import", "/api/jobs"];
-  return principal.role === "owner" || operatorRoutes.includes(pathname) || /^\/api\/saas-management\/(onlyfood|onlygym|onlyturn|onlycars|onlyerp|onlyshop)$/.test(pathname);
+  return principal.role === "owner" || operatorRoutes.includes(pathname) || /^\/api\/saas-management\/(onlyfood|onlycars|onlyerp|onlyshop)$/.test(pathname);
 }
 export function authorizeResource(principal: Principal, slug: string, mutate = true): void {
   if (mutate) {

@@ -3,7 +3,7 @@ const test=require("node:test"),assert=require("node:assert/strict");
 const fs=require("node:fs/promises"),os=require("node:os"),path=require("node:path"),{gzipSync}=require("node:zlib");
 const {createSandboxRunner,sandboxSpec}=require("./restore-sandbox.cjs");
 const image="sha256:"+"a".repeat(64),id="b".repeat(64);
-const app={slug:"onlygym",dbType:"postgres",dbContainer:"fixture-source",containerNames:["fixture-source"]};
+const app={slug:"onlycars",dbType:"postgres",dbContainer:"fixture-source",containerNames:["fixture-source"]};
 test("SQL sandbox has no host volumes, published ports, network, privileges or production secrets",()=>{
  for(const dbType of ["postgres","mariadb","mysql"]){
   const spec=sandboxSpec({...app,dbType},image,"c".repeat(32));

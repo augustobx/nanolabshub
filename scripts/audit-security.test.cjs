@@ -91,7 +91,7 @@ test('authorization denies viewer writes, protected products and unassigned oper
  assert.equal(authorizeRequest(viewer,'/api/apps/logs','GET'),false);assert.equal(authorizeRequest(operator,'/api/auth/users','POST'),false);
  assert.equal(authorizeRequest(operator,'/api/unknown-new-mutation','POST'),false);
  assert.equal(authorizeRequest({...owner,mfaReady:false},'/api/apps','GET'),false);
- assert.doesNotThrow(()=>authorizeResource(operator,'onlyfood'));assert.throws(()=>authorizeResource(operator,'onlygym'),/permiso/);
+ assert.doesNotThrow(()=>authorizeResource(operator,'onlyfood'));assert.throws(()=>authorizeResource(operator,'onlycars'),/permiso/);
  for(const slug of ['onlypadel'])assert.throws(()=>authorizeResource(owner,slug),/protegido/);
  assert.doesNotThrow(()=>authorizeResource(owner,'onlycars'));assert.throws(()=>authorizeResource(operator,'onlycars'),/permiso/);assert.doesNotThrow(()=>authorizeResource({...operator,scopes:['onlycars']},'onlycars'));assert.equal(authorizeRequest(operator,'/api/saas-management/onlycars','POST'),true);
  for(const slug of ['onlycars','onlyerp','onlyshop']){assert.doesNotThrow(()=>authorizeResource(owner,slug));assert.throws(()=>authorizeResource(operator,slug),/permiso/);assert.doesNotThrow(()=>authorizeResource({...operator,scopes:[slug]},slug));assert.throws(()=>authorizeResource(viewer,slug),/consulta/);assert.equal(authorizeRequest(operator,'/api/saas-management/'+slug,'POST'),true);}

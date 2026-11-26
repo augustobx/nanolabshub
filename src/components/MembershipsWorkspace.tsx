@@ -35,7 +35,7 @@ import {
 } from "./nanolabs";
 import { TenantDrawer } from "./TenantDrawer";
 
-const MANAGED_SLUGS: ManagedSaaS[] = ["onlygym", "onlyturn", "onlyfood", "onlycars", "onlyerp", "onlyshop"];
+const MANAGED_SLUGS: ManagedSaaS[] = ["onlyfood", "onlycars", "onlyerp", "onlyshop"];
 
 function isManaged(slug: string): slug is ManagedSaaS {
   return (MANAGED_SLUGS as readonly string[]).includes(slug);

@@ -31,13 +31,13 @@ function response(product, offset = 0, capabilities = {}) {
   });
 }
 const configured = {
-  HUB_SAAS_INTEGRATION_ENABLED: 'true', HUB_SAAS_INTEGRATION_PRODUCTS: 'onlygym, onlyturn',
-  HUB_INTEGRATION_ONLYGYM_TOKEN: 'g'.repeat(64), HUB_INTEGRATION_ONLYTURN_TOKEN: 't'.repeat(64),
+  HUB_SAAS_INTEGRATION_ENABLED: 'true', HUB_SAAS_INTEGRATION_PRODUCTS: 'onlycars, onlyerp',
+  HUB_INTEGRATION_ONLYCARS_TOKEN: 'c'.repeat(64), HUB_INTEGRATION_ONLYERP_TOKEN: 'e'.repeat(64),
 };
 test('global switch and explicit product selection both fail closed', async () => {
   for (const env of [{}, { ...configured, HUB_SAAS_INTEGRATION_ENABLED: 'false' },
     { ...configured, HUB_SAAS_INTEGRATION_PRODUCTS: '' },
-    { ...configured, HUB_SAAS_INTEGRATION_PRODUCTS: 'ONLYGYM,onlygy,unknown' }]) {
+    { ...configured, HUB_SAAS_INTEGRATION_PRODUCTS: 'ONLYCARS,onlyca,unknown' }]) {
     const overview = await bridge(env).getUniversalGovernanceOverview();
     assert.equal(overview.totalTenants, 0);
     assert.ok(overview.sources.every(source => source.status === 'disabled' && source.count === null));
@@ -56,22 +56,22 @@ test('only selected products are fetched and secrets stay in authorization heade
   assert.equal(calls.length, 2);
   assert.equal(overview.totalTenants, 2);
   assert.equal(overview.activeTenants, 2);
-  assert.equal(overview.sources.filter(source => source.status === 'disabled').length, 6);
-  assert.ok(!JSON.stringify(overview).includes(configured.HUB_INTEGRATION_ONLYGYM_TOKEN));
+  assert.equal(overview.sources.filter(source => source.status === 'disabled').length, 4);
+  assert.ok(!JSON.stringify(overview).includes(configured.HUB_INTEGRATION_ONLYCARS_TOKEN));
 });
 test('connection failure has null count, hides private details and preserves other sources', async () => {
   const overview = await bridge(configured, async url => {
-    if (url.includes('onlygym.')) throw Error('Private infrastructure detail');
-    return response('onlyturn');
+    if (url.includes('onlycars.')) throw Error('Private infrastructure detail');
+    return response('onlyerp');
   }).getUniversalGovernanceOverview();
-  const gym = overview.sources.find(source => source.saas === 'onlygym');
-  assert.equal(gym.status, 'unavailable');
-  assert.equal(gym.count, null);
+  const cars = overview.sources.find(source => source.saas === 'onlycars');
+  assert.equal(cars.status, 'unavailable');
+  assert.equal(cars.count, null);
   assert.equal(overview.totalTenants, 1);
   assert.ok(!JSON.stringify(overview).includes('Private infrastructure detail'));
 });
 test('missing credentials never trigger requests', async () => {
-  const overview = await bridge({ ...configured, HUB_INTEGRATION_ONLYGYM_TOKEN: '', HUB_INTEGRATION_ONLYTURN_TOKEN: 'short' }).getUniversalGovernanceOverview();
+  const overview = await bridge({ ...configured, HUB_INTEGRATION_ONLYCARS_TOKEN: '', HUB_INTEGRATION_ONLYERP_TOKEN: 'short' }).getUniversalGovernanceOverview();
   assert.equal(overview.sources.filter(source => source.status === 'unavailable').length, 2);
 });
 test('read-only contract rejects either write capability', async () => {
@@ -84,14 +84,14 @@ test('read-only contract rejects either write capability', async () => {
 test('pagination completes and rejects repeated offsets', async () => {
   for (const invalid of [false, true]) {
     let calls = 0;
-    const overview = await bridge({ ...configured, HUB_SAAS_INTEGRATION_PRODUCTS: 'onlygym' }, async () => {
-      const data = await response('onlygym', calls++).json();
+    const overview = await bridge({ ...configured, HUB_SAAS_INTEGRATION_PRODUCTS: 'onlycars' }, async () => {
+      const data = await response('onlycars', calls++).json();
       data.nextOffset = calls === 1 ? 100 : invalid ? 100 : null;
       return Response.json(data);
     }).getUniversalGovernanceOverview();
     assert.equal(calls, 2);
     assert.equal(overview.totalTenants, invalid ? 0 : 2);
-    assert.equal(overview.sources.find(source => source.saas === 'onlygym').status, invalid ? 'unavailable' : 'available');
+    assert.equal(overview.sources.find(source => source.saas === 'onlycars').status, invalid ? 'unavailable' : 'available');
   }
 });
 test('writes remain blocked', async () => {
@@ -100,19 +100,19 @@ test('writes remain blocked', async () => {
   await assert.rejects(api.toggleTenantModuleInDB(), /Edición bloqueada/);
 });
 test('connected product count excludes disabled and unavailable sources',async()=>{
- const result=await bridge(configured,async url=>{if(url.includes('onlyturn'))throw Error('unavailable');return response('onlygym');}).getUniversalGovernanceOverview();
+ const result=await bridge(configured,async url=>{if(url.includes('onlyerp'))throw Error('unavailable');return response('onlycars');}).getUniversalGovernanceOverview();
  assert.equal(result.saasCount,1);assert.equal(result.sources.filter(s=>s.status==='available').length,1);
 });
 test('repeated tenant IDs invalidate a paginated source',async()=>{
- let n=0;const result=await bridge({...configured,HUB_SAAS_INTEGRATION_PRODUCTS:'onlygym'},async()=>{
-  const j=await response('onlygym').json();j.nextOffset=n++===0?100:null;return Response.json(j);
+ let n=0;const result=await bridge({...configured,HUB_SAAS_INTEGRATION_PRODUCTS:'onlycars'},async()=>{
+  const j=await response('onlycars').json();j.nextOffset=n++===0?100:null;return Response.json(j);
  }).getUniversalGovernanceOverview();assert.equal(result.totalTenants,0);assert.equal(result.saasCount,0);
 });
 test('management readiness requires an authenticated catalog, not only configured keys',async()=>{
- const env={...configured,HUB_SAAS_INTEGRATION_PRODUCTS:'onlygym',HUB_SAAS_MANAGEMENT_PRODUCTS:'onlygym',HUB_MANAGEMENT_ONLYGYM_TOKEN:'m'.repeat(64)};
+ const env={...configured,HUB_SAAS_INTEGRATION_PRODUCTS:'onlycars',HUB_SAAS_MANAGEMENT_PRODUCTS:'onlycars',HUB_MANAGEMENT_ONLYCARS_TOKEN:'m'.repeat(64)};
  for(const valid of [true,false]){
-  const result=await bridge(env,async url=>url.includes('/management')?Response.json(valid?{success:true,contract:'nanolabs.saas.management.v1',product:'onlygym',data:{operations:['tenant.update']}}:{success:false},{status:valid?200:401}):response('onlygym')).getUniversalGovernanceOverview();
-  assert.equal(result.managementProducts.includes('onlygym'),valid);
-  assert.equal(result.managementSources.find(s=>s.saas==='onlygym').status,valid?'available':'unavailable');
+  const result=await bridge(env,async url=>url.includes('/management')?Response.json(valid?{success:true,contract:'nanolabs.saas.management.v1',product:'onlycars',data:{operations:['tenant.update']}}:{success:false},{status:valid?200:401}):response('onlycars')).getUniversalGovernanceOverview();
+  assert.equal(result.managementProducts.includes('onlycars'),valid);
+  assert.equal(result.managementSources.find(s=>s.saas==='onlycars').status,valid?'available':'unavailable');
  }
 });

@@ -5,9 +5,9 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { createHmac } = require('node:crypto');
 const ts = require('typescript');
-const tokens = { onlygym: 'gym-fixture-'.repeat(6), onlyturn: 'turn-fixture-'.repeat(6) };
+const tokens = { onlyshop: 'shop-fixture-'.repeat(6), onlyerp: 'erp-fixture-'.repeat(6) };
 function api(fetch, extra = {}) {
-  const env = { HUB_SAAS_MANAGEMENT_PRODUCTS: 'onlygym,onlyturn,onlyfood,onlypadel,onlycars,onlyerp', HUB_MANAGEMENT_ONLYGYM_TOKEN: tokens.onlygym, HUB_MANAGEMENT_ONLYTURN_TOKEN: tokens.onlyturn, ...extra }, cache = new Map();
+  const env = { HUB_SAAS_MANAGEMENT_PRODUCTS: 'onlyshop,onlyfood,onlypadel,onlycars,onlyerp', HUB_MANAGEMENT_ONLYSHOP_TOKEN: tokens.onlyshop, HUB_MANAGEMENT_ONLYERP_TOKEN: tokens.onlyerp, ...extra }, cache = new Map();
   function load(file) {
     if (cache.has(file)) return cache.get(file).exports;
     const module = { exports: {} }; cache.set(file, module);
@@ -21,7 +21,7 @@ const cmd = { requestId: '13d16e21-0221-4f4d-9cd7-38c5f2b3b9c7', operation: 'ten
 
 test('OnlyShop has independent opt-in, fixed signed destination and native ARS billing', async()=>{
  const key='shop-fixture-'.repeat(6);let calls=0;
- assert.equal(api(()=>{throw Error();}).isManagementEnabled('onlyshop'),false);
+ assert.equal(api(()=>{throw Error();},{HUB_MANAGEMENT_ONLYSHOP_TOKEN:''}).isManagementEnabled('onlyshop'),false);
  const sdk=api(async(url,options)=>{
   calls++;assert.equal(url,'https://onlyshop.nanoapps.ar/api/integrations/nanolabs/management');
   assert.equal(options.headers.Authorization,'Bearer '+key);
@@ -37,7 +37,7 @@ test('OnlyShop has independent opt-in, fixed signed destination and native ARS b
 
 test('OnlyERP requires its own opt-in token and signs native username/calendar commands', async () => {
   const key='erp-fixture-'.repeat(6); let calls=0;
-  assert.equal(api(()=>{throw Error();}).isManagementEnabled('onlyerp'),false);
+  assert.equal(api(()=>{throw Error();},{HUB_MANAGEMENT_ONLYERP_TOKEN:''}).isManagementEnabled('onlyerp'),false);
   const sdk=api(async(url,options)=>{
     calls++; assert.equal(url,'https://onlyerp.nanoapps.ar/api/integrations/nanolabs/management');
     assert.equal(options.headers.Authorization,'Bearer '+key);assert.equal(options.redirect,'error');
@@ -56,7 +56,7 @@ test('OnlyERP requires its own opt-in token and signs native username/calendar c
 test('OnlyCars requires opt-in, signs its fixed destination and keeps native payment/domain contracts', async () => {
   const token = 'cars-fixture-'.repeat(6); let calls = 0;
   assert.equal(api(() => { throw Error(); }).isManagementEnabled('onlycars'), false);
-  assert.equal(api(() => { throw Error(); }, { HUB_MANAGEMENT_ONLYCARS_TOKEN: token, HUB_SAAS_MANAGEMENT_PRODUCTS: 'onlygym' }).isManagementEnabled('onlycars'), false);
+  assert.equal(api(() => { throw Error(); }, { HUB_MANAGEMENT_ONLYCARS_TOKEN: token, HUB_SAAS_MANAGEMENT_PRODUCTS: 'onlyshop' }).isManagementEnabled('onlycars'), false);
   const sdk = api(async (url, options) => {
     calls++; assert.equal(url, 'https://onlycars.nanoapps.ar/api/integrations/nanolabs/management');
     assert.equal(options.headers.Authorization, 'Bearer ' + token); assert.equal(options.redirect, 'error');
@@ -69,7 +69,7 @@ test('OnlyCars requires opt-in, signs its fixed destination and keeps native pay
   await sdk.callSaaSManagement('onlycars', 'trusted-admin', new URLSearchParams(), { ...cmd, operation: 'payment.record', input: { currency: 'USD', amountCents: 1000, start: '2026-10-01T00:00:00Z', end: '2026-11-01T00:00:00Z' } });
   await sdk.callSaaSManagement('onlycars', 'trusted-admin', new URLSearchParams(), { ...cmd, operation: 'domain.add', input: { hostname: 'fixture.example.invalid', confirmOwnership: true } });
   await assert.rejects(sdk.callSaaSManagement('onlycars', 'trusted-admin', new URLSearchParams(), { ...cmd, operation: 'payment.status' }), e => e.status === 400);
-  await assert.rejects(sdk.callSaaSManagement('onlygym', 'trusted-admin', new URLSearchParams(), { ...cmd, operation: 'domain.add' }), e => e.status === 400);
+  await assert.rejects(sdk.callSaaSManagement('onlyshop', 'trusted-admin', new URLSearchParams(), { ...cmd, operation: 'domain.add' }), e => e.status === 400);
   assert.equal(calls, 2);
 });
 test('protected products are rejected before any network call even if configured', async () => {
@@ -81,9 +81,9 @@ test('protected products are rejected before any network call even if configured
   assert.equal(calls, 0);
 });
 test('only configured products with separate management credentials are enabled', async () => {
-  const sdk = api(() => { throw Error('Unexpected fetch'); }, { HUB_MANAGEMENT_ONLYGYM_TOKEN: '', HUB_SAAS_MANAGEMENT_PRODUCTS: 'onlygym' });
-  assert.equal(sdk.isManagementEnabled('onlygym'), false); assert.equal(sdk.isManagementEnabled('onlyturn'), false);
-  await assert.rejects(sdk.callSaaSManagement('onlygym', 'admin', new URLSearchParams()), error => error.status === 503);
+  const sdk = api(() => { throw Error('Unexpected fetch'); }, { HUB_MANAGEMENT_ONLYSHOP_TOKEN: '', HUB_SAAS_MANAGEMENT_PRODUCTS: 'onlyshop' });
+  assert.equal(sdk.isManagementEnabled('onlyshop'), false); assert.equal(sdk.isManagementEnabled('onlyerp'), false);
+  await assert.rejects(sdk.callSaaSManagement('onlyshop', 'admin', new URLSearchParams()), error => error.status === 503);
 });
 test('OnlyFood requires explicit credentials and preserves its payment lifecycle payload', async () => {
   const token = 'food-fixture-'.repeat(6);
@@ -98,33 +98,33 @@ test('OnlyFood requires explicit credentials and preserves its payment lifecycle
   }, { HUB_MANAGEMENT_ONLYFOOD_TOKEN: token });
   assert.equal(sdk.isManagementEnabled('onlyfood'), true);
   await sdk.callSaaSManagement('onlyfood', 'trusted-admin', new URLSearchParams(), { ...cmd, operation: 'payment.status', input: { tenantId: 'legacy-default-tenant', version: 'a'.repeat(64), paymentId: 'fixture', status: 'OVERDUE', paidAt: null } });
-  await assert.rejects(sdk.callSaaSManagement('onlygym', 'admin', new URLSearchParams(), { ...cmd, operation: 'payment.status' }), error => error.status === 400);
+  await assert.rejects(sdk.callSaaSManagement('onlyshop', 'admin', new URLSearchParams(), { ...cmd, operation: 'payment.status' }), error => error.status === 400);
   assert.equal(calls, 1);
 });
 test('writes use a fixed destination and bind actor, exact payload, path and timestamp', async () => {
   let count = 0;
   const sdk = api(async (url, options) => {
     count++;
-    assert.equal(url, 'https://onlygym.nanoapps.ar/api/integrations/nanolabs/management');
+    assert.equal(url, 'https://onlyshop.nanoapps.ar/api/integrations/nanolabs/management');
     assert.equal(options.redirect, 'error'); assert.equal(options.cache, 'no-store');
-    assert.equal(options.headers.Authorization, 'Bearer ' + tokens.onlygym);
+    assert.equal(options.headers.Authorization, 'Bearer ' + tokens.onlyshop);
     const body = JSON.parse(options.body); assert.equal(body.actor, 'trusted-admin'); assert.equal(body.requestId, cmd.requestId);
-    const expected = createHmac('sha256', tokens.onlygym).update([options.headers['X-NanoLabs-Timestamp'], 'POST', '/api/integrations/nanolabs/management', 'trusted-admin', options.body].join('\n')).digest('hex');
+    const expected = createHmac('sha256', tokens.onlyshop).update([options.headers['X-NanoLabs-Timestamp'], 'POST', '/api/integrations/nanolabs/management', 'trusted-admin', options.body].join('\n')).digest('hex');
     assert.equal(options.headers['X-NanoLabs-Signature'], expected);
-    return Response.json({ success: true, contract: 'nanolabs.saas.management.v1', product: 'onlygym', requestId: cmd.requestId, data: { tenantId: 'fixture' } });
+    return Response.json({ success: true, contract: 'nanolabs.saas.management.v1', product: 'onlyshop', requestId: cmd.requestId, data: { tenantId: 'fixture' } });
   });
-  const result = await sdk.callSaaSManagement('onlygym', 'trusted-admin', new URLSearchParams(), cmd);
-  assert.equal(result.tenantId, 'fixture'); assert.equal(count, 1); assert.ok(!JSON.stringify(result).includes(tokens.onlygym));
+  const result = await sdk.callSaaSManagement('onlyshop', 'trusted-admin', new URLSearchParams(), cmd);
+  assert.equal(result.tenantId, 'fixture'); assert.equal(count, 1); assert.ok(!JSON.stringify(result).includes(tokens.onlyshop));
 });
 test('refuses invalid commands and mismatched product/receipt contracts', async () => {
-  const sdk = api(async () => Response.json({ success: true, contract: 'nanolabs.saas.management.v1', product: 'onlyturn', requestId: cmd.requestId, data: {} }));
-  await assert.rejects(sdk.callSaaSManagement('onlygym', 'admin', new URLSearchParams(), { ...cmd, operation: 'dropDatabase' }), error => error.status === 400);
-  await assert.rejects(sdk.callSaaSManagement('onlygym', 'admin', new URLSearchParams(), cmd), error => error.status === 502);
+  const sdk = api(async () => Response.json({ success: true, contract: 'nanolabs.saas.management.v1', product: 'onlyerp', requestId: cmd.requestId, data: {} }));
+  await assert.rejects(sdk.callSaaSManagement('onlyshop', 'admin', new URLSearchParams(), { ...cmd, operation: 'dropDatabase' }), error => error.status === 400);
+  await assert.rejects(sdk.callSaaSManagement('onlyshop', 'admin', new URLSearchParams(), cmd), error => error.status === 502);
 });
 test('hides private connection errors and preserves known conflict messages', async () => {
   const disconnected = api(async () => { throw Error('postgres://private-password'); });
-  await assert.rejects(disconnected.callSaaSManagement('onlygym', 'admin', new URLSearchParams(), cmd), error => error.status === 502 && !error.message.includes('private-password'));
+  await assert.rejects(disconnected.callSaaSManagement('onlyshop', 'admin', new URLSearchParams(), cmd), error => error.status === 502 && !error.message.includes('private-password'));
   const conflict = api(async () => Response.json({ success: false, code: 'STALE_VERSION', error: 'Actualizá la ficha.' }, { status: 409 }));
-  await assert.rejects(conflict.callSaaSManagement('onlygym', 'admin', new URLSearchParams(), cmd), error => error.status === 409 && error.message === 'Actualizá la ficha.');
+  await assert.rejects(conflict.callSaaSManagement('onlyshop', 'admin', new URLSearchParams(), cmd), error => error.status === 409 && error.message === 'Actualizá la ficha.');
 });
 

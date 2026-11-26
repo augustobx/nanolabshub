@@ -52,8 +52,6 @@ type RestoreCheck = {
 const BACKUP_SUPPORTED_SLUGS = new Set([
   "nanolabshub",
   "onlyfood",
-  "onlygym",
-  "onlyturn",
   "onlycars",
   "onlyerp",
   "onlyshop",

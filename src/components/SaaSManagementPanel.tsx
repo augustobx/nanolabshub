@@ -23,7 +23,7 @@ class ClientError extends Error { constructor(message: string, public uncertain:
 export function SaaSManagementPanel({ product, initialTenantId, initialSection = "tenants" }: { product: ManagedSaaS; initialTenantId?: string; initialSection?: "tenants" | "plans" | "audit" }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const loadGeneration = useRef(0);
-  const productName = {onlygym:"OnlyGym",onlyturn:"OnlyTurn",onlyfood:"OnlyFood",onlycars:"OnlyCars",onlyerp:"OnlyERP",onlyshop:"OnlyShop"}[product];
+  const productName = {onlyfood:"OnlyFood",onlycars:"OnlyCars",onlyerp:"OnlyERP",onlyshop:"OnlyShop"}[product];
   const api = "/api/saas-management/" + product;
   const [catalog, setCatalog] = useState<ManagementCatalog | null>(null), [plans, setPlans] = useState<ManagedPlan[]>([]);
   const [tenants, setTenants] = useState<Array<{ id: string; name: string }>>([]), [tenantId, setTenantId] = useState(initialTenantId || ""), [tenant, setTenant] = useState<ManagedTenant | null>(null);

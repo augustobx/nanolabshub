@@ -82,7 +82,7 @@ function UserOptions({ user }: { user?: User }) {
         Cuenta activa
       </label>
       <div className="flex flex-wrap gap-3 text-xs sm:col-span-2">
-        {["nanolabshub", "onlyfood", "onlygym", "onlyturn", "onlycars", "onlyerp", "onlyshop"].map((slug) => (
+        {["nanolabshub", "onlyfood", "onlycars", "onlyerp", "onlyshop"].map((slug) => (
           <label key={slug} className="bh-check-label text-xs">
             <input
               type="checkbox"
