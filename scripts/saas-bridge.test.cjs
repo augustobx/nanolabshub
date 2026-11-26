@@ -56,7 +56,7 @@ test('only selected products are fetched and secrets stay in authorization heade
   assert.equal(calls.length, 2);
   assert.equal(overview.totalTenants, 2);
   assert.equal(overview.activeTenants, 2);
-  assert.equal(overview.sources.filter(source => source.status === 'disabled').length, 5);
+  assert.equal(overview.sources.filter(source => source.status === 'disabled').length, 6);
   assert.ok(!JSON.stringify(overview).includes(configured.HUB_INTEGRATION_ONLYGYM_TOKEN));
 });
 test('connection failure has null count, hides private details and preserves other sources', async () => {

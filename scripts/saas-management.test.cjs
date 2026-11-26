@@ -19,6 +19,40 @@ function api(fetch, extra = {}) {
 }
 const cmd = { requestId: '13d16e21-0221-4f4d-9cd7-38c5f2b3b9c7', operation: 'tenant.status', input: { tenantId: 'fixture', version: '2026-01-01T00:00:00.000Z', status: 'SUSPENDED' } };
 
+test('OnlyShop has independent opt-in, fixed signed destination and native ARS billing', async()=>{
+ const key='shop-fixture-'.repeat(6);let calls=0;
+ assert.equal(api(()=>{throw Error();}).isManagementEnabled('onlyshop'),false);
+ const sdk=api(async(url,options)=>{
+  calls++;assert.equal(url,'https://onlyshop.nanoapps.ar/api/integrations/nanolabs/management');
+  assert.equal(options.headers.Authorization,'Bearer '+key);
+  const body=JSON.parse(options.body);assert.equal(body.actor,'trusted-owner');
+  const timestamp=options.headers['X-NanoLabs-Timestamp'];
+  assert.equal(options.headers['X-NanoLabs-Signature'],createHmac('sha256',key).update([timestamp,'POST',new URL(url).pathname,'trusted-owner',options.body].join('\n')).digest('hex'));
+  return Response.json({success:true,contract:'nanolabs.saas.management.v1',product:'onlyshop',requestId:body.requestId,data:{tenantId:'fixture'}});
+ },{HUB_SAAS_MANAGEMENT_PRODUCTS:'onlyshop',HUB_MANAGEMENT_ONLYSHOP_TOKEN:key});
+ await sdk.callSaaSManagement('onlyshop','trusted-owner',new URLSearchParams(),{...cmd,operation:'payment.record',input:{tenantId:'fixture',amountCents:100,reference:'test',method:'Transferencia',days:0}});
+ for(const operation of ['domain.add','payment.status'])await assert.rejects(sdk.callSaaSManagement('onlyshop','trusted-owner',new URLSearchParams(),{...cmd,operation}),e=>e.status===400);
+ assert.equal(calls,1);
+});
+
+test('OnlyERP requires its own opt-in token and signs native username/calendar commands', async () => {
+  const key='erp-fixture-'.repeat(6); let calls=0;
+  assert.equal(api(()=>{throw Error();}).isManagementEnabled('onlyerp'),false);
+  const sdk=api(async(url,options)=>{
+    calls++; assert.equal(url,'https://onlyerp.nanoapps.ar/api/integrations/nanolabs/management');
+    assert.equal(options.headers.Authorization,'Bearer '+key);assert.equal(options.redirect,'error');
+    const body=JSON.parse(options.body);assert.equal(body.actor,'trusted-owner');
+    assert.equal(options.headers['X-NanoLabs-Signature'],createHmac('sha256',key).update([options.headers['X-NanoLabs-Timestamp'],'POST','/api/integrations/nanolabs/management',body.actor,options.body].join('\n')).digest('hex'));
+    if(body.operation==='admin.update'){assert.equal(body.input.username,'legacy-owner');assert.equal(body.input.email,undefined);}
+    if(body.operation==='payment.record'){assert.equal(body.input.month,10);assert.equal(body.input.applySubscription,false);assert.equal(body.input.days,undefined);}
+    return Response.json({success:true,contract:'nanolabs.saas.management.v1',product:'onlyerp',requestId:cmd.requestId,data:{tenantId:'1'}});
+  },{HUB_MANAGEMENT_ONLYERP_TOKEN:key});
+  await sdk.callSaaSManagement('onlyerp','trusted-owner',new URLSearchParams(),{...cmd,operation:'admin.update',input:{tenantId:'1',userId:'2',username:'legacy-owner',name:'Owner'}});
+  await sdk.callSaaSManagement('onlyerp','trusted-owner',new URLSearchParams(),{...cmd,operation:'payment.record',input:{tenantId:'1',currency:'ARS',amountCents:100,month:10,year:2026,applySubscription:false}});
+  for(const operation of ['domain.add','payment.status'])await assert.rejects(sdk.callSaaSManagement('onlyerp','trusted-owner',new URLSearchParams(),{...cmd,operation}),e=>e.status===400);
+  assert.equal(calls,2);
+});
+
 test('OnlyCars requires opt-in, signs its fixed destination and keeps native payment/domain contracts', async () => {
   const token = 'cars-fixture-'.repeat(6); let calls = 0;
   assert.equal(api(() => { throw Error(); }).isManagementEnabled('onlycars'), false);
@@ -40,7 +74,7 @@ test('OnlyCars requires opt-in, signs its fixed destination and keeps native pay
 });
 test('protected products are rejected before any network call even if configured', async () => {
   let calls = 0; const sdk = api(async () => { calls++; throw Error(); });
-  for (const product of ['onlypadel', 'onlyerp', 'onlymob', 'unknown']) {
+  for (const product of ['onlypadel', 'onlymob', 'unknown']) {
     assert.equal(sdk.isManagementEnabled(product), false);
     await assert.rejects(sdk.callSaaSManagement(product, 'admin', new URLSearchParams()), error => error.status === 403);
   }

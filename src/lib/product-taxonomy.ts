@@ -17,6 +17,8 @@ export const SAAS_PRODUCTS: ReadonlyArray<{
     activity: "pending";
   };
 }> = [
+  { slug: "onlyshop", name: "OnlyShop", focus: "Comercio y tienda digital", domain: "onlyshop.nanoapps.ar", category: "saas",
+    capabilities: { tenantRead: "connected", statusWrite: "pending", moduleWrite: "pending", impersonation: "pending", settings: "pending", activity: "pending" } },
   { slug: "onlyfood", name: "OnlyFood", focus: "Gastronomía y pedidos", domain: "onlyfood.nanoapps.ar", category: "saas",
     capabilities: { tenantRead: "connected", statusWrite: "pending", moduleWrite: "pending", impersonation: "pending", settings: "pending", activity: "pending" } },
   { slug: "onlypadel", name: "OnlyPadel", focus: "Clubes y reservas", domain: "onlypadel.nanoapps.ar", category: "saas",

@@ -4,7 +4,7 @@ const {spawn}=require("node:child_process"),{pipeline}=require("node:stream/prom
 const {createGzip,createGunzip}=require("node:zlib"),{DatabaseSync,backup:sqliteBackup}=require("node:sqlite");
 const {ensureRestoreSchema,latestEvidence}=require("./restore-evidence.cjs");
 const ROOT="/opt/backups",DATA=process.env.DATA_DIR||"/app/data";
-const protectedProducts=new Set(["onlypadel","onlyerp"]);
+const protectedProducts=new Set(["onlypadel"]);
 function assertMutable(slug){if(protectedProducts.has(slug))throw Error("Producto protegido: operación de backup bloqueada");}
 function db(){const d=new DatabaseSync(path.join(DATA,"hub.sqlite"));d.exec("PRAGMA busy_timeout=5000;"+
 "CREATE TABLE IF NOT EXISTS backup_jobs(id TEXT PRIMARY KEY,slug TEXT NOT NULL,db_type TEXT NOT NULL,filename TEXT,status TEXT NOT NULL,created_at TEXT NOT NULL,finished_at TEXT,size_bytes INTEGER DEFAULT 0,checksum TEXT,error TEXT,trigger TEXT NOT NULL);"+

@@ -7,7 +7,7 @@ const fs = require("node:fs");
 const { createGunzip } = require("node:zlib");
 const LIMIT = 512 * 1024 ** 2;
 const LABEL = "ar.nanoapps.hub.restore";
-const ALLOWED = new Set(["onlyfood", "onlygym", "onlyturn", "onlycars"]);
+const ALLOWED = new Set(["onlyfood", "onlygym", "onlyturn", "onlycars", "onlyerp"]);
 
 // No shell, no inherited production environment, no passwords in diagnostics.
 function docker(args, { input, timeout = 180000, maxOutput = 2 * 1024 ** 2, binary = false } = {}) {
@@ -33,7 +33,7 @@ function docker(args, { input, timeout = 180000, maxOutput = 2 * 1024 ** 2, bina
 }
 
 function sandboxSpec(app, image, nonce) {
-  if (!ALLOWED.has(app.slug) || !["postgres", "mariadb"].includes(app.dbType)) throw Error("Aplicación fuera del alcance de restauración SQL");
+  if (!ALLOWED.has(app.slug) || !["postgres", "mariadb", "mysql"].includes(app.dbType)) throw Error("Aplicación fuera del alcance de restauración SQL");
   if (!/^sha256:[a-f0-9]{64}$/.test(image)) throw Error("Se requiere la imagen local exacta de la base");
   if (!/^[a-f0-9]{32}$/.test(nonce)) throw Error("Identidad de sandbox inválida");
   const name = "nanohub-restore-" + nonce;
@@ -46,6 +46,9 @@ function sandboxSpec(app, image, nonce) {
   if (app.dbType === "postgres") args.push("--user", "postgres", "--tmpfs", "/var/lib/postgresql/data:" + tmp,
     "--tmpfs", "/var/run/postgresql:rw,nosuid,nodev,noexec,size=8m,mode=1777", "--env", "PGDATA=/var/lib/postgresql/data/restore",
     "--env", "POSTGRES_USER=" + role, "--env", "POSTGRES_HOST_AUTH_METHOD=trust", image, "postgres", "-c", "listen_addresses=");
+  else if (app.dbType === "mysql") args.push("--user", "mysql", "--tmpfs", "/var/lib/mysql:" + tmp,
+    "--tmpfs", "/var/run/mysqld:rw,nosuid,nodev,noexec,size=8m,mode=1777", "--entrypoint", "sh",
+    image, "-ec", "mysqld --initialize-insecure --datadir=/var/lib/mysql >/dev/null 2>&1; exec mysqld --datadir=/var/lib/mysql --socket=/var/run/mysqld/mysqld.sock --skip-networking --skip-grant-tables --skip-log-bin --event-scheduler=OFF --mysqlx=OFF");
   else args.push("--user", "mysql", "--tmpfs", "/var/lib/mysql:" + tmp,
     "--tmpfs", "/run/mysqld:rw,nosuid,nodev,noexec,size=8m,mode=1777", "--entrypoint", "sh",
     image, "-ec", "mariadb-install-db --datadir=/var/lib/mysql --auth-root-authentication-method=normal --skip-test-db >/dev/null 2>&1; exec mariadbd --datadir=/var/lib/mysql --socket=/run/mysqld/mysqld.sock --skip-networking --skip-grant-tables --skip-log-bin --event-scheduler=OFF");
@@ -78,8 +81,8 @@ function createSandboxRunner({ run: transport = docker, pause = ms => new Promis
       // Only metadata from the registered DB; all SQL goes to a new, owned container ID.
       const source = JSON.parse(await run(["inspect", "--format", "{{json .Image}}", app.dbContainer]));
       const metadata = JSON.parse(await run(["image", "inspect", source]));
-      const expected = app.dbType === "postgres" ? "postgres@sha256:" : "mariadb@sha256:";
-      if (!metadata[0]?.RepoDigests?.some(d => d.startsWith(expected) || d.startsWith("docker.io/library/" + expected))) throw Error("La imagen de base debe tener digest oficial PostgreSQL/MariaDB");
+      const expected = app.dbType + "@sha256:";
+      if (!metadata[0]?.RepoDigests?.some(d => d.startsWith(expected) || d.startsWith("docker.io/library/" + expected))) throw Error("La imagen de base debe tener digest oficial PostgreSQL/MariaDB/MySQL");
       spec = sandboxSpec(app, source, crypto.randomBytes(16).toString("hex"));
       id = await run(spec.args);
       if (!/^[a-f0-9]{64}$/.test(id)) { id = null; throw Error("Docker no confirmó un ID de sandbox válido"); }
@@ -91,10 +94,11 @@ function createSandboxRunner({ run: transport = docker, pause = ms => new Promis
       await owned();
       await run(["start", id]);
       const pg = app.dbType === "postgres";
-      const query = pg ? ["psql", "-X", "-q", "-v", "ON_ERROR_STOP=1", "-U", spec.role, "-d", "postgres"] : ["mariadb", "--protocol=socket", "-uroot", "--batch", "--skip-column-names"];
+      const mysql = app.dbType === "mysql";
+      const query = pg ? ["psql", "-X", "-q", "-v", "ON_ERROR_STOP=1", "-U", spec.role, "-d", "postgres"] : [mysql ? "mysql" : "mariadb", "--protocol=socket", "-uroot", "--batch", "--skip-column-names"];
       let ready = false;
       for (let attempt = 0; attempt < 60; attempt++) {
-        try { await run(["exec", id, ...(pg ? ["sh", "-ec", 'test "$(cat /proc/1/comm)" = postgres; exec pg_isready -U "$1"', "sh", spec.role] : ["mariadb-admin", "--protocol=socket", "-uroot", "ping"])], { timeout: 3000 }); ready = true; break; }
+        try { await run(["exec", id, ...(pg ? ["sh", "-ec", 'test "$(cat /proc/1/comm)" = postgres; exec pg_isready -U "$1"', "sh", spec.role] : [mysql ? "mysqladmin" : "mariadb-admin", "--protocol=socket", "-uroot", "ping"])], { timeout: 3000 }); ready = true; break; }
         catch { await pause(1000); }
       }
       if (!ready) throw Error("La base temporal no quedó lista");
@@ -126,7 +130,18 @@ function createSandboxRunner({ run: transport = docker, pause = ms => new Promis
           manifest.databases.push({ database, tables: counts.tables, rows, constraintsValidated:counts.constraints }); manifest.tables += counts.tables; manifest.rows += rows;manifest.constraintsValidated+=counts.constraints;
         }
       } else {
-        await run(["exec", id, "mariadb-check", "--protocol=socket", "-uroot", "--all-databases", "--check"]);
+        if (mysql) {
+          // MySQL's internal log/dictionary tables cannot all be CHECK TABLE'd.
+          // Validate every restored application schema; engine system data is not
+          // counted as customer state or declared as a tested application table.
+          const schemas = (await run(["exec", id, ...query, "-e", "SELECT DISTINCT TABLE_SCHEMA FROM information_schema.TABLES WHERE TABLE_TYPE='BASE TABLE' AND TABLE_SCHEMA NOT IN ('mysql','information_schema','performance_schema','sys') ORDER BY TABLE_SCHEMA"])).split("\n").filter(Boolean);
+          if (!schemas.length || schemas.length > 64 || schemas.some(s => !/^[a-zA-Z0-9_]{1,64}$/.test(s))) throw Error("Esquemas MySQL inválidos para restauración aislada");
+          const checks = await run(["exec", id, ...query, "-e", "SELECT CONCAT('CHECK TABLE `',TABLE_SCHEMA,'`.`',TABLE_NAME,'`;') FROM information_schema.TABLES WHERE TABLE_TYPE='BASE TABLE' AND TABLE_SCHEMA NOT IN ('mysql','information_schema','performance_schema','sys') ORDER BY TABLE_SCHEMA,TABLE_NAME"]);
+          if (checks.split("\n").length > 2000) throw Error("Más de 2000 tablas en MySQL");
+          const { Readable } = require("node:stream");
+          const statuses = (await run(["exec", "-i", id, ...query], { input: Readable.from([checks]) })).split("\n");
+          if (statuses.length !== checks.split("\n").length || statuses.some(row => !row.endsWith("\tstatus\tOK"))) throw Error("CHECK TABLE falló en una tabla MySQL restaurada");
+        } else await run(["exec", id, "mariadb-check", "--protocol=socket", "-uroot", "--all-databases", "--check"]);
         const rowsSQL = "SELECT CONCAT('SELECT COUNT(*) FROM `',REPLACE(TABLE_SCHEMA,'`','``'),'`.`',REPLACE(TABLE_NAME,'`','``'),'`;') FROM information_schema.TABLES WHERE TABLE_TYPE='BASE TABLE' AND TABLE_SCHEMA NOT IN ('mysql','information_schema','performance_schema','sys') ORDER BY TABLE_SCHEMA,TABLE_NAME;";
         const statements = await run(["exec", id, ...query, "-e", rowsSQL]);
         if(statements.split("\n").length>2000)throw Error("Más de 2000 tablas; requiere un procedimiento dedicado");

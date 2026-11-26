@@ -1,0 +1,12 @@
+# Optional preparation overlay. Production releases use the signed effective manifest.
+# Set this to the inspected Mountpoint of the existing onlyshop_data volume.
+services:
+  nanolabshub:
+    volumes:
+      - type: bind
+        source: ${HUB_ONLYSHOP_SQLITE_SOURCE:?Set the existing OnlyShop volume Mountpoint}
+        target: /opt/apps/onlyshop/data
+        read_only: true
+        bind:
+          create_host_path: false
+          propagation: rslave
