@@ -4,6 +4,7 @@ import { authorizeRequest } from "./lib/authorization-policy";
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   if (pathname === "/login" || pathname === "/api/auth/login" || pathname === "/api/auth/mfa" || pathname === "/api/health" ||
+      pathname === "/nanolabs/logo-nanolabs.svg" ||
       pathname.startsWith("/_next/") || pathname === "/favicon.ico" ||
       // The exact machine endpoint checks its own timing-safe Bearer credential.
       (pathname === "/api/backups/schedule/run" && request.method === "POST")) return NextResponse.next();
