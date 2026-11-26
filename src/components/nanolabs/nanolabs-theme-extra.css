@@ -1,0 +1,387 @@
+/*
+ * NanoLabsThemeDefault: lo que el kit agrega a NanoLabs (orion-theme.css), con sus tokens y medidas. Clases `ot-`.
+ * Se importa después de orion-theme.css. Salió de OnlyCars (13/10/2026), la primera app con este estilo.
+ */
+
+/* ---------- Shell (LayoutNanoLabs) ---------- */
+/* Ícono de la app en el tile de NanoLabs: degradé naranja con brillo, ícono blanco. */
+.ot-mark { position: relative; width: 100%; height: 100%; border-radius: 14px; display: grid; place-items: center;
+  color: #fff; overflow: hidden; background: linear-gradient(135deg, #FF8A2B, #E25700);
+  box-shadow: 0 4px 12px rgba(226, 87, 0, .22), 0 1px 2px rgba(16, 24, 40, .08); }
+.ot-mark::after { content: ''; position: absolute; inset: 0;
+  background: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, .28), rgba(255, 255, 255, 0) 70%); }
+.ot-mark svg { position: relative; transition: transform 600ms cubic-bezier(.16, 1, .3, 1); }
+.bh-logo:hover .ot-mark svg { transform: rotate(-12deg) scale(1.06); }
+.ot-usuario { text-align: right; min-width: 0; margin-left: var(--spacing-sm); }
+.ot-usuario .bh-list-primary { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+.bh-sidebar__item { position: relative; }
+.ot-badge { top: 8px; right: 10px; }
+.bh-sidebar__item--collapsed .ot-badge { top: 4px; right: 4px; }
+.ot-tooltip { display: block; position: fixed; transform: translateY(-50%); }
+/* Plegado gana también en notebook (ahí NanoLabs fija el ancho en 216 px). */
+.bh-sidebar.bh-sidebar--collapsed { width: 76px; }
+@media (max-width: 1023px) {
+  .ot-usuario { display: none; }
+  .bh-sidebar.bh-sidebar--collapsed { width: 100%; }
+}
+
+/* ---------- Página: bloques en columna con el aire de NanoLabs ---------- */
+.ot-pagina { display: flex; flex-direction: column; gap: var(--spacing-lg); }
+.ot-pagina > .bh-stats,
+.ot-pagina > .bh-toolbar { margin-bottom: 0; }
+.ot-pagina > .bh-alert { margin: 0; }
+.ot-volver { align-self: flex-start; text-decoration: none; margin-bottom: calc(-1 * var(--spacing-sm)); }
+.ot-stats-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.ot-stats-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 1100px) {
+  .ot-stats-4, .ot-stats-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.bh-stat-card__value { overflow-wrap: anywhere; }
+.bh-stat-card__label { text-align: left; }
+.ot-enlace { color: inherit; font-weight: var(--bh-weight-medium); text-decoration: underline; }
+.ot-texto-modal { line-height: 1.6; }
+.ot-mas { display: flex; justify-content: center; }
+
+/* ---------- Vista tarjetas ---------- */
+/* Tarjetas de 360 px como mínimo y 3 por fila como máximo: la grilla de NanoLabs (280 px) mete demasiadas por fila
+   en pantallas anchas y la información se aprieta. Usar con .bh-cards-grid. */
+.ot-grid-3 { grid-template-columns: repeat(auto-fill, minmax(max(360px, calc((100% - 2 * var(--spacing-md)) / 3)), 1fr)); }
+@media (max-width: 560px) { .ot-grid-3 { grid-template-columns: minmax(0, 1fr); } }
+/* Tres datos chicos dentro de una tarjeta (etiqueta arriba, valor abajo). */
+.ot-cifras { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.ot-cifras dt { font-size: var(--font-lock-xs-size); color: var(--text-neutral-subtlest); }
+.ot-cifras dd { margin: 2px 0 0; font-size: 13px; font-weight: var(--bh-weight-medium); color: var(--text-neutral-default);
+  font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+/* ---------- Tablas: en una tarjeta, sin scroll horizontal ---------- */
+.ot-tabla { border: 1px solid var(--border-neutral-subtle); border-radius: var(--bh-radius-lg); overflow: hidden;
+  background: var(--bg-surface-default); box-shadow: var(--sombra-tarjeta); }
+.ot-tabla .bh-table, .ot-ops { table-layout: fixed; }
+.bh-table td { overflow-wrap: anywhere; vertical-align: middle; }
+.ot-num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: var(--bh-weight-medium); }
+.ot-mono { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+.ot-ico { vertical-align: -2px; margin-right: 6px; color: var(--icon-neutral-subtle); }
+/* Tablas que no navegan: sin cursor de enlace al pasar el mouse (NanoLabs lo pone en toda .bh-table). */
+.ot-fija tbody tr:hover td, .ot-ops tbody tr:hover td { cursor: default; }
+
+/* ---------- Detalle: pestañas con contador y secciones con tabla ---------- */
+.ot-cuenta { display: inline-block; min-width: 22px; margin-left: 4px; padding: 0 7px; border-radius: 999px;
+  background: var(--bg-neutral-muted); color: var(--text-neutral-subtle); font-size: 11px; font-weight: 600; line-height: 18px;
+  text-align: center; font-variant-numeric: tabular-nums; }
+.ot-cuenta.alerta { background: var(--bg-feedback-warning-subtlest); color: var(--text-feedback-warning-default); }
+.bh-tabs__tab--activa .ot-cuenta { background: var(--bg-primary-subtlest); color: var(--text-primary-subtle); }
+.ot-panel { padding-top: var(--spacing-lg); }
+.ot-secciones { display: flex; flex-direction: column; gap: var(--spacing-md); }
+.ot-secciones > .bh-alert { margin: 0; }
+.ot-seccion { padding: var(--spacing-lg); }
+.ot-seccion__cab { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--spacing-md);
+  flex-wrap: wrap; margin-bottom: var(--spacing-md); }
+.ot-seccion__titulo { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; font-size: 17px; overflow-wrap: anywhere; }
+.ot-ops { border: 1px solid var(--border-neutral-subtle); border-radius: var(--bh-radius-sm); border-collapse: separate;
+  border-spacing: 0; overflow: hidden; }
+.ot-ops th { font-size: var(--font-lock-xs-size); }
+.ot-error { margin-top: 6px; padding: 6px 10px; border-radius: var(--bh-radius-sm);
+  background: var(--bg-feedback-danger-subtlest); color: var(--text-feedback-danger-default);
+  font: 11.5px/1.5 'JetBrains Mono', monospace; overflow-wrap: anywhere; }
+.ot-accion { margin-top: 8px; display: flex; justify-content: flex-end; }
+.ot-pie { margin: 0; padding: 12px 16px; border-radius: var(--bh-radius-lg); border: 1px dashed var(--border-neutral-default);
+  font-size: var(--font-lock-sm-size); color: var(--text-neutral-subtle); font-variant-numeric: tabular-nums; }
+.ot-sin-padding { padding: 0; overflow: hidden; }
+.ot-seccion-titulo { margin: 0; padding: var(--spacing-md) var(--spacing-lg); font-size: 15px;
+  border-bottom: 1px solid var(--border-neutral-subtle); }
+.ot-estado-accion { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+/* Datos de un mail (o de cualquier ficha corta): etiqueta a la izquierda, valor a la derecha. */
+.ot-mail { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 16px; margin: 0 0 var(--spacing-md);
+  font-size: var(--font-lock-sm-size); }
+.ot-mail dt { color: var(--text-neutral-subtlest); }
+.ot-mail dd { margin: 0; color: var(--text-neutral-default); overflow-wrap: anywhere; }
+
+/* ---------- Aviso emergente (Toast) ---------- */
+.ot-toasts { position: fixed; right: 24px; bottom: 24px; z-index: 600; display: flex; flex-direction: column; gap: 8px;
+  width: min(420px, calc(100vw - 48px)); }
+.ot-toast { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: var(--bh-radius-lg);
+  border: 1px solid var(--border-neutral-subtle); background: var(--bg-surface-default); box-shadow: var(--sombra-elevada);
+  font-family: var(--bh-font); font-size: var(--font-lock-sm-size); color: var(--text-neutral-default);
+  animation: ot-toast-entra 260ms cubic-bezier(.16, 1, .3, 1); }
+.ot-toast > svg { flex: none; margin-top: 1px; }
+.ot-toast > span { flex: 1; min-width: 0; overflow-wrap: anywhere; line-height: 1.45; }
+.ot-toast > button { flex: none; border: 0; background: none; cursor: pointer; color: var(--icon-neutral-subtle); padding: 0; }
+.ot-toast--ok > svg { color: var(--text-feedback-success-default); }
+.ot-toast--error { border-color: var(--border-feedback-danger-default); }
+.ot-toast--error > svg { color: var(--text-feedback-danger-default); }
+.ot-toast--info > svg { color: var(--text-primary-default); }
+@keyframes ot-toast-entra { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ---------- Ingreso (PantallaIngreso) ---------- */
+.ot-ingreso { min-height: 100vh; display: grid; place-items: center; padding: var(--spacing-lg); background: var(--bg-surface-layout); }
+.ot-ingreso__tarjeta { width: min(440px, 100%); display: flex; flex-direction: column; gap: var(--spacing-md); padding: var(--spacing-xl); }
+.ot-ingreso__bajada { margin: 0; line-height: 1.6; }
+.ot-ingreso__botones { display: flex; flex-wrap: wrap; gap: 8px; }
+.ot-ingreso__nota { margin: 0; font-size: var(--font-lock-xs-size); color: var(--text-neutral-subtlest); }
+
+@media (prefers-reduced-motion: reduce) {
+  .ot-mark svg { transition: none; }
+  .ot-toast { animation: none; }
+}
+
+/* ==========================================================================
+   ALINEACIÓN Y PADDING DEL LAYOUT
+   ========================================================================== */
+.bh-main {
+  padding: 24px 28px !important;
+  width: 100% !important;
+  max-width: 1650px !important;
+  margin: 0 auto !important;
+  min-width: 0 !important;
+}
+
+@media (max-width: 1024px) {
+  .bh-main {
+    padding: 16px 12px !important;
+  }
+}
+
+/* ==========================================================================
+   TABLAS RESPONSIVAS E INTEGRIDAD VISUAL (SIN DESFASES NI CORTES)
+   ========================================================================== */
+table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.overflow-x-auto {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.7);
+}
+
+/* ==========================================================================
+   PALETAS DINÁMICAS (GRADIENTES, GLOW Y ACCENTS)
+   ========================================================================== */
+.ot-mark, .nl-mark {
+  background: var(--nl-mark-gradient, linear-gradient(135deg, #FF8A2B, #E25700)) !important;
+  box-shadow: 0 4px 14px var(--nl-mark-glow, rgba(226, 87, 0, 0.28)) !important;
+}
+
+.bh-sidebar__item.active {
+  background: var(--bg-primary-subtlest) !important;
+  color: var(--text-primary-default) !important;
+}
+
+.bh-sidebar__item.active .bh-sidebar__icon-chip {
+  background: var(--bg-primary-default) !important;
+  color: #ffffff !important;
+}
+
+/* ==========================================================================
+   MODO OSCURO COHESIVO PARA TODO EL SISTEMA (ERP, TABLAS, CARDS, INPUTS)
+   ========================================================================== */
+html[data-theme='dark'],
+body[data-theme='dark'],
+.dark {
+  background-color: #0c0e14 !important;
+  color: #f1f5f9 !important;
+  color-scheme: dark;
+}
+
+/* Fondos y superficies principales */
+[data-theme='dark'] .bg-white,
+.dark .bg-white {
+  background-color: #141722 !important;
+}
+
+[data-theme='dark'] .bg-slate-50,
+.dark .bg-slate-50 {
+  background-color: #10131c !important;
+}
+
+[data-theme='dark'] .bg-slate-50\/50,
+.dark .bg-slate-50\/50,
+[data-theme='dark'] .bg-slate-50\/80,
+.dark .bg-slate-50\/80 {
+  background-color: #161a26 !important;
+}
+
+[data-theme='dark'] .bg-slate-100,
+.dark .bg-slate-100 {
+  background-color: #1b202e !important;
+}
+
+[data-theme='dark'] .bg-slate-200,
+.dark .bg-slate-200 {
+  background-color: #242b3d !important;
+}
+
+/* Bordes y divisores */
+[data-theme='dark'] .border-slate-100,
+.dark .border-slate-100,
+[data-theme='dark'] .border-slate-200,
+.dark .border-slate-200,
+[data-theme='dark'] .border-slate-300,
+.dark .border-slate-300,
+[data-theme='dark'] .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+[data-theme='dark'] .divide-slate-200 > :not([hidden]) ~ :not([hidden]),
+.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]),
+[data-theme='dark'] .divide-y > :not([hidden]) ~ :not([hidden]),
+.dark .divide-y > :not([hidden]) ~ :not([hidden]) {
+  border-color: #222838 !important;
+}
+
+/* Tipografía de alto contraste en modo oscuro */
+[data-theme='dark'] .text-slate-900,
+.dark .text-slate-900,
+[data-theme='dark'] .text-slate-800,
+.dark .text-slate-800 {
+  color: #f8fafc !important;
+}
+
+[data-theme='dark'] .text-slate-700,
+.dark .text-slate-700,
+[data-theme='dark'] .text-slate-600,
+.dark .text-slate-600 {
+  color: #cbd5e1 !important;
+}
+
+[data-theme='dark'] .text-slate-500,
+.dark .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+[data-theme='dark'] .text-slate-400,
+.dark .text-slate-400 {
+  color: #64748b !important;
+}
+
+/* Tablas en modo oscuro */
+[data-theme='dark'] table thead,
+.dark table thead,
+[data-theme='dark'] table thead tr,
+.dark table thead tr {
+  background-color: #181d2a !important;
+}
+
+[data-theme='dark'] table thead th,
+.dark table thead th {
+  background-color: #181d2a !important;
+  color: #94a3b8 !important;
+  border-bottom: 1px solid #222838 !important;
+}
+
+[data-theme='dark'] table tbody tr,
+.dark table tbody tr {
+  background-color: #141722;
+  border-bottom: 1px solid #1c2130 !important;
+}
+
+[data-theme='dark'] table tbody tr:hover,
+.dark table tbody tr:hover,
+[data-theme='dark'] .hover\:bg-slate-50:hover,
+.dark .hover\:bg-slate-50:hover,
+[data-theme='dark'] .hover\:bg-slate-50\/80:hover,
+.dark .hover\:bg-slate-50\/80:hover {
+  background-color: #1c2130 !important;
+}
+
+/* Formularios, inputs y selects en modo oscuro */
+[data-theme='dark'] input:not([type='checkbox']):not([type='radio']),
+.dark input:not([type='checkbox']):not([type='radio']),
+[data-theme='dark'] select,
+.dark select,
+[data-theme='dark'] textarea,
+.dark textarea {
+  background-color: #181c28 !important;
+  color: #f8fafc !important;
+  border-color: #2b3347 !important;
+}
+
+[data-theme='dark'] input::placeholder,
+.dark input::placeholder {
+  color: #64748b !important;
+}
+
+[data-theme='dark'] input:focus,
+.dark input:focus,
+[data-theme='dark'] select:focus,
+.dark select:focus,
+[data-theme='dark'] textarea:focus,
+.dark textarea:focus {
+  border-color: var(--color-brand, #FF6600) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px var(--color-brand-ring, rgba(255, 102, 0, 0.25)) !important;
+}
+
+/* Badges y chips de estado en modo oscuro con transparencia armoniosa */
+[data-theme='dark'] .bg-blue-50,
+.dark .bg-blue-50 {
+  background-color: rgba(37, 99, 235, 0.16) !important;
+  color: #93c5fd !important;
+  border-color: rgba(37, 99, 235, 0.3) !important;
+}
+
+[data-theme='dark'] .bg-emerald-50,
+.dark .bg-emerald-50 {
+  background-color: rgba(5, 150, 105, 0.16) !important;
+  color: #6ee7b7 !important;
+  border-color: rgba(5, 150, 105, 0.3) !important;
+}
+
+[data-theme='dark'] .bg-amber-50,
+.dark .bg-amber-50 {
+  background-color: rgba(217, 119, 6, 0.16) !important;
+  color: #fcd34d !important;
+  border-color: rgba(217, 119, 6, 0.3) !important;
+}
+
+[data-theme='dark'] .bg-red-50,
+.dark .bg-red-50 {
+  background-color: rgba(220, 38, 38, 0.16) !important;
+  color: #fca5a5 !important;
+  border-color: rgba(220, 38, 38, 0.3) !important;
+}
+
+[data-theme='dark'] .bg-fuchsia-50,
+.dark .bg-fuchsia-50 {
+  background-color: rgba(192, 38, 211, 0.16) !important;
+  color: #f0abfc !important;
+  border-color: rgba(192, 38, 211, 0.3) !important;
+}
+
+[data-theme='dark'] .bg-indigo-50,
+.dark .bg-indigo-50 {
+  background-color: rgba(99, 102, 241, 0.16) !important;
+  color: #a5b4fc !important;
+  border-color: rgba(99, 102, 241, 0.3) !important;
+}
+
+/* Dropdowns, modales y popovers en modo oscuro */
+[data-theme='dark'] .bh-dialog,
+.dark .bh-dialog {
+  background: #141722 !important;
+  border-color: #272e42 !important;
+  color: #f8fafc !important;
+}
+
+[data-theme='dark'] .bh-overlay,
+.dark .bh-overlay {
+  background-color: rgba(4, 6, 12, 0.75) !important;
+  backdrop-filter: blur(8px) !important;
+}
+

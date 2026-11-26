@@ -1,0 +1,400 @@
+/* Escena de espacio profundo, nebulosa, estrellas y tarjeta de ingreso. */
+.bh2 {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #0D0501;
+  color: #FFFFFF;
+}
+
+.bh2-capa {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+}
+
+.bh2--sale {
+  opacity: 0;
+  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.bh2-fondo {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(38% 46% at 30% 46%, rgba(190, 75, 4, 0.34) 0%, rgba(190, 75, 4, 0) 72%),
+    radial-gradient(90% 80% at 40% 45%, rgba(50, 18, 1, 0.9) 0%, rgba(50, 18, 1, 0) 75%),
+    #0D0501;
+}
+
+.bh2-fondo::before {
+  content: '';
+  position: absolute;
+  top: -20%;
+  left: -20%;
+  width: 140%;
+  height: 140%;
+  background: radial-gradient(closest-side, rgba(249, 191, 143, 0.07), rgba(249, 191, 143, 0));
+  animation: bh2-recorre 18s ease-in-out infinite alternate;
+}
+
+@keyframes bh2-recorre {
+  from { transform: translate(0, 0); }
+  to { transform: translate(45vw, 30vh); }
+}
+
+.bh2-lienzo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.bh2-vineta {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(120% 90% at 40% 50%, rgba(8, 3, 0, 0) 50%, rgba(8, 3, 0, 0.7) 100%);
+}
+
+/* ── Arriba: el área del proceso ── */
+.bh2-arriba {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 32px 48px;
+  pointer-events: none;
+  animation: bhi-sube 0.7s var(--bhi-curva) 0.2s both;
+}
+
+.bh2-arriba > * {
+  pointer-events: auto;
+}
+
+.bh2-marca__area {
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+/* ── Abajo: la firma de NanoLabs y el estado ── */
+.bh2-relato {
+  position: absolute;
+  z-index: 2;
+  left: 48px;
+  bottom: 64px;
+  max-width: 560px;
+  pointer-events: none;
+}
+
+.bh2-nanolabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 16px 6px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  font-size: 12px;
+  line-height: 16px;
+  color: rgba(255, 255, 255, 0.85);
+  transition: border-color 0.6s, background 0.6s;
+}
+
+.bh2-nanolabs strong {
+  font-weight: 600;
+  color: #FFFFFF;
+}
+
+.bh2-nanolabs svg {
+  flex-shrink: 0;
+}
+
+.bh2-estado {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+  font-size: 14px;
+  line-height: 20px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.bh2-estado__barra {
+  position: relative;
+  width: 64px;
+  height: 3px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.25);
+  overflow: hidden;
+}
+
+.bh2-estado__barra::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -40%;
+  width: 40%;
+  background: #FFFFFF;
+  border-radius: inherit;
+  animation: bh2-barre 1.3s cubic-bezier(0.45, 0, 0.25, 1) infinite;
+}
+
+@keyframes bh2-barre {
+  to { left: 100%; }
+}
+
+.bh2-pie {
+  position: absolute;
+  z-index: 2;
+  left: 48px;
+  bottom: 24px;
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0.03em;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* ── La tarjeta de ingreso: entra con barrido de arriba hacia abajo ── */
+.bh2-tarjeta {
+  position: absolute;
+  z-index: 3;
+  right: 48px;
+  top: 50%;
+  width: 440px;
+  max-width: calc(100% - 32px);
+  border-radius: var(--bhi-radio);
+  background: var(--bhi-superficie);
+  color: var(--bhi-texto);
+  border: 1px solid var(--bhi-borde-subtle);
+  outline: 1px solid rgba(249, 191, 143, 0.35);
+  outline-offset: 8px;
+  opacity: 0;
+  transform: translate(24px, -50%);
+  clip-path: inset(0 0 100% 0 round 16px);
+  pointer-events: none;
+  transition:
+    opacity 0.5s ease,
+    transform 0.9s var(--bhi-curva),
+    clip-path 0.9s var(--bhi-curva),
+    outline-offset 1.2s var(--bhi-curva);
+}
+
+.bh2-tarjeta--visible {
+  opacity: 1;
+  transform: translate(0, -50%);
+  clip-path: inset(-12px round 16px);
+  pointer-events: auto;
+  outline-offset: 6px;
+}
+
+.bh2-tarjeta__cuerpo {
+  padding: 32px 36px 12px;
+}
+
+.bh2-tarjeta__cabeza {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.bh2-tarjeta__logo {
+  display: block;
+  height: 42px;
+  width: auto;
+}
+
+.bh2-tarjeta__bajada {
+  margin-top: 8px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--bhi-texto-subtle);
+  text-align: left;
+}
+
+.bh2-seguro {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 14px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--bhi-texto-subtlest);
+}
+
+.bh2-tarjeta__pie {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 18px 36px 28px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--bhi-texto-subtlest);
+  border-top: 1px solid var(--bhi-borde-subtle);
+  margin-top: 16px;
+  text-align: center;
+}
+
+/* Entrada escalonada de los elementos dentro de la tarjeta */
+.bh2-tarjeta--visible .bh2-tarjeta__cuerpo > *,
+.bh2-tarjeta--visible .bh2-tarjeta__pie {
+  animation: bhi-sube 0.6s var(--bhi-curva) both;
+}
+
+.bh2-tarjeta--visible .bh2-tarjeta__cuerpo > *:nth-child(2) { animation-delay: 0.08s; }
+.bh2-tarjeta--visible .bh2-tarjeta__cuerpo > *:nth-child(3) { animation-delay: 0.16s; }
+.bh2-tarjeta--visible .bh2-tarjeta__cuerpo > *:nth-child(4) { animation-delay: 0.24s; }
+.bh2-tarjeta--visible .bh2-tarjeta__cuerpo > *:nth-child(5) { animation-delay: 0.32s; }
+.bh2-tarjeta--visible .bh2-tarjeta__cuerpo > *:nth-child(n+6),
+.bh2-tarjeta--visible .bh2-tarjeta__pie { animation-delay: 0.4s; }
+
+/* ── Pantallas angostas: la escena arriba, la tarjeta abajo ── */
+@media (max-width: 1023px) {
+  .bh2 {
+    height: auto;
+    min-height: 100vh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .bh2-arriba {
+    position: relative;
+    padding: 20px 24px;
+  }
+  .bh2-relato {
+    position: relative;
+    left: auto;
+    bottom: auto;
+    margin: 28vh 24px 0;
+    max-width: none;
+  }
+  .bh2-tarjeta {
+    position: relative;
+    right: auto;
+    top: auto;
+    margin: 24px auto 48px;
+    width: calc(100% - 32px);
+    transform: translateY(24px);
+  }
+  .bh2-tarjeta--visible {
+    transform: none;
+  }
+  .bh2-pie {
+    position: relative;
+    left: auto;
+    bottom: auto;
+    margin: 0 24px 24px;
+    text-align: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bh2 *, .bh2 *::before, .bh2 *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ── Pantalla ancha: la tarjeta centrada en la mitad derecha ── */
+@media (min-width: 1024px) {
+  .bh3 .bh2-tarjeta {
+    right: auto;
+    left: 75%;
+    width: 480px;
+    max-width: calc(50% - 48px);
+    transform: translate(calc(-50% + 24px), -50%);
+  }
+  .bh3 .bh2-tarjeta--visible {
+    transform: translate(-50%, -50%);
+  }
+  .bh3 .bh2-tarjeta__cuerpo {
+    padding: 36px 44px 12px;
+  }
+  .bh3 .bh2-tarjeta__bajada {
+    margin-top: 14px;
+    font-size: 15px;
+    line-height: 22px;
+  }
+  .bh3 .bh2-tarjeta__pie {
+    padding: 20px 44px 32px;
+  }
+}
+
+/* El nombre del proceso con texto fijo: centrado donde estuvo el isotipo */
+.bh3-nombre {
+  position: absolute;
+  z-index: 2;
+  left: 25%;
+  width: max-content;
+  max-width: 42%;
+  top: 46%;
+  transform: translate(-50%, -50%);
+  text-align: left;
+  pointer-events: none;
+}
+
+.bh3-nombre__titulo {
+  font-size: clamp(calc(56px + 2pt), calc(7.5vw + 2pt), calc(120px + 2pt));
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #FFFFFF;
+  margin-left: -0.03em;
+  filter: drop-shadow(0 0 28px rgba(243, 115, 32, 0.45));
+  animation: bh3-nombre 1.1s var(--bhi-curva) both;
+}
+
+.bh3-nombre__bajada {
+  margin: 12px 0 0;
+  max-width: 32rem;
+  font-size: 22px;
+  line-height: 30px;
+  font-weight: 400;
+  color: #FFFFFF;
+  animation: bhi-sube 0.8s var(--bhi-curva) 0.45s both;
+}
+
+@keyframes bh3-nombre {
+  from {
+    opacity: 0;
+    letter-spacing: 0.12em;
+    filter: blur(10px) drop-shadow(0 0 28px rgba(243, 115, 32, 0));
+  }
+  to {
+    opacity: 1;
+    letter-spacing: -0.02em;
+    filter: blur(0) drop-shadow(0 0 28px rgba(243, 115, 32, 0.45));
+  }
+}
+
+@media (max-width: 1023px) {
+  .bh3-nombre {
+    left: 24px;
+    right: 24px;
+    width: auto;
+    max-width: none;
+    top: 16vh;
+    transform: none;
+  }
+  .bh3-nombre__bajada {
+    font-size: 16px;
+    line-height: 24px;
+  }
+}

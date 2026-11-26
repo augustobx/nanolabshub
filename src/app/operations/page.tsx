@@ -1,2 +1,5 @@
-import { OperationsDashboard } from "@/components/OperationsDashboard";
-export default function OperationsPage() { return <OperationsDashboard />; }
+import { InfraWorkspace } from "@/components/InfraWorkspace";
+
+export default function OperationsPage() {
+  return <InfraWorkspace initialTab="apps" />;
+}

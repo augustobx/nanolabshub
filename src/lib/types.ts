@@ -132,6 +132,7 @@ export interface UniversalTenant {
   rawStatus: string;
   plan: string;
   planExpiresAt?: string | null;
+  version?: string;
   createdAt: string;
   domain: string;
   adminEmail?: string;

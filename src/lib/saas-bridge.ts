@@ -8,6 +8,8 @@ type WireTenant = {
   id: string; slug: string; name: string; status: string; rawStatus: string;
   createdAt: string; plan: string | null;
   planExpiresAt?: string | null;
+  version?: string;
+  domain?: string | null;
   modules?: Record<string, boolean>;
   metrics?: { totalRecords: number; recordLabel: string; available: boolean };
 };
@@ -28,7 +30,10 @@ function adaptTenant(saas: SaaSSlug, name: string, value: WireTenant): Universal
     id: String(value.id), slug: String(value.slug), name: String(value.name),
     saas, saasName: name, status: normalizeStatus(value.status),
     rawStatus: value.rawStatus, plan: value.plan || "No informado",
-    createdAt: value.createdAt, domain: "", planExpiresAt: value.planExpiresAt ?? null,
+    createdAt: value.createdAt,
+    domain: typeof value.domain === "string" ? value.domain : "",
+    planExpiresAt: value.planExpiresAt ?? null,
+    ...(typeof value.version === "string" && value.version ? { version: value.version } : {}),
     metrics: value.metrics?.available === true && Number.isSafeInteger(value.metrics.totalRecords) && value.metrics.totalRecords >= 0 && typeof value.metrics.recordLabel === "string"
       ? { totalRecords: value.metrics.totalRecords, recordLabel: value.metrics.recordLabel.slice(0, 80), available: true }
       : { totalRecords: 0, recordLabel: "Métricas no disponibles", available: false },

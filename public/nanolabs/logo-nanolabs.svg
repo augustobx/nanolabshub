@@ -1,0 +1,18 @@
+<svg width="240" height="240" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- NanoLabs Automotive Emblem - Optimized for particle cloud rasterization -->
+  <!-- Upper aerodynamic roof / wing line -->
+  <path d="M44 82C62 54 94 38 120 38C146 38 178 54 196 82L178 88C164 66 140 54 120 54C100 54 76 66 62 88L44 82Z" fill="#F37320"/>
+  
+  <!-- Left wing / speed chevron -->
+  <path d="M30 114L62 100L56 122L36 128C32 124 30 119 30 114Z" fill="#F37320"/>
+  <path d="M210 114L178 100L184 122L204 128C208 124 210 119 210 114Z" fill="#F37320"/>
+  
+  <!-- Central NanoLabs Dynamic Monogram "N" -->
+  <path d="M76 172V72H96L144 140V72H164V172H144L96 104V172H76Z" fill="#F37320"/>
+  
+  <!-- Lower velocity diffuser / aerodynamic edge -->
+  <path d="M60 186L120 204L180 186L174 198L120 216L66 198L60 186Z" fill="#F37320"/>
+  
+  <!-- Center tech core accent -->
+  <circle cx="120" cy="120" r="10" fill="#F37320"/>
+</svg>
