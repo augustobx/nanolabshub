@@ -6,7 +6,7 @@ export const runtime="nodejs";
 export async function POST(req: Request) {
   let actor;
   try { actor=await requireMutatingSession(req); }
-  catch { return Response.json({success:false,error:"No autorizado"},{status:403}); }
+  catch(error) { return Response.json({success:false,error:error instanceof Error?error.message:"No autorizado"},{status:403}); }
   try {
     assertBackupSecurity();
     const body=await req.json();

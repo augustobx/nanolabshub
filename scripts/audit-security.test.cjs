@@ -135,3 +135,17 @@ test('backup coverage excludes missing files and labels external copies as metad
   fs.unlinkSync(file);assert.equal(e.list(apps)[0].status,'failed');
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
+test('backups work across an active MFA session older than 10 minutes while high-risk routes still require step-up',async()=>{
+ const staleAuth=Date.now()-20*60000;
+ const principal={userId:'u1',username:'fixture_owner',role:'owner',scopes:[],sessionId:'s1',authenticatedAt:staleAuth,mfaReady:true,enrollmentRequired:false,expiresAt:Date.now()+3600000};
+ const load=modules({...configured,NODE_ENV:'production',HUB_PUBLIC_ORIGIN:'https://hub.nanoapps.ar/'},{
+  [path.join(root,'lib/auth.ts')]:{getPrincipal:async()=>principal,getSessionToken:async()=>'v2.'+'a'.repeat(64),identity:{touch:()=>principal}},
+  [path.join(root,'lib/db.ts')]:{getDatabase:()=>({getBackupSlug:()=>'onlyfood'})},
+ });
+ const {requireMutatingPrincipal}=load('lib/action-security.ts');
+ const mk=(p,origin='https://hub.nanoapps.ar')=>new Request('https://hub.nanoapps.ar'+p,{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify({slug:'onlyfood'})});
+ assert.equal((await requireMutatingPrincipal(mk('/api/backups'))).username,'fixture_owner');
+ await assert.rejects(requireMutatingPrincipal(mk('/api/backups','https://evil.example')),/Origen/);
+ await assert.rejects(requireMutatingPrincipal(mk('/api/apps/deploy')),/Mi cuenta/);
+ await assert.rejects(requireMutatingPrincipal(mk('/api/maintenance/images')),/Mi cuenta/);
+});

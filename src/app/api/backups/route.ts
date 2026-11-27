@@ -21,7 +21,7 @@ export async function GET() {
 export async function POST(req: Request) {
   let actor: string;
   try {actor=await requireMutatingSession(req);}
-  catch {return Response.json({success:false,error:"Sesión u origen no autorizado"},{status:403,headers});}
+  catch(error) {return Response.json({success:false,error:error instanceof Error?error.message:"Sesión u origen no autorizado"},{status:403,headers});}
   if (!req.headers.get("content-type")?.startsWith("application/json")) {
     return Response.json({success:false,error:"Se requiere JSON"},{status:415,headers});
   }
