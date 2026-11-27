@@ -120,7 +120,49 @@ export interface BackupRecord {
   restoreDurationMs?: number | null;
 }
 
-export type SaaSSlug = "onlyfood" | "onlypadel" | "onlycars" | "onlyerp" | "onlyshop" | "onlymob";
+export type SaaSSlug = "onlyfood" | "onlypadel" | "onlycars" | "onlymarket" | "onlyerp" | "onlyshop" | "onlymob";
+
+export type IndependentStatus = "ACTIVE" | "TRIAL" | "PAST_DUE" | "SUSPENDED" | "CANCELED";
+export type IndependentPaymentStatus = "PENDING" | "PAID" | "OVERDUE" | "REFUNDED" | "VOID";
+
+export interface IndependentPayment {
+  id: string;
+  slug: string;
+  amountCents: number;
+  currency: string;
+  status: IndependentPaymentStatus;
+  method: string;
+  reference: string;
+  notes: string;
+  periodStart: string;
+  periodEnd: string;
+  dueAt: string | null;
+  paidAt: string | null;
+  createdAt: string;
+  createdBy: string;
+}
+
+export interface IndependentContract {
+  slug: string;
+  appName: string;
+  clientName: string;
+  contactEmail: string;
+  contactPhone: string;
+  domain: string;
+  status: IndependentStatus;
+  planName: string;
+  billingCycle: "MONTHLY" | "QUARTERLY" | "ANNUAL" | "CUSTOM";
+  priceCents: number;
+  currency: string;
+  periodStart: string;
+  periodEnd: string;
+  trialEndsAt: string | null;
+  notes: string;
+  updatedAt: string;
+  updatedBy: string;
+  paymentsCount?: number;
+  overdueCount?: number;
+}
 
 export interface UniversalTenant {
   id: string;

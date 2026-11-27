@@ -53,9 +53,9 @@ test("SQLite copy validation happens on isolated files and records an audit trai
   await assert.rejects(recovery.checkIsolated(apps,"../file","ci"));
   // Legacy records from protected apps are never opened, even if called without HTTP guards.
   const protectedId=crypto.randomUUID(), protectedDb=backup.db();
-  try{protectedDb.prepare("INSERT INTO backup_jobs(id,slug,db_type,status,created_at,trigger) VALUES(?,?,?,'integrity_ok',?,'test')").run(protectedId,"onlypadel","postgres",new Date().toISOString());}finally{protectedDb.close();}
+  try{protectedDb.prepare("INSERT INTO backup_jobs(id,slug,db_type,status,created_at,trigger) VALUES(?,?,?,'integrity_ok',?,'test')").run(protectedId,"unregistered-app","postgres",new Date().toISOString());}finally{protectedDb.close();}
   let opens=0;backup.download=async()=>{opens++;throw Error("must not read");};
-  await assert.rejects(recovery.checkIsolated([{slug:"onlypadel",dbType:"postgres"}],protectedId,"ci"),/fuera del alcance/);
+  await assert.rejects(recovery.checkIsolated([{slug:"unregistered-app",dbType:"postgres"}],protectedId,"ci"),/fuera del alcance/);
   assert.equal(opens,0);
  }finally{
   backup.download=original;

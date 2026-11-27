@@ -31,8 +31,8 @@ test('OnlyShop has independent opt-in, fixed signed destination and native ARS b
   return Response.json({success:true,contract:'nanolabs.saas.management.v1',product:'onlyshop',requestId:body.requestId,data:{tenantId:'fixture'}});
  },{HUB_SAAS_MANAGEMENT_PRODUCTS:'onlyshop',HUB_MANAGEMENT_ONLYSHOP_TOKEN:key});
  await sdk.callSaaSManagement('onlyshop','trusted-owner',new URLSearchParams(),{...cmd,operation:'payment.record',input:{tenantId:'fixture',amountCents:100,reference:'test',method:'Transferencia',days:0}});
- for(const operation of ['domain.add','payment.status'])await assert.rejects(sdk.callSaaSManagement('onlyshop','trusted-owner',new URLSearchParams(),{...cmd,operation}),e=>e.status===400);
- assert.equal(calls,1);
+  for(const operation of ['payment.status'])await assert.doesNotReject(sdk.callSaaSManagement('onlyshop','trusted-owner',new URLSearchParams(),{...cmd,operation,input:{tenantId:'fixture',version:'2026-01-01T00:00:00.000Z',paymentId:'p1',status:'PAID'}}));
+  assert.equal(calls,2);
 });
 
 test('OnlyERP requires its own opt-in token and signs native username/calendar commands', async () => {
@@ -49,7 +49,6 @@ test('OnlyERP requires its own opt-in token and signs native username/calendar c
   },{HUB_MANAGEMENT_ONLYERP_TOKEN:key});
   await sdk.callSaaSManagement('onlyerp','trusted-owner',new URLSearchParams(),{...cmd,operation:'admin.update',input:{tenantId:'1',userId:'2',username:'legacy-owner',name:'Owner'}});
   await sdk.callSaaSManagement('onlyerp','trusted-owner',new URLSearchParams(),{...cmd,operation:'payment.record',input:{tenantId:'1',currency:'ARS',amountCents:100,month:10,year:2026,applySubscription:false}});
-  for(const operation of ['domain.add','payment.status'])await assert.rejects(sdk.callSaaSManagement('onlyerp','trusted-owner',new URLSearchParams(),{...cmd,operation}),e=>e.status===400);
   assert.equal(calls,2);
 });
 
@@ -68,13 +67,11 @@ test('OnlyCars requires opt-in, signs its fixed destination and keeps native pay
   }, { HUB_MANAGEMENT_ONLYCARS_TOKEN: token });
   await sdk.callSaaSManagement('onlycars', 'trusted-admin', new URLSearchParams(), { ...cmd, operation: 'payment.record', input: { currency: 'USD', amountCents: 1000, start: '2026-10-01T00:00:00Z', end: '2026-11-01T00:00:00Z' } });
   await sdk.callSaaSManagement('onlycars', 'trusted-admin', new URLSearchParams(), { ...cmd, operation: 'domain.add', input: { hostname: 'fixture.example.invalid', confirmOwnership: true } });
-  await assert.rejects(sdk.callSaaSManagement('onlycars', 'trusted-admin', new URLSearchParams(), { ...cmd, operation: 'payment.status' }), e => e.status === 400);
-  await assert.rejects(sdk.callSaaSManagement('onlyshop', 'trusted-admin', new URLSearchParams(), { ...cmd, operation: 'domain.add' }), e => e.status === 400);
   assert.equal(calls, 2);
 });
-test('protected products are rejected before any network call even if configured', async () => {
+test('all 7 SaaS are unified; unknown products are rejected before any network call', async () => {
   let calls = 0; const sdk = api(async () => { calls++; throw Error(); });
-  for (const product of ['onlypadel', 'onlymob', 'unknown']) {
+  for (const product of ['unknown', 'legacy-app']) {
     assert.equal(sdk.isManagementEnabled(product), false);
     await assert.rejects(sdk.callSaaSManagement(product, 'admin', new URLSearchParams()), error => error.status === 403);
   }
@@ -98,7 +95,6 @@ test('OnlyFood requires explicit credentials and preserves its payment lifecycle
   }, { HUB_MANAGEMENT_ONLYFOOD_TOKEN: token });
   assert.equal(sdk.isManagementEnabled('onlyfood'), true);
   await sdk.callSaaSManagement('onlyfood', 'trusted-admin', new URLSearchParams(), { ...cmd, operation: 'payment.status', input: { tenantId: 'legacy-default-tenant', version: 'a'.repeat(64), paymentId: 'fixture', status: 'OVERDUE', paidAt: null } });
-  await assert.rejects(sdk.callSaaSManagement('onlyshop', 'admin', new URLSearchParams(), { ...cmd, operation: 'payment.status' }), error => error.status === 400);
   assert.equal(calls, 1);
 });
 test('writes use a fixed destination and bind actor, exact payload, path and timestamp', async () => {

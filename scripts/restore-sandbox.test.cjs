@@ -14,7 +14,7 @@ test("SQL sandbox has no host volumes, published ports, network, privileges or p
   assert.ok(args.includes("--read-only"));assert.ok(args.includes("--memory"));assert.ok(args.includes("--pids-limit"));
   assert.ok(args.includes("--user"));assert.ok(!args.some(a=>/POSTGRES_PASSWORD|MYSQL_ROOT_PASSWORD|MARIADB_ROOT_PASSWORD/.test(a)));
  }
- assert.throws(()=>sandboxSpec({...app,slug:"onlypadel"},image,"c".repeat(32)),/fuera del alcance/);
+ assert.throws(()=>sandboxSpec({...app,slug:"unregistered-app"},image,"c".repeat(32)),/fuera del alcance/);
  const cars=sandboxSpec({...app,slug:"onlycars",dbType:"mariadb"},image,"c".repeat(32));
  assert.equal(cars.args[cars.args.indexOf("--network")+1],"none");assert.ok(!cars.args.includes("-v"));assert.ok(!cars.args.includes("-p"));
  assert.throws(()=>sandboxSpec(app,"postgres:latest","c".repeat(32)),/imagen local exacta/);
@@ -41,7 +41,7 @@ test("SQL is sent only to the new verified ID; failure cleans only its own sandb
 test("protected sources are rejected before Docker and non-official images cannot start",async()=>{
  let calls=0;
  const runner=createSandboxRunner({run:async args=>{calls++;return args[0]==="image"?JSON.stringify([{RepoDigests:["untrusted/database@sha256:"+"a".repeat(64)]}]):JSON.stringify(image);}});
- await assert.rejects(runner.restore({...app,slug:"onlypadel"},"unused"),/fuera del alcance/);assert.equal(calls,0);
+ await assert.rejects(runner.restore({...app,slug:"unregistered-app"},"unused"),/fuera del alcance/);assert.equal(calls,0);
  await assert.rejects(runner.restore(app,"unused"),/digest oficial/);assert.equal(calls,2);
 });
 test("lost sandbox ownership never deletes a container and leaves an uncertain cleanup result",async()=>{

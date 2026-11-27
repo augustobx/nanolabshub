@@ -2,7 +2,7 @@ import type { Principal } from "./auth";
 import { KNOWN_APPS } from "./apps-registry";
 import { assertProductMutable } from "./operational-policy";
 
-const mutableApps = new Set(["nanolabshub", "onlyfood", "onlycars", "onlyerp", "onlyshop"]);
+const mutableApps = new Set(["nanolabshub", "onlyfood", "onlypadel", "onlycars", "onlymarket", "onlyerp", "onlyshop", "onlymob", "acevedocontrol", "liga-padel", "nanolabs-ai-trading", "nanolabs"]);
 export function authorizeRequest(principal: Principal, pathname: string, method: string): boolean {
   if (pathname === "/account" || pathname === "/api/auth/account" || pathname === "/api/auth/logout") return true;
   if (!principal.mfaReady) return false;
@@ -12,14 +12,12 @@ export function authorizeRequest(principal: Principal, pathname: string, method:
     return true;
   }
   if (principal.role === "viewer") return false;
-  const operatorRoutes = ["/api/apps/restart", "/api/apps/lifecycle", "/api/backups", "/api/backups/schedule", "/api/backups/restore-check", "/api/backups/import", "/api/jobs"];
-  return principal.role === "owner" || operatorRoutes.includes(pathname) || /^\/api\/saas-management\/(onlyfood|onlycars|onlyerp|onlyshop)$/.test(pathname);
+  const operatorRoutes = ["/api/apps/restart", "/api/apps/lifecycle", "/api/backups", "/api/backups/schedule", "/api/backups/restore-check", "/api/backups/import", "/api/independent-billing", "/api/jobs"];
+  return principal.role === "owner" || operatorRoutes.includes(pathname) || /^\/api\/saas-management\/(onlyfood|onlypadel|onlycars|onlymarket|onlyerp|onlyshop|onlymob)$/.test(pathname);
 }
 export function authorizeResource(principal: Principal, slug: string, mutate = true): void {
   if (mutate) {
-    // Cars is authorized for scoped management and backups. Generic container
-    // lifecycle/restarts retain their independent operational-policy guard.
-    if (!["onlycars", "onlyerp","onlyshop"].includes(slug)) assertProductMutable(slug);
+    assertProductMutable(slug);
     if (!mutableApps.has(slug)) throw Error("Aplicación fuera del alcance habilitado");
     if (principal.role === "viewer") throw Error("El rol de consulta no permite cambios");
   }

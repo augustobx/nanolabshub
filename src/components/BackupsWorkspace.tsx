@@ -52,9 +52,16 @@ type RestoreCheck = {
 const BACKUP_SUPPORTED_SLUGS = new Set([
   "nanolabshub",
   "onlyfood",
+  "onlypadel",
   "onlycars",
+  "onlymarket",
   "onlyerp",
   "onlyshop",
+  "onlymob",
+  "acevedocontrol",
+  "liga-padel",
+  "nanolabs-ai-trading",
+  "nanolabs",
 ]);
 
 export function BackupsWorkspace({

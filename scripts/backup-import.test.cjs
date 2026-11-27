@@ -40,7 +40,7 @@ test("external SQLite import preserves the original, validates before publicatio
   assert.deepEqual(await fs.readFile(source),original);
   const denied=runner.enqueue(apps,"nanolabshub","hub-existing.sqlite",crypto.randomUUID(),"fixture-owner");permitted=false;await runner.tick(apps);assert.equal(store.get(denied.id).state,"failed");permitted=true;
   assert.throws(()=>importer.source(apps,"nanolabshub","../hub.sqlite"),/Formato no admitido/);
-  assert.throws(()=>importer.source([{slug:"onlypadel",dbType:"postgres"}],"onlypadel","fixture.sql.gz"),/fuera del alcance/);
+  assert.throws(()=>importer.source([{slug:"unregistered-app",dbType:"postgres"}],"unregistered-app","fixture.sql.gz"),/fuera del alcance/);
   const stale=importer.source(apps,"nanolabshub","hub-existing.sqlite").snapshot;await fs.appendFile(source,"changed");
   await assert.rejects(importer.importFile(apps,"nanolabshub",stale,"fixture-owner",{jobId:crypto.randomUUID()}),/cambió desde la solicitud/);
   const invalid=path.join(directory,"invalid.sqlite"),bad=new DatabaseSync(invalid);

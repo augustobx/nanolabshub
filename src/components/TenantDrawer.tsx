@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ManagedPlan, ManagedSaaS, ManagedTenant, ManagementCatalog, ManagementCommand, ManagementOperation } from "@/lib/saas-management-types";
 import { Cargando, NanoLabsAlert, NanoLabsButton, NanoLabsChip, NanoLabsModal, NanoLabsTabs, useToast } from "./nanolabs";
-import { OnlyCarsDomains, OnlyCarsPayments } from "./OnlyCarsControls";
-import { OnlyERPPayments } from "./OnlyERPPayments";
-import { OnlyFoodPayments } from "./OnlyFoodPayments";
+import { OnlyCarsDomains } from "./OnlyCarsControls";
+import { UnifiedSaaSPayments } from "./UnifiedSaaSPayments";
+import { SAAS_PRODUCTS } from "@/lib/product-taxonomy";
 
 const MODULE_LABELS: Record<string, string> = {
   VENTAS: "Ventas y pedidos",
@@ -39,27 +39,34 @@ const MODULE_LABELS: Record<string, string> = {
   maxProducts: "Productos",
   pwaEnabled: "Tienda PWA",
   accountsEnabled: "Cuentas corrientes",
-  socios: "Socios",
-  membresias: "Membresías",
-  accesos: "Control de accesos",
-  caja: "Caja y ventas",
-  entrenamiento: "Entrenamiento",
-  clases: "Clases",
-  mediciones: "Mediciones",
-  puntos: "Fidelización",
-  reportes: "Reportes",
-  whatsappNotifications: "Avisos por WhatsApp",
-  advancedReports: "Reportes avanzados",
-  customDomain: "Dominio propio",
-  waitlist: "Lista de espera",
-  deposits: "Cobros y señas",
-  recurringBookings: "Reservas recurrentes",
+  reservations: "Reservas",
+  users: "Usuarios",
+  tournaments: "Torneos",
+  rankings: "Rankings",
+  player_categories: "Categorías de jugadores",
+  expenses: "Gastos",
+  push: "Notificaciones Push",
+  payments: "Pagos",
+  community: "Comunidad",
+  analytics: "Analytics",
+  integrations: "Integraciones",
+  owner_portal: "Portal de propietarios",
+  renter_portal: "Portal de inquilinos",
+  automation: "Automatizaciones",
+  inventory: "Inventario",
+  lotTracking: "Lotes y vencimientos",
+  transformations: "Transformaciones",
+  pos: "Punto de venta (POS)",
+  promotions: "Promociones",
+  finance: "Finanzas",
+  reports: "Reportes",
   maxUsers: "Usuarios",
   maxBranches: "Sucursales",
-  maxMembers: "Socios",
   maxLocations: "Sedes",
-  maxStaff: "Profesionales",
-  maxResources: "Recursos",
+  maxProperties: "Propiedades",
+  maxGarages: "Cocheras",
+  maxPublications: "Publicaciones",
+  maxCourts: "Canchas",
   maxBookings: "Reservas mensuales",
 };
 
@@ -563,85 +570,14 @@ export function TenantDrawer({
               )}
 
               {tab === "pagos" && (
-                <div className="space-y-4">
-                  {catalog.paymentLifecycle && <OnlyFoodPayments tenant={tenant} submit={submit} />}
-                  {catalog.paymentCalendar && <OnlyERPPayments tenant={tenant} submit={submit} />}
-                  {catalog.paymentPeriods && <OnlyCarsPayments tenant={tenant} plans={plans} submit={submit} />}
-                  {!catalog.paymentLifecycle && !catalog.paymentCalendar && !catalog.paymentPeriods && (
-                    <>
-                      <form
-                        className="grid gap-3 rounded-xl border border-slate-200 p-4 sm:grid-cols-2 dark:border-slate-800"
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          const f = new FormData(e.currentTarget);
-                          submit("payment.record", {
-                            ...base(),
-                            amountCents: Math.round(Number(f.get("amount")) * 100),
-                            method: f.get("method"),
-                            reference: f.get("reference"),
-                            notes: f.get("notes") || "",
-                            days: Number(f.get("days") || 0),
-                          });
-                        }}
-                      >
-                        <h4 className="text-sm font-bold sm:col-span-2">Registrar pago SaaS</h4>
-                        <label className="space-y-1 text-xs">
-                          <span className="text-slate-500">Importe ({catalog.currency})</span>
-                          <input name="amount" type="number" min={0.01} step="0.01" required className="bh-input" />
-                        </label>
-                        <label className="space-y-1 text-xs">
-                          <span className="text-slate-500">Método</span>
-                          <input name="method" required defaultValue="Transferencia" className="bh-input" />
-                        </label>
-                        <label className="space-y-1 text-xs">
-                          <span className="text-slate-500">Referencia</span>
-                          <input name="reference" required className="bh-input" />
-                        </label>
-                        <label className="space-y-1 text-xs">
-                          <span className="text-slate-500">Días a extender</span>
-                          <input name="days" type="number" min={0} max={3650} defaultValue={30} className="bh-input" />
-                        </label>
-                        <div className="sm:col-span-2">
-                          <NanoLabsButton type="submit" size="small" disabled={busy}>
-                            Registrar pago
-                          </NanoLabsButton>
-                        </div>
-                      </form>
-
-                      <div className="ot-tabla">
-                        <div className="overflow-x-auto custom-scrollbar">
-                          <table className="bh-table min-w-[460px]">
-                            <thead>
-                              <tr>
-                                <th>Fecha</th>
-                                <th>Importe</th>
-                                <th>Método</th>
-                                <th>Referencia</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {tenant.payments.map((pay) => (
-                                <tr key={pay.id}>
-                                  <td>{new Date(pay.createdAt).toLocaleDateString("es-AR")}</td>
-                                  <td className="ot-mono">{money(pay.amountCents, pay.currency || catalog.currency)}</td>
-                                  <td>{pay.method}</td>
-                                  <td>{pay.reference || "—"}</td>
-                                </tr>
-                              ))}
-                              {tenant.payments.length === 0 && (
-                                <tr>
-                                  <td colSpan={4} className="text-center text-xs text-slate-500">
-                                    Sin pagos registrados.
-                                  </td>
-                                </tr>
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
+                <UnifiedSaaSPayments
+                  productName={SAAS_PRODUCTS.find((p) => p.slug === product)?.name || product}
+                  defaultCurrency={catalog.currency || "ARS"}
+                  tenant={tenant}
+                  plans={plans}
+                  supportsStatusUpdate={catalog.operations.includes("payment.status")}
+                  submit={submit}
+                />
               )}
 
               {tab === "accesos" && (

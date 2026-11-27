@@ -18,9 +18,9 @@ import {
   Settings2,
   ShieldAlert,
 } from "lucide-react";
-import { SAAS_PRODUCTS } from "@/lib/product-taxonomy";
+import { INSTITUTIONAL_APPS, SAAS_PRODUCTS } from "@/lib/product-taxonomy";
 import type { ManagedPlan, ManagedSaaS, ManagedTenant, ManagementAudit, ManagementCatalog } from "@/lib/saas-management-types";
-import type { GovernanceOverview, UniversalTenant } from "@/lib/types";
+import type { GovernanceOverview, IndependentContract, UniversalTenant } from "@/lib/types";
 import {
   Cargando,
   Encabezado,
@@ -34,8 +34,9 @@ import {
   useToast,
 } from "./nanolabs";
 import { TenantDrawer } from "./TenantDrawer";
+import { IndependentAppDrawer } from "./IndependentAppDrawer";
 
-const MANAGED_SLUGS: ManagedSaaS[] = ["onlyfood", "onlycars", "onlyerp", "onlyshop"];
+const MANAGED_SLUGS: ManagedSaaS[] = ["onlyfood", "onlypadel", "onlycars", "onlymarket", "onlyerp", "onlyshop", "onlymob"];
 
 function isManaged(slug: string): slug is ManagedSaaS {
   return (MANAGED_SLUGS as readonly string[]).includes(slug);
@@ -62,12 +63,14 @@ function expirationBadge(isoDate?: string | null) {
   return { kind: "ok" as const, label: `Vence en ${days}d`, severity: "success" as const };
 }
 
-function statusChip(status: UniversalTenant["status"]) {
+function statusChip(status: UniversalTenant["status"] | IndependentContract["status"]) {
   switch (status) {
     case "ACTIVE":
       return <NanoLabsChip severity="success">Activo</NanoLabsChip>;
     case "TRIAL":
       return <NanoLabsChip severity="info">Prueba</NanoLabsChip>;
+    case "PAST_DUE":
+      return <NanoLabsChip severity="danger">Vencido por deuda</NanoLabsChip>;
     case "SUSPENDED":
       return <NanoLabsChip severity="warning">Suspendido</NanoLabsChip>;
     default:
@@ -99,6 +102,7 @@ export function MembershipsWorkspace({
 }) {
   const toast = useToast();
   const [data, setData] = useState<GovernanceOverview | null>(null);
+  const [independentList, setIndependentList] = useState<IndependentContract[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -113,12 +117,21 @@ export function MembershipsWorkspace({
   const [drawerTenantId, setDrawerTenantId] = useState("");
   const [drawerTab, setDrawerTab] = useState<"resumen" | "modulos" | "pagos" | "accesos">("resumen");
 
+  // Independent App Drawer state
+  const [indDrawerOpen, setIndDrawerOpen] = useState(false);
+  const [indSlug, setIndSlug] = useState("");
+  const [indTab, setIndTab] = useState<"resumen" | "pagos" | "historial">("resumen");
+
   // Read-only tenant modal
   const [readonlyTenant, setReadonlyTenant] = useState<UniversalTenant | null>(null);
 
   // Quick confirm modal (+30d / suspend / activate)
   const [quickConfirm, setQuickConfirm] = useState<{
     tenant: UniversalTenant;
+    action: "renew30" | "suspend" | "activate";
+  } | null>(null);
+  const [indQuickConfirm, setIndQuickConfirm] = useState<{
+    contract: IndependentContract;
     action: "renew30" | "suspend" | "activate";
   } | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
@@ -146,12 +159,21 @@ export function MembershipsWorkspace({
     setLoading(true);
     setLoadError(null);
     try {
-      const res = await fetch("/api/governance", { cache: "no-store" });
-      const json = await res.json();
-      if (!res.ok || !json.success || !json.data) {
+      const [govRes, indRes] = await Promise.all([
+        fetch("/api/governance", { cache: "no-store" }),
+        fetch("/api/independent-billing", { cache: "no-store" }),
+      ]);
+      const json = await govRes.json();
+      if (!govRes.ok || !json.success || !json.data) {
         throw new Error(json.error || "No se pudo consultar el estado de clientes");
       }
       setData(json.data as GovernanceOverview);
+      if (indRes.ok) {
+        const indJson = await indRes.json();
+        if (indJson.success && Array.isArray(indJson.data)) {
+          setIndependentList(indJson.data as IndependentContract[]);
+        }
+      }
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : "Error consultando membresías");
     } finally {
@@ -189,10 +211,18 @@ export function MembershipsWorkspace({
       if (meta.kind === "expiring") expiring++;
       if (meta.kind === "expired") expired++;
     }
-    return { all: allTenants.length, active, expiring, expired, paused };
-  }, [allTenants]);
+    for (const c of independentList) {
+      if (c.status === "ACTIVE") active++;
+      if (c.status === "TRIAL" || c.status === "SUSPENDED" || c.status === "CANCELED") paused++;
+      const meta = expirationBadge(c.periodEnd);
+      if (meta.kind === "expiring") expiring++;
+      if (meta.kind === "expired" || c.status === "PAST_DUE") expired++;
+    }
+    return { all: allTenants.length + independentList.length, active, expiring, expired, paused };
+  }, [allTenants, independentList]);
 
   const filteredTenants = useMemo(() => {
+    if (selectedSaas === "__independent__") return [];
     const q = search.trim().toLocaleLowerCase("es");
     return allTenants
       .filter((t) => {
@@ -226,6 +256,31 @@ export function MembershipsWorkspace({
         return a.name.localeCompare(b.name, "es");
       });
   }, [allTenants, quickFilter, search, selectedSaas]);
+
+  const filteredIndependent = useMemo(() => {
+    if (selectedSaas !== "all" && selectedSaas !== "__independent__" && !independentList.some((c) => c.slug === selectedSaas)) {
+      return [];
+    }
+    const q = search.trim().toLocaleLowerCase("es");
+    return independentList.filter((c) => {
+      if (selectedSaas !== "all" && selectedSaas !== "__independent__" && c.slug !== selectedSaas) return false;
+      const meta = expirationBadge(c.periodEnd);
+      if (quickFilter === "active" && c.status !== "ACTIVE") return false;
+      if (quickFilter === "expiring" && meta.kind !== "expiring") return false;
+      if (quickFilter === "expired" && meta.kind !== "expired" && c.status !== "PAST_DUE") return false;
+      if (quickFilter === "paused" && !["TRIAL", "SUSPENDED", "CANCELED"].includes(c.status)) return false;
+      if (quickFilter === "attention") {
+        const needsAttention = meta.kind === "expired" || meta.kind === "expiring" || c.status === "PAST_DUE" || c.status === "SUSPENDED" || c.status === "CANCELED";
+        if (!needsAttention) return false;
+      }
+      if (q) {
+        return [c.appName, c.clientName, c.slug, c.domain, c.planName].some((val) =>
+          String(val || "").toLocaleLowerCase("es").includes(q)
+        );
+      }
+      return true;
+    });
+  }, [independentList, quickFilter, search, selectedSaas]);
 
   const openDrawer = (t: UniversalTenant, initial: "resumen" | "modulos" | "pagos" | "accesos" = "resumen") => {
     if (isManaged(t.saas) && managedSet.has(t.saas)) {
@@ -291,6 +346,43 @@ export function MembershipsWorkspace({
       await fetchGovernance();
     } catch (e) {
       toast(e instanceof Error ? e.message : "Error ejecutando acción rápida.", "error");
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const executeIndQuickAction = async () => {
+    if (!indQuickConfirm) return;
+    const { contract, action } = indQuickConfirm;
+    setActionBusy(true);
+    try {
+      const payload =
+        action === "renew30"
+          ? { requestId: crypto.randomUUID(), operation: "contract.renew", input: { slug: contract.slug, days: 30 } }
+          : {
+              requestId: crypto.randomUUID(),
+              operation: "contract.update",
+              input: { slug: contract.slug, status: action === "suspend" ? "SUSPENDED" : "ACTIVE" },
+            };
+      const res = await fetch("/api/independent-billing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || "No se pudo aplicar la acción.");
+      toast(
+        action === "renew30"
+          ? `${contract.appName}: período extendido +30 días.`
+          : action === "suspend"
+          ? `${contract.appName}: contrato suspendido.`
+          : `${contract.appName}: contrato activado.`,
+        "ok"
+      );
+      setIndQuickConfirm(null);
+      await fetchGovernance();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Error ejecutando acción.", "error");
     } finally {
       setActionBusy(false);
     }
@@ -480,7 +572,8 @@ export function MembershipsWorkspace({
                   value={selectedSaas}
                   onChange={(e) => setSelectedSaas(e.target.value)}
                 >
-                  <option value="all">Todas las SaaS ({allTenants.length})</option>
+                  <option value="all">Todas las plataformas ({allTenants.length + independentList.length})</option>
+                  <option value="__independent__">Apps Independientes ({independentList.length})</option>
                   {SAAS_PRODUCTS.map((p) => (
                     <option key={p.slug} value={p.slug}>
                       {p.name}
@@ -501,7 +594,7 @@ export function MembershipsWorkspace({
             {/* Tabla Maestra */}
             {loading && !data ? (
               <Cargando texto="Cargando membresías y clientes…" />
-            ) : filteredTenants.length === 0 ? (
+            ) : filteredTenants.length === 0 && filteredIndependent.length === 0 ? (
               <Vacio
                 titulo="No hay clientes que coincidan"
                 texto="Probá cambiando los filtros de plataforma, estado o vencimiento."
@@ -513,7 +606,7 @@ export function MembershipsWorkspace({
                     <thead>
                       <tr>
                         <th style={{ width: "24%" }}>Cliente / Dominio</th>
-                        <th style={{ width: "13%" }}>SaaS</th>
+                        <th style={{ width: "13%" }}>Plataforma</th>
                         <th style={{ width: "14%" }}>Plan</th>
                         <th style={{ width: "12%" }}>Estado</th>
                         <th style={{ width: "16%" }}>Vencimiento</th>
@@ -521,6 +614,95 @@ export function MembershipsWorkspace({
                       </tr>
                     </thead>
                     <tbody>
+                      {filteredIndependent.map((c) => {
+                        const exp = expirationBadge(c.periodEnd);
+                        return (
+                          <tr key={`ind-${c.slug}`}>
+                            <td>
+                              <div className="bh-table-title">{c.appName}</div>
+                              <div className="bh-table-meta flex items-center gap-2">
+                                <span className="ot-mono">{c.clientName}</span>
+                                <a
+                                  href={`https://${c.domain}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="hub-text-link !text-[11px]"
+                                >
+                                  {c.domain} <ExternalLink size={11} />
+                                </a>
+                              </div>
+                            </td>
+                            <td>
+                              <div className="flex flex-col items-start gap-1">
+                                <span className="text-xs font-bold">App independiente</span>
+                                <span className="text-[10px] text-slate-500">Circuito NanoLabs</span>
+                              </div>
+                            </td>
+                            <td>
+                              <span className="text-xs font-medium">{c.planName}</span>
+                              <div className="bh-table-meta">
+                                {c.priceCents > 0 ? money(c.priceCents, c.currency) : c.billingCycle}
+                              </div>
+                            </td>
+                            <td>{statusChip(c.status)}</td>
+                            <td>
+                              <div className="flex flex-col items-start gap-1">
+                                <NanoLabsChip severity={exp.severity}>{exp.label}</NanoLabsChip>
+                                <span className="ot-mono text-[11px] text-slate-500">
+                                  {new Date(c.periodEnd).toLocaleDateString("es-AR")}
+                                </span>
+                              </div>
+                            </td>
+                            <td>
+                              <div className="flex flex-wrap items-center justify-end gap-1.5">
+                                <NanoLabsButton
+                                  size="small"
+                                  variant="secondary"
+                                  title="Renovar +30 días"
+                                  onClick={() => setIndQuickConfirm({ contract: c, action: "renew30" })}
+                                >
+                                  +30d
+                                </NanoLabsButton>
+                                <NanoLabsButton
+                                  size="small"
+                                  variant="tertiary"
+                                  icon={c.status === "SUSPENDED" ? <PlayCircle size={14} /> : <PauseCircle size={14} />}
+                                  onClick={() =>
+                                    setIndQuickConfirm({
+                                      contract: c,
+                                      action: c.status === "SUSPENDED" ? "activate" : "suspend",
+                                    })
+                                  }
+                                >
+                                  {c.status === "SUSPENDED" ? "Activar" : "Pausar"}
+                                </NanoLabsButton>
+                                <NanoLabsButton
+                                  size="small"
+                                  variant="tertiary"
+                                  title="Cobros de la app"
+                                  icon={<CreditCard size={14} />}
+                                  onClick={() => {
+                                    setIndSlug(c.slug);
+                                    setIndTab("pagos");
+                                    setIndDrawerOpen(true);
+                                  }}
+                                />
+                                <NanoLabsButton
+                                  size="small"
+                                  icon={<Settings2 size={14} />}
+                                  onClick={() => {
+                                    setIndSlug(c.slug);
+                                    setIndTab("resumen");
+                                    setIndDrawerOpen(true);
+                                  }}
+                                >
+                                  Gestionar
+                                </NanoLabsButton>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                       {filteredTenants.map((t) => {
                         const exp = expirationBadge(t.planExpiresAt);
                         const canManage = isManaged(t.saas) && managedSet.has(t.saas);
@@ -635,6 +817,15 @@ export function MembershipsWorkspace({
                 </div>
               </div>
             )}
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-xs text-slate-500 dark:border-slate-800">
+              <span>
+                Web institucional sin cobro:{" "}
+                <strong className="text-slate-700 dark:text-slate-200">
+                  {INSTITUTIONAL_APPS.map((a) => `${a.name} (${a.domain})`).join(", ")}
+                </strong>
+              </span>
+              <span>Solo monitoreo técnico y respaldos en Infraestructura/Backups</span>
+            </div>
           </div>
         )}
 
@@ -871,6 +1062,49 @@ export function MembershipsWorkspace({
         initialTab={drawerTab}
         onUpdated={() => void fetchGovernance()}
       />
+
+      <IndependentAppDrawer
+        open={indDrawerOpen}
+        onClose={() => setIndDrawerOpen(false)}
+        slug={indSlug}
+        initialTab={indTab}
+        onUpdated={() => void fetchGovernance()}
+      />
+
+      <NanoLabsModal
+        open={!!indQuickConfirm}
+        onClose={() => !actionBusy && setIndQuickConfirm(null)}
+        title={
+          indQuickConfirm?.action === "renew30"
+            ? "Renovar app independiente +30 días"
+            : indQuickConfirm?.action === "suspend"
+            ? "Suspender contrato"
+            : "Activar contrato"
+        }
+        subtitle={indQuickConfirm ? `${indQuickConfirm.contract.appName} · ${indQuickConfirm.contract.domain}` : undefined}
+        icon={CalendarClock}
+        width={460}
+      >
+        {indQuickConfirm && (
+          <div className="space-y-4 text-sm">
+            <p className="text-slate-500">
+              {indQuickConfirm.action === "renew30"
+                ? "Se extenderá el período 30 días y el estado quedará Activo."
+                : indQuickConfirm.action === "suspend"
+                ? "El estado administrativo pasará a Suspendido."
+                : "El contrato pasará a estado Activo."}
+            </p>
+            <div className="bh-dialog__actions">
+              <NanoLabsButton variant="secondary" disabled={actionBusy} onClick={() => setIndQuickConfirm(null)}>
+                Cancelar
+              </NanoLabsButton>
+              <NanoLabsButton disabled={actionBusy} onClick={() => void executeIndQuickAction()}>
+                {actionBusy ? "Aplicando…" : "Confirmar"}
+              </NanoLabsButton>
+            </div>
+          </div>
+        )}
+      </NanoLabsModal>
 
       {/* Modal de confirmación rápida (+30d / Pausar / Activar) */}
       <NanoLabsModal

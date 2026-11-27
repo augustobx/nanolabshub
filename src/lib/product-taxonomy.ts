@@ -27,8 +27,32 @@ export const SAAS_PRODUCTS: ReadonlyArray<{
     capabilities: { tenantRead: "connected", statusWrite: "pending", moduleWrite: "pending", impersonation: "pending", settings: "pending", activity: "pending" } },
   { slug: "onlymob", name: "OnlyMob", focus: "Gestión inmobiliaria y alquileres", domain: "onlymob.nanoapps.ar", category: "saas",
     capabilities: { tenantRead: "connected", statusWrite: "pending", moduleWrite: "pending", impersonation: "pending", settings: "pending", activity: "pending" } },
+  { slug: "onlymarket", name: "OnlyMarket", focus: "Supermercados, mercados y sucursales", domain: "onlymarket.nanoapps.ar", category: "saas",
+    capabilities: { tenantRead: "connected", statusWrite: "pending", moduleWrite: "pending", impersonation: "pending", settings: "pending", activity: "pending" } },
   { slug: "onlyerp", name: "OnlyERP", focus: "Gestión industrial y distribución", domain: "onlyerp.nanoapps.ar", category: "saas",
     capabilities: { tenantRead: "connected", statusWrite: "pending", moduleWrite: "pending", impersonation: "pending", settings: "pending", activity: "pending" } },
+] as const;
+
+export const INDEPENDENT_BILLED_APPS: ReadonlyArray<{
+  slug: "acevedocontrol" | "nanolabs-ai-trading" | "liga-padel";
+  name: string;
+  focus: string;
+  domain: string;
+  billingEnabled: true;
+}> = [
+  { slug: "acevedocontrol", name: "Acevedo Control", focus: "Control operativo y gestión dedicada", domain: "acevedocontrol.nanoapps.ar", billingEnabled: true },
+  { slug: "nanolabs-ai-trading", name: "NanoLabs AI Trading", focus: "Análisis algorítmico y trading", domain: "nanotrading.nanoapps.ar", billingEnabled: true },
+  { slug: "liga-padel", name: "Liga Pádel", focus: "Torneos, ligas y agenda deportiva", domain: "asp.nanoapps.ar", billingEnabled: true },
+] as const;
+
+export const INSTITUTIONAL_APPS: ReadonlyArray<{
+  slug: "nanolabs";
+  name: string;
+  focus: string;
+  domain: string;
+  billingEnabled: false;
+}> = [
+  { slug: "nanolabs", name: "NanoLabs Web", focus: "Sitio web institucional de NanoLabs", domain: "nanolabs.com.ar", billingEnabled: false },
 ] as const;
 
 const SAAS_SLUGS = new Set<string>(SAAS_PRODUCTS.map(p => p.slug));

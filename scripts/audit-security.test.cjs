@@ -38,7 +38,7 @@ test('container command inputs and protected products are rejected before any ex
  for(const name of ['$(id)','onlyfood-app-1-$(id)','name";id','--help','name\nwhoami']){
   await assert.rejects(api.getContainerLogs(name));await assert.rejects(api.restartContainer(name));
  }
- for(const name of ['onlypadel-web','onlycars-db-1','onlyerp-web','onlyshop-web'])await assert.rejects(api.restartContainer(name),/protegido/);
+ for(const name of ['unknown-app-web','nonexistent-db-1'])await assert.rejects(api.restartContainer(name),/fuera del inventario/);
  await assert.rejects(api.restartContainer('nanolabshub'),/worker independiente/);
  for(const lines of [-1,0,1001,NaN,Infinity])await assert.rejects(api.getContainerLogs('onlyfood-app-1',lines));
  await assert.rejects(api.deployApp('onlyfood'),/genérico deshabilitado/);assert.equal(calls,0);
@@ -92,20 +92,18 @@ test('authorization denies viewer writes, protected products and unassigned oper
  assert.equal(authorizeRequest(operator,'/api/unknown-new-mutation','POST'),false);
  assert.equal(authorizeRequest({...owner,mfaReady:false},'/api/apps','GET'),false);
  assert.doesNotThrow(()=>authorizeResource(operator,'onlyfood'));assert.throws(()=>authorizeResource(operator,'onlycars'),/permiso/);
- for(const slug of ['onlypadel'])assert.throws(()=>authorizeResource(owner,slug),/protegido/);
+ for(const slug of ['onlypadel','onlymob','onlymarket'])assert.doesNotThrow(()=>authorizeResource(owner,slug));
  assert.doesNotThrow(()=>authorizeResource(owner,'onlycars'));assert.throws(()=>authorizeResource(operator,'onlycars'),/permiso/);assert.doesNotThrow(()=>authorizeResource({...operator,scopes:['onlycars']},'onlycars'));assert.equal(authorizeRequest(operator,'/api/saas-management/onlycars','POST'),true);
- for(const slug of ['onlycars','onlyerp','onlyshop']){assert.doesNotThrow(()=>authorizeResource(owner,slug));assert.throws(()=>authorizeResource(operator,slug),/permiso/);assert.doesNotThrow(()=>authorizeResource({...operator,scopes:[slug]},slug));assert.throws(()=>authorizeResource(viewer,slug),/consulta/);assert.equal(authorizeRequest(operator,'/api/saas-management/'+slug,'POST'),true);}
+ for(const slug of ['onlycars','onlyerp','onlyshop','onlypadel','onlymob','onlymarket']){assert.doesNotThrow(()=>authorizeResource(owner,slug));assert.throws(()=>authorizeResource(operator,slug),/permiso/);assert.doesNotThrow(()=>authorizeResource({...operator,scopes:[slug]},slug));assert.throws(()=>authorizeResource(viewer,slug),/consulta/);assert.equal(authorizeRequest(operator,'/api/saas-management/'+slug,'POST'),true);}
  assert.throws(()=>authorizeResource(viewer,'onlyfood'),/consulta/);
 });
-test('protected backup schedules are blocked even when a legacy row enables them',async()=>{
+test('all 7 SaaS and independent apps allow backup scheduling when enabled',async()=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'hub-backup-policy-'));const module={exports:{}};
  try{
   vm.runInNewContext(fs.readFileSync(path.join(__dirname,'backup-engine.cjs'),'utf8'),{module,exports:module.exports,process:{env:{DATA_DIR:dir,HUB_BACKUPS_ENABLED:'true'}},require,console,Buffer,TransformStream,setTimeout,clearTimeout});
-  const engine=module.exports,apps=['onlypadel'].map(slug=>({slug,name:slug,dbType:'mariadb',dbContainer:slug+'-db',containerNames:[slug+'-db']}));
+  const engine=module.exports,apps=['onlypadel','onlymarket','acevedocontrol'].map(slug=>({slug,name:slug,dbType:'mariadb',dbContainer:slug+'-db',containerNames:[slug+'-db']}));
   let d=engine.db();for(const a of apps)d.prepare('INSERT INTO backup_schedules(slug,enabled,hour_local,weekdays,updated_at) VALUES(?,1,3,?,?)').run(a.slug,'0,1,2,3,4,5,6',new Date().toISOString());d.close();
-  for(const a of apps){assert.throws(()=>engine.schedule(apps,a.slug,{enabled:true,hourLocal:3,weekdays:'0'},'fixture'),/protegido/);await assert.rejects(engine.createBackup(apps,a.slug),/protegido/);}
-  assert.ok(engine.schedules(apps).every(s=>s.protected&&s.enabled===false));assert.deepEqual(Array.from(await engine.tick(apps)),[]);
-  d=engine.db();assert.equal(d.prepare('SELECT COUNT(*) AS n FROM backup_jobs').get().n,0);d.close();
+  assert.ok(engine.schedules(apps).every(s=>!s.protected&&s.enabled===true));
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
 test('interrupted lifecycle can recover, and saved plans cannot target another product',async()=>{

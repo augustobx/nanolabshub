@@ -15,8 +15,8 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import type { OperationsSnapshot } from "@/lib/operations";
-import { SAAS_PRODUCTS } from "@/lib/product-taxonomy";
-import type { AppInfo, BackupRecord, GovernanceOverview, UniversalTenant } from "@/lib/types";
+import { INDEPENDENT_BILLED_APPS, INSTITUTIONAL_APPS, SAAS_PRODUCTS } from "@/lib/product-taxonomy";
+import type { AppInfo, BackupRecord, GovernanceOverview, IndependentContract, UniversalTenant } from "@/lib/types";
 import {
   Cargando,
   Encabezado,
@@ -52,12 +52,13 @@ export function ExecutiveHome() {
   const [snapshot, setSnapshot] = useState<OperationsSnapshot | null>(null);
   const [governance, setGovernance] = useState<GovernanceOverview | null>(null);
   const [backups, setBackups] = useState<BackupRecord[] | null>(null);
+  const [independent, setIndependent] = useState<IndependentContract[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
-    const paths = ["/api/operations", "/api/governance", "/api/backups"];
+    const paths = ["/api/operations", "/api/governance", "/api/backups", "/api/independent-billing"];
     const results = await Promise.allSettled(
       paths.map(async (url) => {
         const response = await fetch(url, { cache: "no-store", signal });
@@ -67,10 +68,11 @@ export function ExecutiveHome() {
       })
     );
     if (signal?.aborted) return;
-    const [ops, gov, backup] = results;
+    const [ops, gov, backup, ind] = results;
     setSnapshot(ops.status === "fulfilled" ? ops.value.data : null);
     setGovernance(gov.status === "fulfilled" ? gov.value.data : null);
     setBackups(backup.status === "fulfilled" ? backup.value.data : null);
+    setIndependent(ind.status === "fulfilled" && Array.isArray(ind.value.data) ? ind.value.data : []);
     setErrors(
       results.flatMap((result, index) =>
         result.status === "rejected"
@@ -311,6 +313,55 @@ export function ExecutiveHome() {
                     </div>
                   </div>
                 ))}
+              </div>
+
+              <div className="border-t border-slate-200 pt-4 dark:border-slate-800">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                    Apps independientes del circuito ({INDEPENDENT_BILLED_APPS.length} con cobro · {INSTITUTIONAL_APPS.length} institucional)
+                  </h3>
+                  <Link href="/clientes?saas=__independent__" className="hub-text-link text-xs">
+                    Gestionar cobros <ArrowUpRight size={13} />
+                  </Link>
+                </div>
+                <div className="grid gap-2.5 sm:grid-cols-2">
+                  {independent.map((c) => {
+                    const app = apps.find((a) => a.slug === c.slug);
+                    return (
+                      <Link
+                        key={c.slug}
+                        href={`/clientes?saas=${c.slug}`}
+                        className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-xs transition-colors hover:border-orange-400/50 dark:border-slate-800"
+                        style={{ textDecoration: "none" }}
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate font-bold">{c.appName}</p>
+                          <p className="truncate text-[11px] text-slate-500">
+                            {c.status} · Vence {new Date(c.periodEnd).toLocaleDateString("es-AR")}
+                          </p>
+                        </div>
+                        {appBadge(app)}
+                      </Link>
+                    );
+                  })}
+                  {INSTITUTIONAL_APPS.map((inst) => {
+                    const app = apps.find((a) => a.slug === inst.slug);
+                    return (
+                      <Link
+                        key={inst.slug}
+                        href="/infraestructura"
+                        className="flex items-center justify-between gap-2 rounded-xl border border-dashed border-slate-200 px-3 py-2.5 text-xs dark:border-slate-800"
+                        style={{ textDecoration: "none" }}
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate font-bold">{inst.name}</p>
+                          <p className="truncate text-[11px] text-slate-500">Web propia · Sin cobro</p>
+                        </div>
+                        {appBadge(app)}
+                      </Link>
+                    );
+                  })}
+                </div>
               </div>
             </section>
 
