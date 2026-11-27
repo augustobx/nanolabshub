@@ -7,7 +7,7 @@ const fs = require("node:fs");
 const { createGunzip } = require("node:zlib");
 const LIMIT = 512 * 1024 ** 2;
 const LABEL = "ar.nanoapps.hub.restore";
-const ALLOWED = new Set(["onlyfood", "onlypadel", "onlycars", "onlymarket", "onlyerp", "onlymob", "acevedocontrol", "nanolabs-ai-trading", "nanolabs"]);
+const ALLOWED = new Set(["onlyfood", "onlypadel", "onlycars", "onlymarket", "onlyerp", "onlymob", "acevedocontrol", "nanolabs"]);
 
 // No shell, no inherited production environment, no passwords in diagnostics.
 function docker(args, { input, timeout = 180000, maxOutput = 2 * 1024 ** 2, binary = false } = {}) {

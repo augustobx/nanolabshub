@@ -34,14 +34,13 @@ export const SAAS_PRODUCTS: ReadonlyArray<{
 ] as const;
 
 export const INDEPENDENT_BILLED_APPS: ReadonlyArray<{
-  slug: "acevedocontrol" | "nanolabs-ai-trading" | "liga-padel";
+  slug: "acevedocontrol" | "liga-padel";
   name: string;
   focus: string;
   domain: string;
   billingEnabled: true;
 }> = [
   { slug: "acevedocontrol", name: "Acevedo Control", focus: "Control operativo y gestión dedicada", domain: "acevedocontrol.nanoapps.ar", billingEnabled: true },
-  { slug: "nanolabs-ai-trading", name: "NanoLabs AI Trading", focus: "Análisis algorítmico y trading", domain: "nanotrading.nanoapps.ar", billingEnabled: true },
   { slug: "liga-padel", name: "Liga Pádel", focus: "Torneos, ligas y agenda deportiva", domain: "asp.nanoapps.ar", billingEnabled: true },
 ] as const;
 

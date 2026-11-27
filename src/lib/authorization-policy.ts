@@ -2,7 +2,7 @@ import type { Principal } from "./auth";
 import { KNOWN_APPS } from "./apps-registry";
 import { assertProductMutable } from "./operational-policy";
 
-const mutableApps = new Set(["nanolabshub", "onlyfood", "onlypadel", "onlycars", "onlymarket", "onlyerp", "onlyshop", "onlymob", "acevedocontrol", "liga-padel", "nanolabs-ai-trading", "nanolabs"]);
+const mutableApps = new Set(["nanolabshub", "onlyfood", "onlypadel", "onlycars", "onlymarket", "onlyerp", "onlyshop", "onlymob", "acevedocontrol", "liga-padel", "nanolabs"]);
 export function authorizeRequest(principal: Principal, pathname: string, method: string): boolean {
   if (pathname === "/account" || pathname === "/api/auth/account" || pathname === "/api/auth/logout") return true;
   if (!principal.mfaReady) return false;

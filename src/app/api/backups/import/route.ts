@@ -12,7 +12,7 @@ export async function GET(){
  if(!p?.mfaReady||p.role==="viewer")return Response.json({success:false,error:"Permisos de administración requeridos"},{status:403,headers});
  try{
   assertBackupSecurity();
-  const slugs=p.role==="owner"?["nanolabshub","onlyfood","onlypadel","onlycars","onlymarket","onlyerp","onlyshop","onlymob","acevedocontrol","liga-padel","nanolabs-ai-trading","nanolabs"]:p.scopes;
+  const slugs=p.role==="owner"?["nanolabshub","onlyfood","onlypadel","onlycars","onlymarket","onlyerp","onlyshop","onlymob","acevedocontrol","liga-padel","nanolabs"]:p.scopes;
   return Response.json({success:true,data:backupImporter.candidates(KNOWN_APPS,slugs)},{headers});
  }catch{return Response.json({success:false,error:"No se pudo leer el inventario de importación"},{status:503,headers});}
 }

@@ -60,7 +60,6 @@ const BACKUP_SUPPORTED_SLUGS = new Set([
   "onlymob",
   "acevedocontrol",
   "liga-padel",
-  "nanolabs-ai-trading",
   "nanolabs",
 ]);
 

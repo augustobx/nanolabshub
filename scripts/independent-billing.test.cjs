@@ -8,13 +8,13 @@ const crypto = require("node:crypto");
 
 const billing = require("./independent-billing.cjs");
 
-test("independent billing seeds 3 billed apps (excluding nanolabs web) and supports full payment lifecycle", () => {
+test("independent billing seeds 2 billed apps (excluding nanolabs web) and supports full payment lifecycle", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hub-ind-billing-"));
   try {
     const list = billing.listContracts(dir);
     assert.deepEqual(
       list.map((c) => c.slug).sort(),
-      ["acevedocontrol", "liga-padel", "nanolabs-ai-trading"]
+      ["acevedocontrol", "liga-padel"]
     );
     assert.equal(list.some((c) => c.slug === "nanolabs"), false);
 

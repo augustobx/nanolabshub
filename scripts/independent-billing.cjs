@@ -21,16 +21,6 @@ const DEFAULT_APPS = [
     currency: "ARS",
   },
   {
-    slug: "nanolabs-ai-trading",
-    appName: "NanoLabs AI Trading",
-    clientName: "AI Trading",
-    domain: "nanotrading.nanoapps.ar",
-    planName: "Suscripción Trading",
-    billingCycle: "MONTHLY",
-    priceCents: 0,
-    currency: "USD",
-  },
-  {
     slug: "liga-padel",
     appName: "Liga Pádel",
     clientName: "Liga Pádel ASP",
